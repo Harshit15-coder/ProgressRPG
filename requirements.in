@@ -16,7 +16,7 @@ daphne
 defusedxml
 dj-database-url
 dj-rest-auth
-Django<7
+Django>=5.2.14,<6
 django-allauth
 django-celery-beat
 django-cf-turnstile
