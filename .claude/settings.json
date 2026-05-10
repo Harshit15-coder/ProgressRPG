@@ -1,0 +1,7 @@
+{
+  "enabledPlugins": {
+    "stripe@claude-plugins-official": true,
+    "security-guidance@claude-plugins-official": true,
+    "sentry@claude-plugins-official": true
+  }
+}

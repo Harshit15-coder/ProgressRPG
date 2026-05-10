@@ -1,4 +1,5 @@
 from asgiref.sync import sync_to_async
+from celery import current_app
 from channels.db import database_sync_to_async
 
 # from channels.exceptions import StopConsumer
@@ -11,6 +12,9 @@ from django.core.cache import cache
 
 from gameplay.services.xp_modifiers import schedule_online_end
 from users.models import Player
+
+DISCONNECT_GRACE_SECONDS = 30
+DISCONNECT_TASK_CACHE_KEY = "disconnect_task:{player_id}"
 
 from .models import ServerMessage
 from .utils import process_completion, process_initiation, control_timers
@@ -55,6 +59,19 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                 await self.set_player_and_character(user)
             )
             self.player_group = f"player_{self.player.id}"
+
+            # Cancel any pending auto-complete scheduled from the last disconnection.
+            pending_task_id = await cache.aget(
+                DISCONNECT_TASK_CACHE_KEY.format(player_id=self.player.id)
+            )
+            if pending_task_id:
+                await sync_to_async(current_app.control.revoke)(pending_task_id)
+                await cache.adelete(
+                    DISCONNECT_TASK_CACHE_KEY.format(player_id=self.player.id)
+                )
+                logger.info(
+                    f"[CONNECT] Revoked pending auto-complete task {pending_task_id} for player {self.player.id}"
+                )
 
             if self.link is None:
                 logger.info(
@@ -125,14 +142,31 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
             await self.channel_layer.group_discard(self.player_group, self.channel_name)
 
         if hasattr(self, "player") and hasattr(self, "character"):
-            logger.info(
-                f"Pausing timers for player {self.player.id}; websocket disconnected"
-            )
-            if self.activity_timer.status not in [
+            if self.activity_timer and self.activity_timer.status == "active":
+                # Give the player DISCONNECT_GRACE_SECONDS to reconnect before
+                # the activity is auto-completed and XP is awarded.
+                from .tasks import auto_complete_timer_on_disconnect
+
+                result = await sync_to_async(
+                    auto_complete_timer_on_disconnect.apply_async
+                )(
+                    kwargs={"player_id": self.player.id},
+                    countdown=DISCONNECT_GRACE_SECONDS,
+                )
+                await cache.aset(
+                    DISCONNECT_TASK_CACHE_KEY.format(player_id=self.player.id),
+                    result.id,
+                    timeout=DISCONNECT_GRACE_SECONDS + 60,
+                )
+                logger.info(
+                    f"[DISCONNECT] Scheduled auto-complete task {result.id} for player {self.player.id} in {DISCONNECT_GRACE_SECONDS}s"
+                )
+            elif self.activity_timer and self.activity_timer.status not in [
                 "completed",
                 "empty",
                 "paused",
             ]:
+                # Timer was waiting/other non-active state — pause it immediately.
                 await control_timers(self.player, self.activity_timer, "pause")
 
             if self.link is not None:

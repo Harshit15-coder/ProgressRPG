@@ -1,4 +1,5 @@
 amqp
+Pillow
 asgiref<3.9
 astral
 billiard
