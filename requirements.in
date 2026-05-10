@@ -1,11 +1,11 @@
 amqp
 Pillow
-asgiref<3.9
+asgiref
 astral
 billiard
 celery
-channels<4.3
-channels_redis<4.3
+channels
+channels_redis
 click
 click-didyoumean
 click-plugins
@@ -16,7 +16,7 @@ daphne
 defusedxml
 dj-database-url
 dj-rest-auth
-Django<6
+Django>=5.2.14,<6
 django-allauth
 django-celery-beat
 django-cf-turnstile
