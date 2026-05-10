@@ -185,6 +185,8 @@ packaging==26.2
     # via
     #   incremental
     #   kombu
+pillow==11.2.1
+    # via -r requirements.in
 prompt-toolkit==3.0.52
     # via click-repl
 psycopg2==2.9.12

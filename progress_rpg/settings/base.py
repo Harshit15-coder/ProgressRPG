@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "channels",
     "django_vite",
     "sendgrid",
+    "core",
     "character",
     "gameplay",
     "gameworld",
