@@ -306,6 +306,9 @@ class Player(Person):
     onboarding_step = models.PositiveIntegerField(choices=ONBOARDING_STEPS, default=0)
 
     onboarding_completed = models.BooleanField(default=False)
+    tutorial_steps_seen = models.ManyToManyField(
+        "TutorialStep", blank=True, related_name="seen_by"
+    )
     # onboarding = models.JSONField(default=dict, blank=True)
 
     @property
@@ -422,6 +425,7 @@ class TutorialStep(ImageBase):
     title = models.CharField(max_length=200)
     body = models.TextField(blank=True)
     order = models.PositiveIntegerField(unique=True)
+    youtube_url = models.URLField(blank=True)
 
     class Meta:
         ordering = ["order"]

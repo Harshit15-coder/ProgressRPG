@@ -287,7 +287,7 @@ class InviteCodeAdmin(admin.ModelAdmin):
 
 @admin.register(TutorialStep)
 class TutorialStepAdmin(admin.ModelAdmin):
-    list_display = ["order", "title", "image", "updated_at"]
+    list_display = ["order", "title", "image", "youtube_url", "updated_at"]
     ordering = ["order"]
 
 

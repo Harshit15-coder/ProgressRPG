@@ -5,7 +5,7 @@ import Button from '../../components/Button/Button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-export default function Navbar({ onMenuClick }) {
+export default function Navbar({ onMenuClick, onHelpClick }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
   const [accountOpenMobile, setAccountOpenMobile] = useState(false);
@@ -85,6 +85,16 @@ export default function Navbar({ onMenuClick }) {
                 </Button>
               </Link>
             </>
+          )}
+          {isAuthenticated && onHelpClick && (
+            <Button
+              variant="secondary"
+              className={styles.navLink}
+              onClick={onHelpClick}
+              ariaLabel="Open tutorial"
+            >
+              ?
+            </Button>
           )}
           <div className={styles.account}>
             {/* Reserved for future icons or dropdowns */}
