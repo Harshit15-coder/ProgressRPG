@@ -52,7 +52,7 @@ def handle_checkout_session_completed(event):
         )
         return
 
-    if not user.stripe_customer_id:
+    if user.stripe_customer_id != customer_id:
         user.stripe_customer_id = customer_id
         user.save(update_fields=["stripe_customer_id"])
 
