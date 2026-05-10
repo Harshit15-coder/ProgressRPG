@@ -60,6 +60,44 @@ def sync_subscription_from_stripe(user):
             limit=10,
             expand=["data.items.data.price"],
         )
+    except stripe.error.InvalidRequestError as exc:
+        if exc.code == "resource_missing" and exc.param == "customer":
+            # Stored customer ID is stale (e.g. copied from another Stripe environment).
+            # Fall back to looking up the local subscription directly in Stripe.
+            logger.warning(
+                "[PAYMENTS.SYNC] Stored customer_id=%s not found in Stripe for user_id=%s "
+                "— falling back to local subscription lookup",
+                customer_id,
+                user.id,
+            )
+            local_sub = UserSubscription.active_for_user(user)
+            if not local_sub or not local_sub.stripe_subscription_id:
+                return {"status": "none", "synced": False}
+            try:
+                candidate = stripe.Subscription.retrieve(
+                    local_sub.stripe_subscription_id,
+                    expand=["items.data.price"],
+                )
+                # Update the stored customer ID now that we know the real one
+                real_customer_id = getattr(candidate, "customer", None)
+                if real_customer_id and real_customer_id != customer_id:
+                    user.stripe_customer_id = real_customer_id
+                    user.save(update_fields=["stripe_customer_id"])
+                subscriptions_data = [candidate]
+            except stripe.error.StripeError:
+                logger.exception(
+                    "[PAYMENTS.SYNC] Failed to retrieve subscription %s for user_id=%s",
+                    local_sub.stripe_subscription_id,
+                    user.id,
+                )
+                raise
+        else:
+            logger.exception(
+                "[PAYMENTS.SYNC] Failed to list Stripe subscriptions for user_id=%s customer_id=%s",
+                user.id,
+                customer_id,
+            )
+            raise
     except stripe.error.StripeError:
         logger.exception(
             "[PAYMENTS.SYNC] Failed to list Stripe subscriptions for user_id=%s customer_id=%s",
@@ -67,14 +105,17 @@ def sync_subscription_from_stripe(user):
             customer_id,
         )
         raise
+    else:
+        subscriptions_data = getattr(subscriptions, "data", [])
 
     # Pick the most relevant subscription: active/trialing first, then most recent
     ACTIVE_STATUSES = {"active", "trialing"}
     DEAD_STATUSES = {"canceled", "incomplete_expired", "unpaid"}
 
-    stripe_subs = getattr(subscriptions, "data", [])
-    live = [s for s in stripe_subs if s.status in ACTIVE_STATUSES]
-    candidate = live[0] if live else (stripe_subs[0] if stripe_subs else None)
+    live = [s for s in subscriptions_data if s.status in ACTIVE_STATUSES]
+    candidate = (
+        live[0] if live else (subscriptions_data[0] if subscriptions_data else None)
+    )
 
     if not candidate:
         UserSubscription.deactivate_all_for_user(user)
