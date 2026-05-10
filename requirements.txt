@@ -8,7 +8,7 @@ amqp==5.3.1
     # via
     #   -r requirements.in
     #   kombu
-asgiref==3.8.1
+asgiref==3.11.1
     # via
     #   -r requirements.in
     #   channels
@@ -47,11 +47,11 @@ cffi==2.0.0
     # via
     #   autobahn
     #   cryptography
-channels==4.2.2
+channels==4.3.2
     # via
     #   -r requirements.in
     #   channels-redis
-channels-redis==4.2.1
+channels-redis==4.3.0
     # via -r requirements.in
 charset-normalizer==3.4.7
     # via requests
@@ -97,7 +97,7 @@ dj-database-url==3.1.2
     # via -r requirements.in
 dj-rest-auth==7.2.0
     # via -r requirements.in
-django==5.2.14
+django==6.0.5
     # via
     #   -r requirements.in
     #   channels
