@@ -16,7 +16,7 @@ export default function OnboardingPage() {
     } catch {
       // Non-fatal — still navigate forward
     }
-    navigate("/timer", { replace: true });
+    navigate("/", { replace: true });
   };
 
   return (
