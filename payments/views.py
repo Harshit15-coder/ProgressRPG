@@ -177,7 +177,25 @@ class CreateCheckoutSessionView(APIView):
             else:
                 session_kwargs["customer_email"] = request.user.email
 
-            session = stripe.checkout.Session.create(**session_kwargs)
+            try:
+                session = stripe.checkout.Session.create(**session_kwargs)
+            except stripe.error.InvalidRequestError as exc:
+                if exc.code == "resource_missing" and exc.param == "customer":
+                    # Stale customer ID (e.g. wrong Stripe environment) — clear it and retry
+                    logger.warning(
+                        "[PAYMENTS.CHECKOUT] Customer %s not found in Stripe, "
+                        "clearing stored ID and retrying for user_id=%s",
+                        request.user.stripe_customer_id,
+                        request.user.id,
+                    )
+                    request.user.stripe_customer_id = ""
+                    request.user.save(update_fields=["stripe_customer_id"])
+                    session_kwargs.pop("customer", None)
+                    session_kwargs["customer_email"] = request.user.email
+                    session = stripe.checkout.Session.create(**session_kwargs)
+                else:
+                    raise
+
             logger.info(
                 "[PAYMENTS.CHECKOUT] Created "
                 f"session_id={getattr(session, 'id', None)} for user_id={request.user.id} "
