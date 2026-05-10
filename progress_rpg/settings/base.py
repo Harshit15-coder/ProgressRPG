@@ -241,7 +241,7 @@ DJANGO_VITE = {
     }
 }
 
-FRONTEND_URL = os.getenv("FRONTEND_URL")
+FRONTEND_URL = (os.getenv("FRONTEND_URL") or "").rstrip("/")
 
 if not FRONTEND_URL:
     FRONTEND_URL = "http://localhost"
