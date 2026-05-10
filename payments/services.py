@@ -14,11 +14,7 @@ def end_active_subscription(user):
     if active_sub is None:
         return None
 
-    if (
-        active_sub.stripe_subscription_id
-        and active_sub.plan
-        and active_sub.plan.is_premium
-    ):
+    if active_sub.stripe_subscription_id:
         stripe.Subscription.cancel(active_sub.stripe_subscription_id)
 
     active_sub.deactivate()

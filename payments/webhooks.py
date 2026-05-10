@@ -16,7 +16,7 @@ stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
 def process_stripe_event(event):
-    event_type = event.get("type")
+    event_type = event.type
 
     handlers = {
         "checkout.session.completed": handle_checkout_session_completed,
@@ -32,24 +32,23 @@ def process_stripe_event(event):
 
 @transaction.atomic
 def handle_checkout_session_completed(event):
-    session = event["data"]["object"]
-    customer_id = session.get("customer")
+    session = event.data.object
+    customer_id = session.customer
 
     user = resolve_user_from_checkout_session(session)
-    subscription_id = session.get("subscription")
-    subscription_payload = session.get("subscription_details", {})
+    subscription_id = session.subscription
 
     if not user:
         logger.warning(
             f"[PAYMENTS.WEBHOOK] checkout.session.completed for unknown user "
-            f"(customer_id={customer_id}, session_id={session.get('id')})"
+            f"(customer_id={customer_id}, session_id={session.id})"
         )
         return
 
     if not subscription_id:
         logger.warning(
             "[PAYMENTS.WEBHOOK] checkout.session.completed missing subscription id "
-            f"(session_id={session.get('id')})"
+            f"(session_id={session.id})"
         )
         return
 
@@ -57,22 +56,21 @@ def handle_checkout_session_completed(event):
         user.stripe_customer_id = customer_id
         user.save(update_fields=["stripe_customer_id"])
 
-    price_id = extract_price_id(subscription_payload)
-    if not price_id:
-        try:
-            retrieved_subscription = stripe.Subscription.retrieve(subscription_id)
-            price_id = extract_price_id(retrieved_subscription)
-        except Exception:
-            logger.exception(
-                "[PAYMENTS.WEBHOOK] Failed to retrieve subscription for checkout "
-                f"(subscription_id={subscription_id}, event_id={event.get('id')})"
-            )
+    try:
+        retrieved_subscription = stripe.Subscription.retrieve(subscription_id)
+        price_id = extract_price_id(retrieved_subscription)
+    except Exception:
+        logger.exception(
+            "[PAYMENTS.WEBHOOK] Failed to retrieve subscription for checkout "
+            f"(subscription_id={subscription_id}, event_id={event.id})"
+        )
+        price_id = None
 
     plan = SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
     if not plan:
         logger.error(
             "[PAYMENTS.WEBHOOK] No matching subscription plan "
-            f"for price_id={price_id} in event_id={event.get('id')}"
+            f"for price_id={price_id} in event_id={event.id}"
         )
         return
 
@@ -96,7 +94,7 @@ def handle_subscription_updated(event):
     if not subscription_payload or not subscription:
         return
 
-    status = subscription_payload.get("status")
+    status = subscription_payload.status
 
     price_id = extract_price_id(subscription_payload)
     if price_id:

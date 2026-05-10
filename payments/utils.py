@@ -8,26 +8,31 @@ logger = logging.getLogger("django")
 
 
 def extract_price_id(subscription):
-    item = subscription.get("items", {}).get("data", [{}])[0]
+    if not subscription:
+        return None
+    items_obj = getattr(subscription, "items", None)
+    if not items_obj:
+        return None
+    data = getattr(items_obj, "data", None)
+    if not data:
+        return None
+    item = data[0] if data else None
+    if not item:
+        return None
 
-    # Stripe may send `price` as an object or string depending on expand/config.
-    price = item.get("price")
-    if isinstance(price, dict):
-        price_id = price.get("id")
-    elif isinstance(price, str):
-        price_id = price
-    else:
-        price_id = None
+    price = getattr(item, "price", None)
+    if isinstance(price, str):
+        return price
+    if price:
+        return getattr(price, "id", None)
 
-    # Backward-compatible fallback for older payload shapes.
-    if not price_id:
-        plan = item.get("plan")
-        if isinstance(plan, dict):
-            price_id = plan.get("id")
-        elif isinstance(plan, str):
-            price_id = plan
+    plan = getattr(item, "plan", None)
+    if isinstance(plan, str):
+        return plan
+    if plan:
+        return getattr(plan, "id", None)
 
-    return price_id
+    return None
 
 
 def get_user_from_customer_id(customer_id):
@@ -35,12 +40,12 @@ def get_user_from_customer_id(customer_id):
 
 
 def resolve_user_from_checkout_session(session_object):
-    customer_id = session_object.get("customer")
+    customer_id = session_object.customer
     user = get_user_from_customer_id(customer_id)
     if user:
         return user
 
-    user_id = session_object.get("client_reference_id")
+    user_id = session_object.client_reference_id
     if user_id:
         return CustomUser.objects.filter(id=user_id).first()
 
@@ -48,13 +53,13 @@ def resolve_user_from_checkout_session(session_object):
 
 
 def resolve_subscription_payload_and_model(event, event_name):
-    stripe_object = event["data"]["object"]
+    stripe_object = event.data.object
 
     if event_name == "subscription.updated":
         subscription_payload = stripe_object
     elif event_name in {"subscription.deleted", "invoice.payment_failed"}:
         subscription_payload = (
-            stripe_object.get("subscription")
+            stripe_object.subscription
             if event_name == "invoice.payment_failed"
             else stripe_object
         )
@@ -68,12 +73,12 @@ def resolve_subscription_payload_and_model(event, event_name):
         )
         return None, subscription_payload, None, None
 
-    if not isinstance(subscription_payload, dict):
+    if not subscription_payload or isinstance(subscription_payload, str):
         logger.warning(f"[PAYMENTS.WEBHOOK] {event_name} missing subscription payload")
         return None, None, None, None
 
-    subscription_id = subscription_payload.get("id")
-    customer_id = subscription_payload.get("customer")
+    subscription_id = subscription_payload.id
+    customer_id = subscription_payload.customer
 
     user = get_user_from_customer_id(customer_id)
     if not user:
@@ -102,10 +107,10 @@ def resolve_subscription_payload_and_model(event, event_name):
 
 
 def resolve_subscription_from_event(event, event_name):
-    stripe_object = event["data"]["object"]
+    stripe_object = event.data.object
 
-    subscription_id = stripe_object.get("id")
-    customer_id = stripe_object.get("customer")
+    subscription_id = stripe_object.id
+    customer_id = stripe_object.customer
 
     user = get_user_from_customer_id(customer_id)
 
