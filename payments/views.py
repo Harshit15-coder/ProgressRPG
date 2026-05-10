@@ -16,6 +16,7 @@ from .serializers import (
     CreateCheckoutSessionResponseSerializer,
 )
 from .models import StripeEvent, SubscriptionPlan, UserSubscription
+from .services import sync_subscription_from_stripe
 from .webhooks import process_stripe_event
 
 logger = logging.getLogger("django")
@@ -220,3 +221,19 @@ class CreateCheckoutSessionView(APIView):
                 {"error": "Unable to create checkout session."},
                 status=400,
             )
+
+
+class SyncSubscriptionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            result = sync_subscription_from_stripe(request.user)
+        except stripe.error.StripeError as exc:
+            logger.error(
+                "[PAYMENTS.SYNC] Stripe error syncing subscription for user_id=%s: %s",
+                request.user.id,
+                exc,
+            )
+            return Response({"error": "Unable to sync subscription."}, status=502)
+        return Response(result)

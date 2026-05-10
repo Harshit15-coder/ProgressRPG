@@ -4,7 +4,8 @@ import stripe
 from django.conf import settings
 from django.db import transaction
 
-from payments.models import UserSubscription
+from payments.models import SubscriptionPlan, UserSubscription
+from payments.utils import extract_price_id
 
 logger = logging.getLogger("general")
 stripe.api_key = settings.STRIPE_SECRET_KEY
@@ -36,3 +37,108 @@ def end_active_subscription(user):
         user.id,
     )
     return active_sub
+
+
+@transaction.atomic
+def sync_subscription_from_stripe(user):
+    """
+    Fetch the user's current subscription(s) from Stripe and reconcile local state.
+    Returns a dict: {"status": "active"|"trialing"|"none", "synced": bool}.
+    """
+    customer_id = getattr(user, "stripe_customer_id", None)
+    if not customer_id:
+        logger.info(
+            "[PAYMENTS.SYNC] No stripe_customer_id for user_id=%s — nothing to sync",
+            user.id,
+        )
+        return {"status": "none", "synced": False}
+
+    try:
+        subscriptions = stripe.Subscription.list(
+            customer=customer_id,
+            status="all",
+            limit=10,
+            expand=["data.items.data.price"],
+        )
+    except stripe.error.StripeError:
+        logger.exception(
+            "[PAYMENTS.SYNC] Failed to list Stripe subscriptions for user_id=%s customer_id=%s",
+            user.id,
+            customer_id,
+        )
+        raise
+
+    # Pick the most relevant subscription: active/trialing first, then most recent
+    ACTIVE_STATUSES = {"active", "trialing"}
+    DEAD_STATUSES = {"canceled", "incomplete_expired", "unpaid"}
+
+    stripe_subs = getattr(subscriptions, "data", [])
+    live = [s for s in stripe_subs if s.status in ACTIVE_STATUSES]
+    candidate = live[0] if live else (stripe_subs[0] if stripe_subs else None)
+
+    if not candidate:
+        UserSubscription.deactivate_all_for_user(user)
+        logger.info(
+            "[PAYMENTS.SYNC] No Stripe subscriptions found for user_id=%s — deactivated all local",
+            user.id,
+        )
+        return {"status": "none", "synced": True}
+
+    stripe_sub_id = candidate.id
+    stripe_status = candidate.status
+    price_id = extract_price_id(candidate)
+    plan = (
+        SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
+        if price_id
+        else None
+    )
+
+    if stripe_status in ACTIVE_STATUSES:
+        local_sub = UserSubscription.objects.filter(
+            stripe_subscription_id=stripe_sub_id
+        ).first()
+        if not local_sub:
+            UserSubscription.deactivate_all_for_user(user)
+            local_sub = UserSubscription.objects.create(
+                user=user,
+                plan=plan,
+                stripe_subscription_id=stripe_sub_id,
+                active=True,
+            )
+            logger.info(
+                "[PAYMENTS.SYNC] Created missing local subscription id=%s for user_id=%s "
+                "stripe_subscription_id=%s status=%s",
+                local_sub.id,
+                user.id,
+                stripe_sub_id,
+                stripe_status,
+            )
+        else:
+            if plan and local_sub.plan != plan:
+                local_sub.plan = plan
+                local_sub.save(update_fields=["plan"])
+            if not local_sub.active:
+                local_sub.activate()
+                logger.info(
+                    "[PAYMENTS.SYNC] Reactivated local subscription id=%s for user_id=%s",
+                    local_sub.id,
+                    user.id,
+                )
+        return {"status": stripe_status, "synced": True}
+
+    if stripe_status in DEAD_STATUSES:
+        local_sub = UserSubscription.objects.filter(
+            stripe_subscription_id=stripe_sub_id, active=True
+        ).first()
+        if local_sub:
+            local_sub.deactivate()
+            logger.info(
+                "[PAYMENTS.SYNC] Deactivated local subscription id=%s for user_id=%s "
+                "stripe_status=%s",
+                local_sub.id,
+                user.id,
+                stripe_status,
+            )
+        return {"status": stripe_status, "synced": True}
+
+    return {"status": stripe_status, "synced": False}
