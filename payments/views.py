@@ -53,8 +53,14 @@ class StripeWebhookView(APIView):
             f"[PAYMENTS.WEBHOOK] Received event_id={event.id} type={event.type} "
         )
 
-        # Already-processed events are safe to ignore.
         if not created and obj.processed_at:
+            logger.info(
+                "[PAYMENTS.WEBHOOK] Skipping duplicate event_id=%s type=%s "
+                "(already processed at %s)",
+                event.id,
+                event.type,
+                obj.processed_at,
+            )
             return HttpResponse(status=200)
 
         try:
@@ -84,7 +90,10 @@ class StripeWebhookView(APIView):
             return HttpResponse(status=500)
 
         logger.info(
-            f"[PAYMENTS.WEBHOOK] object created={created} existing_processed_at={obj.processed_at} existing_error={obj.processing_error}"
+            "[PAYMENTS.WEBHOOK] Processed event_id=%s type=%s created=%s",
+            event.id,
+            event.type,
+            created,
         )
 
         return HttpResponse(status=200)

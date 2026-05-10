@@ -64,7 +64,14 @@ def handle_checkout_session_completed(event):
             "[PAYMENTS.WEBHOOK] Failed to retrieve subscription for checkout "
             f"(subscription_id={subscription_id}, event_id={event.id})"
         )
-        price_id = None
+        raise  # Return 500 so Stripe retries the event
+
+    if not price_id:
+        logger.error(
+            "[PAYMENTS.WEBHOOK] Could not extract price_id from subscription "
+            f"(subscription_id={subscription_id}, event_id={event.id})"
+        )
+        return
 
     plan = SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
     if not plan:
@@ -76,11 +83,19 @@ def handle_checkout_session_completed(event):
 
     UserSubscription.deactivate_all_for_user(user)
 
-    UserSubscription.objects.create(
+    sub = UserSubscription.objects.create(
         user=user,
         plan=plan,
         stripe_subscription_id=subscription_id,
         active=True,
+    )
+    logger.info(
+        "[PAYMENTS.WEBHOOK] Created subscription id=%s for user_id=%s "
+        f"plan=%s stripe_subscription_id=%s",
+        sub.id,
+        user.id,
+        plan.name,
+        subscription_id,
     )
     return
 
@@ -100,17 +115,48 @@ def handle_subscription_updated(event):
     if price_id:
         plan = SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
         if plan and subscription.plan != plan:
+            old_plan_name = subscription.plan.name if subscription.plan else None
             subscription.plan = plan
             subscription.save(update_fields=["plan"])
+            logger.info(
+                "[PAYMENTS.WEBHOOK] Plan updated for stripe_subscription_id=%s "
+                "user_id=%s from %s to %s",
+                subscription.stripe_subscription_id,
+                subscription.user_id,
+                old_plan_name,
+                plan.name,
+            )
 
     if status in ["active", "trialing"]:
         subscription.activate()
-
+        logger.info(
+            "[PAYMENTS.WEBHOOK] Activated stripe_subscription_id=%s user_id=%s status=%s",
+            subscription.stripe_subscription_id,
+            subscription.user_id,
+            status,
+        )
     elif status in ["canceled", "incomplete_expired", "unpaid"]:
         subscription.deactivate()
-
+        logger.info(
+            "[PAYMENTS.WEBHOOK] Deactivated stripe_subscription_id=%s user_id=%s status=%s",
+            subscription.stripe_subscription_id,
+            subscription.user_id,
+            status,
+        )
     elif status == "past_due":
-        pass
+        logger.warning(
+            "[PAYMENTS.WEBHOOK] Past due stripe_subscription_id=%s user_id=%s — no action taken",
+            subscription.stripe_subscription_id,
+            subscription.user_id,
+        )
+    else:
+        logger.warning(
+            "[PAYMENTS.WEBHOOK] Unhandled subscription status=%s "
+            "stripe_subscription_id=%s user_id=%s",
+            status,
+            subscription.stripe_subscription_id,
+            subscription.user_id,
+        )
 
     return
 
@@ -124,6 +170,11 @@ def handle_subscription_deleted(event):
         return
 
     subscription.deactivate()
+    logger.info(
+        "[PAYMENTS.WEBHOOK] Deactivated (deleted) stripe_subscription_id=%s user_id=%s",
+        subscription.stripe_subscription_id,
+        subscription.user_id,
+    )
 
 
 def handle_payment_failed(event):
@@ -134,5 +185,8 @@ def handle_payment_failed(event):
     if not subscription:
         return
 
-    # subscription.deactivate()
-    return
+    logger.warning(
+        "[PAYMENTS.WEBHOOK] Payment failed for stripe_subscription_id=%s user_id=%s",
+        subscription.stripe_subscription_id,
+        subscription.user_id,
+    )
