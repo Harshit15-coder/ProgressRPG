@@ -72,21 +72,21 @@ LOGGING = {
         # },
     },
     "loggers": {
-        "django": {
-            "handlers": ["console"],  # "file_errors"
-            "level": "DEBUG",
-            "propagate": False,
-        },
+        # "django": {
+        #     "handlers": ["console"],  # "file_errors"
+        #     "level": "DEBUG",
+        #     "propagate": False,
+        # },
         # "errors": {
         #     "handlers": ["file_errors"],
         #     "level": "ERROR",
         #     "propagate": False,
         # },
-        # "general": {
-        #     "handlers": ["file_info"],
-        #     "level": "INFO",
-        #     "propagate": False,
-        # },
+        "general": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
         # "activity": {
         #     "handlers": ["file_debug"],
         #     "level": "DEBUG",

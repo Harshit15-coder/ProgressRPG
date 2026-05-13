@@ -19,7 +19,7 @@ from .models import StripeEvent, SubscriptionPlan, UserSubscription
 from .services import sync_subscription_from_stripe
 from .webhooks import process_stripe_event
 
-logger = logging.getLogger("django")
+logger = logging.getLogger("general")
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
