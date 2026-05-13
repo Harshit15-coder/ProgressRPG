@@ -80,6 +80,7 @@ INSTALLED_APPS = [
     "channels",
     "django_vite",
     "sendgrid",
+    "core",
     "character",
     "gameplay",
     "gameworld",
@@ -240,7 +241,7 @@ DJANGO_VITE = {
     }
 }
 
-FRONTEND_URL = os.getenv("FRONTEND_URL")
+FRONTEND_URL = (os.getenv("FRONTEND_URL") or "").rstrip("/")
 
 if not FRONTEND_URL:
     FRONTEND_URL = "http://localhost"
@@ -265,6 +266,9 @@ STATICFILES_DIRS = [
 STATIC_ROOT = os.path.join(BASE_DIR, "staticfiles")
 
 STORAGES = {
+    "default": {
+        "BACKEND": "django.core.files.storage.FileSystemStorage",
+    },
     "staticfiles": {
         "BACKEND": "whitenoise.storage.CompressedManifestStaticFilesStorage",
     },

@@ -48,6 +48,7 @@ from api.serializers import (
     FetchInfoResponseSerializer,
     DownloadUserDataResponseSerializer,
     DeleteAccountResponseSerializer,
+    GameSettingsSerializer,
     WaitlistSignupRequestSerializer,
     WaitlistSignupResponseSerializer,
     CustomRegisterSerializer,
@@ -62,6 +63,7 @@ from api.mailchimp import (
 
 from character.models import Character, PlayerCharacterLink
 from character.serializers import CharacterSerializer
+from core.models import GameSettings
 
 from gameplay.models import XpModifier
 from gameplay.serializers import ActivityTimerSerializer, XpModifierSerializer
@@ -135,6 +137,15 @@ class WaitlistSignupAPIView(APIView):
             )
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class GameSettingsAPIView(APIView):
+    permission_classes = [IsAuthenticated]
+    serializer_class = GameSettingsSerializer
+
+    def get(self, request):
+        settings_obj = GameSettings.current()
+        return Response(self.serializer_class(settings_obj).data)
 
 
 class IsOwnerPlayer(permissions.BasePermission):
@@ -519,7 +530,9 @@ class FetchInfoAPIView(APIView):
                 "login_streak": login_state_data["login_streak"],
                 "login_event_at": login_state_data["login_event_at"],
                 "login_reward_xp": login_state_data["login_reward_xp"],
-                "free_timer_limit_seconds": settings.FREE_TIMER_LIMIT_SECONDS,
+                "free_timer_limit_seconds": (
+                    GameSettings.current().free_timer_limit_seconds
+                ),
             }
             return Response(data)
 

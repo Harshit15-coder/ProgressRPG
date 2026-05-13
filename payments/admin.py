@@ -4,7 +4,7 @@ import stripe
 from django.contrib import admin, messages
 
 from payments.models import SubscriptionPlan, UserSubscription, StripeEvent
-from payments.services import end_active_subscription_and_activate_free
+from payments.services import end_active_subscription, sync_subscription_from_stripe
 
 logger = logging.getLogger(__name__)
 
@@ -42,10 +42,10 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
     list_display = ["user", "plan", "active", "start_date", "end_date"]
     list_filter = ["active", "plan__name"]
     search_fields = ["user__email", "plan__name", "stripe_subscription_id"]
-    actions = ["end_subscription_and_activate_free"]
+    actions = ["end_subscription", "sync_subscription"]
 
-    @admin.action(description="End active subscription and activate free plan")
-    def end_subscription_and_activate_free(self, request, queryset):
+    @admin.action(description="End active subscription")
+    def end_subscription(self, request, queryset):
         success_count = 0
         skip_count = 0
 
@@ -55,7 +55,7 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
                 continue
 
             try:
-                end_active_subscription_and_activate_free(subscription.user)
+                end_active_subscription(subscription.user)
                 success_count += 1
             except stripe.error.StripeError as exc:
                 logger.warning(
@@ -83,7 +83,7 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
         if success_count:
             self.message_user(
                 request,
-                f"Successfully ended subscription and activated free plan for {success_count} user(s).",
+                f"Successfully ended active subscriptions for {success_count} user(s).",
                 level=messages.SUCCESS,
             )
         if skip_count:
@@ -91,4 +91,50 @@ class UserSubscriptionAdmin(admin.ModelAdmin):
                 request,
                 f"{skip_count} subscription(s) skipped — already inactive.",
                 level=messages.WARNING,
+            )
+
+    @admin.action(description="Sync subscription state from Stripe")
+    def sync_subscription(self, request, queryset):
+        synced = 0
+        failed = 0
+
+        for subscription in queryset.select_related("user"):
+            try:
+                result = sync_subscription_from_stripe(subscription.user)
+                if result.get("synced"):
+                    synced += 1
+                    logger.info(
+                        "Synced subscription for user %s: status=%s",
+                        subscription.user_id,
+                        result.get("status"),
+                    )
+            except stripe.error.StripeError as exc:
+                failed += 1
+                self.message_user(
+                    request,
+                    f"Stripe error syncing {subscription.user}: {exc}",
+                    level=messages.WARNING,
+                )
+            except Exception as exc:
+                failed += 1
+                logger.exception(
+                    "Failed to sync subscription for user %s", subscription.user_id
+                )
+                self.message_user(
+                    request,
+                    f"Failed to sync {subscription.user}: {exc}",
+                    level=messages.ERROR,
+                )
+
+        if synced:
+            self.message_user(
+                request,
+                f"Synced {synced} subscription(s) from Stripe.",
+                level=messages.SUCCESS,
+            )
+        if failed:
+            self.message_user(
+                request,
+                f"{failed} subscription(s) could not be synced — see errors above.",
+                level=messages.ERROR,
             )

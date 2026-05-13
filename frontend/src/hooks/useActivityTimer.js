@@ -1,6 +1,7 @@
 // hooks/useActivityTimer.js
 import { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch } from "../utils/api.js";
+import { playActivityStartedSound } from "../utils/sounds.js";
 //import { useGame } from "../context/GameContext.jsx";
 
 
@@ -139,6 +140,8 @@ export default function useActivityTimer() {
       const startData = await apiFetch(`/activity_timers/start/`, {
         method: "POST",
       });
+
+      playActivityStartedSound();
 
       // Don't load from server here - keep optimistic state to avoid flicker
       // The timer is already running locally and will sync on next reload
@@ -303,7 +306,6 @@ export default function useActivityTimer() {
     didAutoStopRef.current = false;
     setLimitReached(false);
     setAutoStopCompletion(null);
-    pausedTimeRef.current = nextElapsed;
 
     if (activity) {
       setCurrentActivity(activity);
@@ -312,9 +314,13 @@ export default function useActivityTimer() {
     }
 
     if (nextStatus === 'active') {
+      // startTimeRef encodes the full elapsed time, so pausedTimeRef must be 0.
+      // Setting both to nextElapsed would cause tickMain to double-count.
+      pausedTimeRef.current = 0;
       startTimeRef.current = Date.now() - nextElapsed * 1000;
       timerRef.current = setInterval(tickMain, 1000);
     } else {
+      pausedTimeRef.current = nextElapsed;
       startTimeRef.current = null;
     }
   }, [normalizeLimitSeconds, tickMain]);

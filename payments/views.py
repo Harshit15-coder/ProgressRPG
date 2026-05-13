@@ -1,3 +1,4 @@
+import json
 import stripe
 from django.conf import settings
 from django.http import HttpResponse
@@ -14,10 +15,11 @@ from .serializers import (
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
 )
-from .models import StripeEvent, UserSubscription
+from .models import StripeEvent, SubscriptionPlan, UserSubscription
+from .services import sync_subscription_from_stripe
 from .webhooks import process_stripe_event
 
-logger = logging.getLogger("django")
+logger = logging.getLogger("general")
 
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
@@ -41,25 +43,31 @@ class StripeWebhookView(APIView):
             return HttpResponse(status=400)
 
         obj, created = StripeEvent.objects.get_or_create(
-            event_id=event.get("id"),
+            event_id=event.id,
             defaults={
-                "event_type": event.get("type"),
-                "payload": event,
+                "event_type": event.type,
+                "payload": json.loads(payload),
             },
         )
 
         logger.info(
-            f"[PAYMENTS.WEBHOOK] Received event_id={event.get('id')} type={event.get('type')} "
+            f"[PAYMENTS.WEBHOOK] Received event_id={event.id} type={event.type} "
         )
 
-        # Already-processed events are safe to ignore.
         if not created and obj.processed_at:
+            logger.info(
+                "[PAYMENTS.WEBHOOK] Skipping duplicate event_id=%s type=%s "
+                "(already processed at %s)",
+                event.id,
+                event.type,
+                obj.processed_at,
+            )
             return HttpResponse(status=200)
 
         try:
             process_stripe_event(event)
-            obj.event_type = event.get("type")
-            obj.payload = event
+            obj.event_type = event.type
+            obj.payload = json.loads(payload)
             obj.processed_at = timezone.now()
             obj.processing_error = ""
             obj.save(
@@ -71,19 +79,22 @@ class StripeWebhookView(APIView):
                 ]
             )
         except Exception as exc:
-            obj.event_type = event.get("type")
-            obj.payload = event
+            obj.event_type = event.type
+            obj.payload = json.loads(payload)
             obj.processing_error = str(exc)
             obj.save(update_fields=["event_type", "payload", "processing_error"])
             logger.exception(
                 "[PAYMENTS.WEBHOOK] Failed processing event_id=%s type=%s",
-                event.get("id"),
-                event.get("type"),
+                event.id,
+                event.type,
             )
             return HttpResponse(status=500)
 
         logger.info(
-            f"[PAYMENTS.WEBHOOK] object created={created} existing_processed_at={obj.processed_at} existing_error={obj.processing_error}"
+            "[PAYMENTS.WEBHOOK] Processed event_id=%s type=%s created=%s",
+            event.id,
+            event.type,
+            created,
         )
 
         return HttpResponse(status=200)
@@ -108,54 +119,49 @@ class CreateCheckoutSessionView(APIView):
             )
 
         requested_plan = (request.data.get("plan") or "monthly").strip().lower()
-        plan = "annual" if requested_plan == "annual" else requested_plan
+        interval = "annual" if requested_plan == "annual" else "monthly"
 
-        price_id_by_plan = {
-            "monthly": getattr(settings, "STRIPE_PRICE_ID_PREMIUM_MONTHLY", "") or "",
-            "annual": getattr(settings, "STRIPE_PRICE_ID_PREMIUM_ANNUAL", "") or "",
-        }
+        subscription_plan = SubscriptionPlan.objects.filter(interval=interval).first()
 
-        if plan not in price_id_by_plan:
-            return Response(
-                {"error": "Invalid plan. Expected 'monthly' or 'annual'."},
-                status=400,
-            )
-
-        premium_price_id = price_id_by_plan[plan]
-        logger.info(
-            "[PAYMENTS.CHECKOUT] Creating checkout session "
-            f"for user_id={request.user.id} plan={plan} price_id={premium_price_id}"
-        )
-
-        if not premium_price_id:
+        if not subscription_plan:
             logger.error(
-                "[PAYMENTS.CHECKOUT] Missing Stripe price id "
-                f"for user_id={request.user.id} selected_plan={requested_plan}"
+                "[PAYMENTS.CHECKOUT] No SubscriptionPlan found "
+                f"for user_id={request.user.id} interval={interval}"
             )
             return Response(
-                {
-                    "error": (
-                        "Missing STRIPE price setting for selected plan "
-                        f"'{requested_plan}'."
-                    )
-                },
+                {"error": f"No plan configured for interval '{interval}'."},
                 status=500,
             )
+
+        premium_price_id = subscription_plan.stripe_price_id
+        if not premium_price_id:
+            logger.error(
+                "[PAYMENTS.CHECKOUT] SubscriptionPlan has no stripe_price_id "
+                f"for user_id={request.user.id} plan_id={subscription_plan.id}"
+            )
+            return Response(
+                {"error": "Plan is not configured with a Stripe price ID."},
+                status=500,
+            )
+
+        logger.info(
+            "[PAYMENTS.CHECKOUT] Creating checkout session "
+            f"for user_id={request.user.id} interval={interval} price_id={premium_price_id}"
+        )
 
         success_url = getattr(settings, "STRIPE_SUCCESS_URL", "")
         cancel_url = getattr(settings, "STRIPE_CANCEL_URL", "")
 
         try:
-            session = stripe.checkout.Session.create(
-                mode="subscription",
-                payment_method_types=["card"],
-                customer_email=request.user.email,
-                client_reference_id=str(request.user.id),
-                line_items=[{"price": premium_price_id, "quantity": 1}],
-                subscription_data={
+            session_kwargs = {
+                "mode": "subscription",
+                "payment_method_types": ["card"],
+                "client_reference_id": str(request.user.id),
+                "line_items": [{"price": premium_price_id, "quantity": 1}],
+                "subscription_data": {
                     "metadata": {
                         "user_id": str(request.user.id),
-                        "billing_plan": "annual" if plan == "annual" else "monthly",
+                        "billing_plan": "annual" if interval == "annual" else "monthly",
                     },
                     "trial_period_days": 30,
                     "trial_settings": {
@@ -164,21 +170,70 @@ class CreateCheckoutSessionView(APIView):
                         },
                     },
                 },
-                success_url=success_url,
-                cancel_url=cancel_url,
-            )
+                "success_url": success_url,
+                "cancel_url": cancel_url,
+            }
+            if request.user.stripe_customer_id:
+                session_kwargs["customer"] = request.user.stripe_customer_id
+            else:
+                session_kwargs["customer_email"] = request.user.email
+
+            try:
+                session = stripe.checkout.Session.create(**session_kwargs)
+            except stripe.error.InvalidRequestError as exc:
+                if exc.code == "resource_missing" and exc.param == "customer":
+                    # Stale customer ID (e.g. wrong Stripe environment) — clear it and retry
+                    logger.warning(
+                        "[PAYMENTS.CHECKOUT] Customer %s not found in Stripe, "
+                        "clearing stored ID and retrying for user_id=%s",
+                        request.user.stripe_customer_id,
+                        request.user.id,
+                    )
+                    request.user.stripe_customer_id = ""
+                    request.user.save(update_fields=["stripe_customer_id"])
+                    session_kwargs.pop("customer", None)
+                    session_kwargs["customer_email"] = request.user.email
+                    session = stripe.checkout.Session.create(**session_kwargs)
+                else:
+                    raise
+
             logger.info(
                 "[PAYMENTS.CHECKOUT] Created "
-                f"session_id={session.get('id')} for user_id={request.user.id} "
+                f"session_id={getattr(session, 'id', None)} for user_id={request.user.id} "
                 f"client_reference_id={request.user.id}"
             )
             return Response({"url": session.url})
-        except Exception:
-            logger.exception(
-                "[PAYMENTS.CHECKOUT] Error creating Stripe checkout session "
-                f"for user_id={request.user.id} plan={plan}"
+        except stripe.error.StripeError as exc:
+            logger.error(
+                "[PAYMENTS.CHECKOUT] Stripe error creating checkout session "
+                f"for user_id={request.user.id} interval={interval}: {exc.user_message or exc}"
             )
             return Response(
                 {"error": "Unable to create checkout session."},
                 status=400,
             )
+        except Exception:
+            logger.exception(
+                "[PAYMENTS.CHECKOUT] Unexpected error creating Stripe checkout session "
+                f"for user_id={request.user.id} interval={interval}"
+            )
+            return Response(
+                {"error": "Unable to create checkout session."},
+                status=400,
+            )
+
+
+class SyncSubscriptionView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        try:
+            result = sync_subscription_from_stripe(request.user)
+        except stripe.error.StripeError as exc:
+            logger.error(
+                "[PAYMENTS.SYNC] Stripe error syncing subscription for user_id=%s: %s",
+                request.user.id,
+                exc,
+            )
+            return Response({"error": "Unable to sync subscription."}, status=502)
+        return Response(result)

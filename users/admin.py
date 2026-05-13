@@ -1,7 +1,14 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 
-from .models import CustomUser, Player, PlayerCurrency, UserLogin, InviteCode
+from .models import (
+    CustomUser,
+    Player,
+    PlayerCurrency,
+    UserLogin,
+    InviteCode,
+    TutorialStep,
+)
 from character.models import PlayerCharacterLink, Character
 from payments.models import UserSubscription
 
@@ -276,6 +283,12 @@ class InviteCodeAdmin(admin.ModelAdmin):
         "uses",
     ]
     readonly_fields = ["uses"]
+
+
+@admin.register(TutorialStep)
+class TutorialStepAdmin(admin.ModelAdmin):
+    list_display = ["order", "title", "image", "updated_at"]
+    ordering = ["order"]
 
 
 @admin.register(PlayerCurrency)

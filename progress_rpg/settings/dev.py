@@ -72,21 +72,21 @@ LOGGING = {
         # },
     },
     "loggers": {
-        "django": {
-            "handlers": ["console"],  # "file_errors"
-            "level": "DEBUG",
-            "propagate": False,
-        },
+        # "django": {
+        #     "handlers": ["console"],  # "file_errors"
+        #     "level": "DEBUG",
+        #     "propagate": False,
+        # },
         # "errors": {
         #     "handlers": ["file_errors"],
         #     "level": "ERROR",
         #     "propagate": False,
         # },
-        # "general": {
-        #     "handlers": ["file_info"],
-        #     "level": "INFO",
-        #     "propagate": False,
-        # },
+        "general": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
         # "activity": {
         #     "handlers": ["file_debug"],
         #     "level": "DEBUG",
@@ -105,6 +105,7 @@ dotenv_path = os.path.join(BASE_DIR, ".env")
 load_dotenv(dotenv_path)
 
 REGISTRATION_ENABLED = True
+ACCOUNT_EMAIL_VERIFICATION = "none"
 SECRET_KEY_FALLBACKS = [
     "django-insecure-46)84p=e^!*as-px9&4pl0jqh7wfy$clbwtu3(%9$qj&(5ri-$"
 ]

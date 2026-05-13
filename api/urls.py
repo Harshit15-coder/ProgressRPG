@@ -3,13 +3,13 @@ from rest_framework_simplejwt.views import TokenVerifyView
 
 from django.urls import path, include, register_converter
 from rest_framework.routers import DefaultRouter
-from django_channels_jwt.views import AsgiValidateTokenView
 
 from .views import (
     CustomRegisterView,
     ConfirmEmailView,
     MeViewSet,
     FetchInfoAPIView,
+    GameSettingsAPIView,
     DownloadUserDataAPIView,
     DeleteAccountAPIView,
     CustomTokenObtainPairView,
@@ -74,10 +74,10 @@ urlpatterns = [
     path("payments/", include("payments.urls")),
     path("maintenance_status/", maintenance_status, name="maintenance_status"),
     path("app_config/", AppConfigView.as_view(), name="app_config"),
+    path("game_settings/", GameSettingsAPIView.as_view(), name="game_settings"),
     path("fetch_info/", FetchInfoAPIView.as_view(), name="fetch_info"),
     path("waitlist_signup/", WaitlistSignupAPIView.as_view(), name="waitlist_signup"),
     # Auth urls
-    path("ws_auth/", AsgiValidateTokenView.as_view(), name="ws_auth"),
     path("auth/", include(auth_urls)),
     path("auth/jwt/create/", CustomTokenObtainPairView.as_view(), name="jwt_create"),
     path("auth/jwt/refresh/", CustomTokenRefreshView.as_view(), name="jwt_refresh"),

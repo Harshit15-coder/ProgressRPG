@@ -29,15 +29,6 @@ class SubscriptionPlan(models.Model):
     def __str__(self):
         return self.name
 
-    @property
-    def is_premium(self):
-        premium_price_ids = {
-            getattr(settings, "STRIPE_PRICE_ID_PREMIUM_MONTHLY", ""),
-            getattr(settings, "STRIPE_PRICE_ID_PREMIUM_ANNUAL", ""),
-        }
-        premium_price_ids.discard("")
-        return self.stripe_price_id in premium_price_ids
-
 
 class UserSubscription(models.Model):
     user = models.ForeignKey(
@@ -102,7 +93,7 @@ class UserSubscription(models.Model):
 
     @property
     def is_active_premium(self):
-        return self.active and self.plan and self.plan.is_premium
+        return self.active
 
     class Meta:
         constraints = [

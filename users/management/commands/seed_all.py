@@ -15,10 +15,12 @@ class Command(BaseCommand):
         self.stdout.write("⏳ Creating superuser...")
         call_command("seed_superuser")
 
-        self.stdout.write("⏳ Setting up world...")
-        call_command("setup_world")
+        # self.stdout.write("⏳ Setting up world...")
+        self.stdout.write("World setup is currently disabled.")
 
-        self.stdout.write("⏳ Generating character days...")
+        # call_command("setup_world")
+
+        # self.stdout.write("⏳ Generating character days...")
         self.stdout.write("Character day generation is currently disabled.")
         # try:
         #     from character.tasks import generate_character_days

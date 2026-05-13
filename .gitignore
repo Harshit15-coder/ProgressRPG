@@ -25,3 +25,5 @@ users.json
 user_data.json
 *.dump
 *.sql
+playwright-report/
+media/

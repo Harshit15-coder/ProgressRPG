@@ -32,6 +32,7 @@ from typing import TYPE_CHECKING, Optional
 import logging
 from timezone_field import TimeZoneField
 
+from core.models import ImageBase
 from gameplay.models import Currency, CurrencyAccountBase, ServerMessage
 
 if TYPE_CHECKING:
@@ -124,7 +125,7 @@ class CustomUser(AbstractUser):
     def is_premium(self):
         from payments.models import UserSubscription
 
-        subscription = UserSubscription.current_for_user(self)
+        subscription = UserSubscription.active_for_user(self)
         if not subscription:
             return False
         return subscription.is_active_premium
@@ -411,6 +412,18 @@ class Player(Person):
 
         PlayerCharacterLink.objects.create(player=self, character=new_character)
         self.save()
+
+
+class TutorialStep(ImageBase):
+    title = models.CharField(max_length=200)
+    body = models.TextField(blank=True)
+    order = models.PositiveIntegerField(unique=True)
+
+    class Meta:
+        ordering = ["order"]
+
+    def __str__(self):
+        return f"Step {self.order}: {self.title}"
 
 
 class InviteCode(models.Model):
