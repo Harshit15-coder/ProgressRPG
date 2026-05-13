@@ -48,23 +48,25 @@ test.describe('Page Accessibility', () => {
 test.describe('Authenticated Page Accessibility', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
+
   test('Timer page is accessible', async ({ page }) => {
     await page.goto('/timer');
-    await page.locator('.app-container > main').waitFor();
+    await page.getByRole('heading', { name: /timer/i }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
+
   test('Account page is accessible', async ({ page }) => {
     await page.goto('/account');
-    await page.locator('.app-container > main').waitFor();
+    await page.getByRole('heading', { name: 'Account', exact: true }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Onboarding page is accessible', async ({ page }) => {
     await page.goto('/onboarding');
-    await page.locator('.app-container > main').waitFor();
+    await page.getByRole('heading', { name: /welcome/i }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
