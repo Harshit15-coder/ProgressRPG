@@ -317,7 +317,11 @@ class Player(Person):
         return self.user.is_premium
 
     def get_activity_xp_multiplier(self):
-        return Decimal("2.0") if self.is_premium else Decimal("1.0")
+        if not self.is_premium:
+            return Decimal("1.0")
+        from core.models import GameSettings
+
+        return GameSettings.current().premium_activity_xp_multiplier
 
     @property
     def group_name(self):

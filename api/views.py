@@ -506,6 +506,7 @@ class FetchInfoAPIView(APIView):
             )
 
         # --- Serialize everything ---
+        game_settings = GameSettings.current()
         try:
             data = {
                 "success": True,
@@ -530,9 +531,8 @@ class FetchInfoAPIView(APIView):
                 "login_streak": login_state_data["login_streak"],
                 "login_event_at": login_state_data["login_event_at"],
                 "login_reward_xp": login_state_data["login_reward_xp"],
-                "free_timer_limit_seconds": (
-                    GameSettings.current().free_timer_limit_seconds
-                ),
+                "free_timer_limit_seconds": game_settings.free_timer_limit_seconds,
+                "game_settings": GameSettingsSerializer(game_settings).data,
             }
             return Response(data)
 
