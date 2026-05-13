@@ -153,7 +153,14 @@ def _reconcile_subscriptions(user, subscriptions_data):
     candidate = (
         live[0] if live else (subscriptions_data[0] if subscriptions_data else None)
     )
-
+    logger.debug(
+        "[PAYMENTS.SYNC] Reconciling %d Stripe subscriptions for user_id=%s, "
+        "candidate subscription_id=%s status=%s",
+        len(subscriptions_data),
+        user.id,
+        getattr(candidate, "id", None),
+        getattr(candidate, "status", None),
+    )
     if not candidate:
         UserSubscription.deactivate_all_for_user(user)
         logger.info(
@@ -208,6 +215,15 @@ def _reconcile_subscriptions(user, subscriptions_data):
         local_sub = UserSubscription.objects.filter(
             stripe_subscription_id=stripe_sub_id, active=True
         ).first()
+        logger.debug(
+            "[PAYMENTS.SYNC] Stripe subscription status is '%s' for user_id=%s, "
+            "looking for active local subscription with stripe_subscription_id=%s: "
+            "found local_sub id=%s",
+            stripe_status,
+            user.id,
+            stripe_sub_id,
+            getattr(local_sub, "id", None),
+        )
         if local_sub:
             local_sub.deactivate()
             logger.info(
@@ -229,4 +245,9 @@ def sync_subscription_from_stripe(user):
     Returns a dict: {"status": "active"|"trialing"|"none", "synced": bool}.
     """
     subscriptions_data = _fetch_stripe_subscriptions(user)
+    logger.info(
+        "[PAYMENTS.SERVICES] Fetched %d Stripe subscriptions for user_id=%s",
+        len(subscriptions_data),
+        user.id,
+    )
     return _reconcile_subscriptions(user, subscriptions_data)

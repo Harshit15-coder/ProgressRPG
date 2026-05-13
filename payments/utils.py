@@ -4,7 +4,7 @@ from users.models import CustomUser
 
 import logging
 
-logger = logging.getLogger("django")
+logger = logging.getLogger("general")
 
 
 def extract_price_id(subscription):

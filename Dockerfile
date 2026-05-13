@@ -36,8 +36,7 @@ ENV GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
 
 COPY requirements.txt ./
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --upgrade pip \
-    && python -m pip install -r requirements.txt
+    python -m pip install -r requirements.txt
 
 COPY . .
 COPY --chmod=755 entrypoint.sh /app/entrypoint.sh
