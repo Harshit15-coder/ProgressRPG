@@ -9,6 +9,7 @@ from .views import (
     ConfirmEmailView,
     MeViewSet,
     FetchInfoAPIView,
+    GameSettingsAPIView,
     DownloadUserDataAPIView,
     DeleteAccountAPIView,
     CustomTokenObtainPairView,
@@ -73,6 +74,7 @@ urlpatterns = [
     path("payments/", include("payments.urls")),
     path("maintenance_status/", maintenance_status, name="maintenance_status"),
     path("app_config/", AppConfigView.as_view(), name="app_config"),
+    path("game_settings/", GameSettingsAPIView.as_view(), name="game_settings"),
     path("fetch_info/", FetchInfoAPIView.as_view(), name="fetch_info"),
     path("waitlist_signup/", WaitlistSignupAPIView.as_view(), name="waitlist_signup"),
     # Auth urls
