@@ -422,6 +422,7 @@ class Player(Person):
 
 
 class TutorialStep(ImageBase):
+    image = models.ImageField(upload_to="images/tutorialstep/", blank=True, null=True)
     title = models.CharField(max_length=200)
     body = models.TextField(blank=True)
     order = models.PositiveIntegerField(unique=True)
