@@ -1,0 +1,131 @@
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
+
+.section {
+  padding: v.$padding-lg;
+  border: 1px solid rgba(c.$color-border-primary, 0.2);
+  border-radius: v.$border-radius;
+  background: rgba(c.$color-bg, 0.4);
+
+  h2 {
+    margin: 0 0 v.$spacing-md 0;
+    @include t.apply-text-style(t.$text-heading-2);
+    color: c.$color-border-primary;
+  }
+}
+
+.achievementGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: v.$spacing-md;
+}
+
+.achievementBadge {
+  --achievement-color: #6f7782;
+  --achievement-bg: rgba(111, 119, 130, 0.12);
+
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-sm;
+  min-width: 0;
+  padding: v.$spacing-md;
+  border: 1px solid rgba(c.$color-border-primary, 0.16);
+  border-left: 0.35rem solid var(--achievement-color);
+  border-radius: v.$border-radius;
+  background: var(--achievement-bg);
+}
+
+.achievementHeader {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-sm;
+  min-width: 0;
+
+  h3,
+  p {
+    margin: 0;
+  }
+
+  h3 {
+    color: c.$color-border-primary;
+    @include t.apply-text-style(t.$text-body);
+    font-weight: 700;
+  }
+
+  p {
+    color: rgba(0, 0, 0, 0.62);
+    @include t.apply-text-style(t.$text-body);
+  }
+}
+
+.achievementSymbol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 2.5rem;
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.72);
+  font-size: 1.35rem;
+}
+
+.achievementProgress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$spacing-sm;
+  color: rgba(0, 0, 0, 0.72);
+  @include t.apply-text-style(t.$text-body);
+}
+
+.progressTrack {
+  height: 0.45rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.12);
+
+  span {
+    display: block;
+    height: 100%;
+    border-radius: inherit;
+    background: var(--achievement-color);
+  }
+}
+
+.achievementComplete {
+  box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.26);
+}
+
+.tierGrey {
+  --achievement-color: #6f7782;
+  --achievement-bg: rgba(111, 119, 130, 0.12);
+}
+
+.tierGreen {
+  --achievement-color: #2e7d32;
+  --achievement-bg: rgba(46, 125, 50, 0.12);
+}
+
+.tierBlue {
+  --achievement-color: #1565c0;
+  --achievement-bg: rgba(21, 101, 192, 0.12);
+}
+
+.tierPurple {
+  --achievement-color: #6a1b9a;
+  --achievement-bg: rgba(106, 27, 154, 0.12);
+}
+
+.tierGold {
+  --achievement-color: #b7791f;
+  --achievement-bg: rgba(183, 121, 31, 0.14);
+}
+
+@include m.respond-to(md, down) {
+  .achievementGrid {
+    grid-template-columns: 1fr;
+  }
+}

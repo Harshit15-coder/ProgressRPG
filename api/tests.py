@@ -27,6 +27,7 @@ class TestMeViewSet(APITestCase):
         self.me_url = reverse("me-list")
         self.me_player_url = reverse("me-player")
         self.me_complete_onboarding_url = reverse("me-complete-onboarding")
+        self.fetch_info_url = reverse("fetch_info")
 
     def authenticate(self):
         self.client.force_authenticate(user=self.user)
@@ -41,6 +42,24 @@ class TestMeViewSet(APITestCase):
         res = self.client.get(self.me_url)
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertEqual(res.data["email"], self.user.email)
+
+    def test_me_player_returns_achievements(self):
+        self.authenticate()
+
+        res = self.client.get(self.me_player_url)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("achievements", res.data)
+        self.assertEqual(len(res.data["achievements"]), 3)
+
+    def test_fetch_info_returns_player_achievements(self):
+        self.authenticate()
+
+        res = self.client.get(self.fetch_info_url)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIn("achievements", res.data["player"])
+        self.assertEqual(len(res.data["player"]["achievements"]), 3)
 
     def test_me_player_patch_updates_name(self):
         self.authenticate()

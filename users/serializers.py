@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from .achievements import achievement_goals_for_player
 from .models import Player
 from .validators import clean_player_name
 
@@ -7,10 +8,14 @@ from .validators import clean_player_name
 class PlayerSerializer(serializers.ModelSerializer):
     total_time = serializers.IntegerField(read_only=True)
     total_activities = serializers.IntegerField(read_only=True)
+    achievements = serializers.SerializerMethodField()
     is_premium = serializers.BooleanField(source="user.is_premium", read_only=True)
     login_streak = serializers.IntegerField(
         source="user.current_login_streak", read_only=True
     )
+
+    def get_achievements(self, obj):
+        return achievement_goals_for_player(obj)
 
     def validate_name(self, value):
         try:
@@ -29,6 +34,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "level",
             "total_time",
             "total_activities",
+            "achievements",
             "is_premium",
             "onboarding_step",
             "onboarding_completed",
@@ -42,5 +48,6 @@ class PlayerSerializer(serializers.ModelSerializer):
             "level",
             "total_time",
             "total_activities",
+            "achievements",
             "login_streak",
         ]

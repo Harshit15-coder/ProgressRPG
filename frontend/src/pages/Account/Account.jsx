@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useGame } from "../../context/GameContext";
 import { useMutation } from "@tanstack/react-query";
 import { updatePlayer, downloadUserData, deleteAccount } from "../../api/player";
+import Achievements from "../../components/Achievements/Achievements";
 import Button from "../../components/Button/Button";
 import {
   PLAYER_NAME_MAX_LENGTH,
@@ -55,6 +56,9 @@ export default function Account() {
   const totalTimeSeconds = player?.total_time ?? 0;
   const totalHours = Math.floor(totalTimeSeconds / 3600);
   const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60);
+  const achievements = Array.isArray(player?.achievements)
+    ? player.achievements
+    : [];
   const nameDisplay = loading
     ? "Loading..."
     : (player?.name?.trim() || "Unnamed player");
@@ -185,6 +189,8 @@ export default function Account() {
             </div>
           </div>
         </section>
+
+        <Achievements achievements={achievements} />
 
         <section className={styles.section}>
           <h2>Billing</h2>

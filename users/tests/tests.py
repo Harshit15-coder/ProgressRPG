@@ -16,6 +16,7 @@ from api.views import MeViewSet
 from api.serializers import CustomTokenObtainPairSerializer
 from progress_rpg.middleware.timezone import UserTimezoneMiddleware
 from users.adapters import CustomAccountAdapter
+from users.achievements import achievement_goals_for_player
 from users.serializers import PlayerSerializer
 from users.models import Player, UserLogin
 from progression.models import PlayerActivity
@@ -166,6 +167,66 @@ class PlayerNameValidationTest(TestCase):
 
         self.assertFalse(serializer.is_valid())
         self.assertEqual(serializer.errors["name"][0], "Invalid player name.")
+
+
+class PlayerAchievementGoalsTest(TestCase):
+    def test_new_player_gets_three_tier_one_goals(self):
+        goals = achievement_goals_for_player(
+            SimpleNamespace(level=0, total_time=0, total_activities=0)
+        )
+
+        self.assertEqual(
+            [goal["type"] for goal in goals], ["level", "time", "activities"]
+        )
+        self.assertEqual([goal["tier"] for goal in goals], [1, 1, 1])
+        self.assertEqual([goal["complete"] for goal in goals], [False, False, False])
+        self.assertEqual([goal["threshold"] for goal in goals], [2, 1800, 5])
+
+    def test_exact_threshold_values_advance_to_next_goal(self):
+        goals = achievement_goals_for_player(
+            SimpleNamespace(level=2, total_time=1800, total_activities=5)
+        )
+
+        self.assertEqual([goal["tier"] for goal in goals], [2, 2, 2])
+        self.assertEqual([goal["threshold"] for goal in goals], [5, 18000, 25])
+        self.assertEqual([goal["color"] for goal in goals], ["green", "green", "green"])
+
+    def test_values_above_multiple_thresholds_show_next_unearned_goal(self):
+        goals = achievement_goals_for_player(
+            SimpleNamespace(level=11, total_time=80 * 60 * 60, total_activities=550)
+        )
+
+        self.assertEqual([goal["tier"] for goal in goals], [4, 5, 5])
+        self.assertEqual(
+            [goal["threshold"] for goal in goals],
+            [20, 300 * 60 * 60, 2000],
+        )
+        self.assertEqual([goal["complete"] for goal in goals], [False, False, False])
+
+    def test_completed_tier_five_stays_visible_as_complete(self):
+        goals = achievement_goals_for_player(
+            SimpleNamespace(
+                level=50,
+                total_time=300 * 60 * 60,
+                total_activities=2000,
+            )
+        )
+
+        self.assertEqual([goal["tier"] for goal in goals], [5, 5, 5])
+        self.assertEqual([goal["complete"] for goal in goals], [True, True, True])
+        self.assertEqual([goal["next_threshold"] for goal in goals], [None, None, None])
+
+    def test_player_serializer_includes_achievements(self):
+        Character.objects.create(first_name="Jane", can_link=True)
+        user = get_user_model().objects.create_user(
+            email="achievements@example.com",
+            password="testpassword123",
+        )
+
+        data = PlayerSerializer(user.player).data
+
+        self.assertIn("achievements", data)
+        self.assertEqual(len(data["achievements"]), 3)
 
 
 class OnboardingTest(TestCase):

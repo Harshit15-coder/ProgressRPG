@@ -22,6 +22,128 @@ vi.mock("../../api/player", () => ({
   deleteAccount: (...args) => mockDeleteAccount(...args),
 }));
 
+const tierOneAchievements = [
+  {
+    type: "level",
+    label: "Level",
+    symbol: "⭐",
+    tier: 1,
+    complete: false,
+    color: "grey",
+    value: 0,
+    threshold: 2,
+    next_threshold: 5,
+  },
+  {
+    type: "time",
+    label: "Total time",
+    symbol: "⏱️",
+    tier: 1,
+    complete: false,
+    color: "grey",
+    value: 0,
+    threshold: 1800,
+    next_threshold: 18000,
+  },
+  {
+    type: "activities",
+    label: "Activities",
+    symbol: "✅",
+    tier: 1,
+    complete: false,
+    color: "grey",
+    value: 0,
+    threshold: 5,
+    next_threshold: 25,
+  },
+];
+
+const tierTwoAchievements = [
+  {
+    type: "level",
+    label: "Level",
+    symbol: "⭐",
+    tier: 2,
+    complete: false,
+    color: "green",
+    value: 2,
+    threshold: 5,
+    next_threshold: 10,
+  },
+  {
+    type: "time",
+    label: "Total time",
+    symbol: "⏱️",
+    tier: 2,
+    complete: false,
+    color: "green",
+    value: 1800,
+    threshold: 18000,
+    next_threshold: 72000,
+  },
+  {
+    type: "activities",
+    label: "Activities",
+    symbol: "✅",
+    tier: 2,
+    complete: false,
+    color: "green",
+    value: 5,
+    threshold: 25,
+    next_threshold: 100,
+  },
+];
+
+const completedAchievements = [
+  {
+    type: "level",
+    label: "Level",
+    symbol: "⭐",
+    tier: 5,
+    complete: true,
+    color: "gold",
+    value: 50,
+    threshold: 50,
+    next_threshold: null,
+  },
+  {
+    type: "time",
+    label: "Total time",
+    symbol: "⏱️",
+    tier: 5,
+    complete: true,
+    color: "gold",
+    value: 1080000,
+    threshold: 1080000,
+    next_threshold: null,
+  },
+  {
+    type: "activities",
+    label: "Activities",
+    symbol: "✅",
+    tier: 5,
+    complete: true,
+    color: "gold",
+    value: 2000,
+    threshold: 2000,
+    next_threshold: null,
+  },
+];
+
+function mockPlayer(overrides = {}) {
+  return {
+    name: "player_01234",
+    level: 3,
+    xp: 25,
+    xp_next_level: 100,
+    total_activities: 4,
+    total_time: 5400,
+    achievements: tierTwoAchievements,
+    is_premium: false,
+    ...overrides,
+  };
+}
+
 function renderAccount() {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -45,15 +167,7 @@ describe("Account", () => {
     mockDownloadUserData.mockReset();
     mockDeleteAccount.mockReset();
     mockUseGame.mockReturnValue({
-      player: {
-        name: "player_01234",
-        level: 3,
-        xp: 25,
-        xp_next_level: 100,
-        total_activities: 4,
-        total_time: 5400,
-        is_premium: false,
-      },
+      player: mockPlayer(),
       loading: false,
       fetchPlayerAndCharacter: vi.fn(),
     });
@@ -134,17 +248,61 @@ describe("Account", () => {
     ).not.toBeInTheDocument();
   });
 
+  it("renders three next-goal achievement badges", () => {
+    renderAccount();
+
+    expect(screen.getByRole("heading", { name: "Achievements" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Level" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Total time" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Activities" })).toBeInTheDocument();
+    expect(screen.getAllByText("Tier 2")).toHaveLength(3);
+    expect(screen.getByText("2 / 5")).toBeInTheDocument();
+    expect(screen.getByText("30m / 5h")).toBeInTheDocument();
+    expect(screen.getByText("5 / 25")).toBeInTheDocument();
+  });
+
+  it("shows tier one goals for below-threshold stats", () => {
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({
+        level: 0,
+        total_activities: 0,
+        total_time: 0,
+        achievements: tierOneAchievements,
+      }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.getAllByText("Tier 1")).toHaveLength(3);
+    expect(screen.getByText("0 / 2")).toBeInTheDocument();
+    expect(screen.getByText("0m / 30m")).toBeInTheDocument();
+    expect(screen.getByText("0 / 5")).toBeInTheDocument();
+  });
+
+  it("shows completed max-tier achievements", () => {
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({
+        level: 50,
+        total_activities: 2000,
+        total_time: 1080000,
+        achievements: completedAchievements,
+      }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.getAllByText("Tier 5")).toHaveLength(3);
+    expect(screen.getAllByText("Complete")).toHaveLength(3);
+    expect(screen.getAllByText("Max tier")).toHaveLength(3);
+  });
+
   it("shows billing portal controls for premium users", () => {
     mockUseGame.mockReturnValue({
-      player: {
-        name: "player_01234",
-        level: 3,
-        xp: 25,
-        xp_next_level: 100,
-        total_activities: 4,
-        total_time: 5400,
-        is_premium: true,
-      },
+      player: mockPlayer({ is_premium: true }),
       loading: false,
       fetchPlayerAndCharacter: vi.fn(),
     });
