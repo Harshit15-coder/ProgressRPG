@@ -6,6 +6,7 @@ import Button from "../Button/Button"
 export default function Modal({
   title,
   children,
+  footer,
   onClose,
   onBack,
   backLabel = "Back",
@@ -111,6 +112,11 @@ export default function Modal({
         <div className={styles.modalContent}>
           {children}
         </div>
+        {footer && (
+          <div className={styles.modalFooter}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,
