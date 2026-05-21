@@ -113,6 +113,10 @@ export async function apiFetch(path, options = {}, explicitAccessToken = null) {
         return response.json();
     }
   } catch (err) {
+    if (err instanceof TypeError) {
+      window.location.href = "/unavailable";
+      return Promise.reject(err);
+    }
     console.error("apiFetch error:", err);
     throw err;
   }
