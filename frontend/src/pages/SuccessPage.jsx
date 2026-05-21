@@ -1,14 +1,18 @@
 import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { apiFetch } from "../utils/api.js";
+import { useGame } from "../context/GameContext.jsx";
 
 export default function SuccessPage() {
   const [status, setStatus] = useState("syncing"); // "syncing" | "active" | "trialing" | "error"
+  const { fetchPlayerAndCharacter } = useGame();
 
   useEffect(() => {
     apiFetch("/payments/sync-subscription/", { method: "POST" })
       .then((data) => {
-        setStatus(data.status === "active" || data.status === "trialing" ? data.status : "error");
+        const resolved = data.status === "active" || data.status === "trialing" ? data.status : "error";
+        if (resolved !== "error") fetchPlayerAndCharacter();
+        setStatus(resolved);
       })
       .catch(() => setStatus("error"));
   }, []);
