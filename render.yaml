@@ -76,7 +76,7 @@ projects:
                 sync: false
               - fromGroup: Prod env
             staticPublishPath: dist
-            buildCommand: npm install && npm run build:production
+            buildCommand: npm ci && npm run build:production
             routes:
             - type: rewrite
               source: /*

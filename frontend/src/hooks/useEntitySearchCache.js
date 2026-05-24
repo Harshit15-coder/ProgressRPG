@@ -1,12 +1,9 @@
-import { useCallback, useMemo } from "react";
+import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchActivities } from "../api/activities";
 import { fetchTasks } from "../api/tasks";
-
-function isTaskComplete(task) {
-  return Boolean(task?.completed_at ?? task?.is_complete);
-}
+import { useGame } from "../context/GameContext";
 
 const ACTIVITY_LIST_CACHE_KEY = ["entity-search", "activity", "activities"];
 const TASK_LIST_CACHE_KEY = ["entity-search", "activity", "tasks"];
@@ -15,19 +12,8 @@ const ENTITY_CONFIG = {
   activity: {
     queryKey: ["entity-search", "activity"],
     queryFn: async () => {
-      const [activities, tasks] = await Promise.all([
-        fetchActivities(),
-        fetchTasks().catch(() => []),
-      ]);
-
-      const incompleteTasks = Array.isArray(tasks)
-        ? tasks.filter((task) => !isTaskComplete(task))
-        : [];
-
-      return {
-        activities: Array.isArray(activities) ? activities : [],
-        tasks: incompleteTasks,
-      };
+      const activities = await fetchActivities();
+      return Array.isArray(activities) ? activities : [];
     },
   },
 };
@@ -41,8 +27,7 @@ function getEntityNameKey(name) {
 }
 
 function getEntityCacheKey(entity) {
-  const source = entity?.source || "activity";
-  return `${source}:${getEntityNameKey(entity?.name)}`;
+  return `${entity?.source ?? "activity"}:${getEntityNameKey(entity?.name)}`;
 }
 
 function normalizeActivityEntity(activity) {
@@ -68,116 +53,63 @@ function normalizeTaskEntity(task) {
     id: task?.id ?? `task-${name.toLowerCase()}`,
     name,
     taskId: task?.id ?? null,
-    completedAt: task?.updated_at ?? task?.created_at ?? null,
+    completedAt: task?.completed_at ?? null,
     source: "task",
-    isOptimistic: Boolean(task?.isOptimistic),
-    frequency: task?.frequency ?? 0,
+    isOptimistic: false,
+    frequency: 0,
   };
-}
-
-function normalizeAnyEntity(entity) {
-  if (entity?.source === "task") {
-    return normalizeTaskEntity(entity);
-  }
-
-  if (entity?.source === "activity") {
-    return normalizeActivityEntity(entity);
-  }
-
-  // Activity records include completed_at; tasks generally do not.
-  if (
-    Object.prototype.hasOwnProperty.call(entity ?? {}, "duration") ||
-    Object.prototype.hasOwnProperty.call(entity ?? {}, "started_at") ||
-    Object.prototype.hasOwnProperty.call(entity ?? {}, "xp_gained")
-  ) {
-    return normalizeActivityEntity(entity);
-  }
-
-  return normalizeTaskEntity(entity);
-}
-
-function normalizeStringEntity(type, name) {
-  if (type === "activity") {
-    return normalizeActivityEntity({ name, isOptimistic: true });
-  }
-
-  return null;
-}
-
-function getEntityNormalizer(type) {
-  if (type === "activity") {
-    return normalizeAnyEntity;
-  }
-
-  throw new Error(`Unsupported entity search type: ${type}`);
 }
 
 function sortEntitiesByRecency(entities) {
   return [...entities].sort((left, right) => {
     const leftTime = left.completedAt ? new Date(left.completedAt).getTime() : 0;
     const rightTime = right.completedAt ? new Date(right.completedAt).getTime() : 0;
-    // Sort by frequency first (most used), then recency, then name
-    if (left.frequency !== right.frequency) {
-      return right.frequency - left.frequency;
-    }
-
-    if (leftTime !== rightTime) {
-      return rightTime - leftTime;
-    }
-
+    if (left.frequency !== right.frequency) return right.frequency - left.frequency;
+    if (leftTime !== rightTime) return rightTime - leftTime;
     return left.name.localeCompare(right.name);
   });
 }
 
 function dedupeEntities(entities) {
   const byName = new Map();
-
   sortEntitiesByRecency(entities).forEach((entity) => {
     const key = getEntityCacheKey(entity);
-    if (!byName.has(key)) {
-      byName.set(key, entity);
-    }
+    if (!byName.has(key)) byName.set(key, entity);
   });
-
   return [...byName.values()];
 }
 
 export function useEntitySearchCache(type) {
   const queryClient = useQueryClient();
   const config = ENTITY_CONFIG[type];
-  const normalizeEntity = useMemo(() => getEntityNormalizer(type), [type]);
 
   if (!config) {
     throw new Error(`Unsupported entity search type: ${type}`);
   }
 
+  const { gameSettings } = useGame();
+  const includesTasks = gameSettings?.activity_search_includes_tasks ?? false;
+
   const query = useQuery({
     queryKey: config.queryKey,
     queryFn: async () => {
-      const data = await config.queryFn();
-
-      if (type !== "activity") {
-        const normalizedEntities = Array.isArray(data)
-          ? data.map(normalizeEntity).filter(Boolean)
-          : [];
-        return dedupeEntities(normalizedEntities);
-      }
-
-      const normalizedActivities = (data?.activities ?? [])
-        .map(normalizeActivityEntity)
-        .filter(Boolean);
-      const normalizedTasks = (data?.tasks ?? [])
-        .map(normalizeTaskEntity)
-        .filter(Boolean);
-
-      const dedupedActivities = dedupeEntities(normalizedActivities);
-      const dedupedTasks = dedupeEntities(normalizedTasks);
-
-      queryClient.setQueryData(ACTIVITY_LIST_CACHE_KEY, dedupedActivities);
-      queryClient.setQueryData(TASK_LIST_CACHE_KEY, dedupedTasks);
-
-      return dedupeEntities([...dedupedActivities, ...dedupedTasks]);
+      const activities = await config.queryFn();
+      const deduped = dedupeEntities(activities.map(normalizeActivityEntity).filter(Boolean));
+      queryClient.setQueryData(ACTIVITY_LIST_CACHE_KEY, deduped);
+      return deduped;
     },
+    staleTime: Number.POSITIVE_INFINITY,
+    gcTime: Number.POSITIVE_INFINITY,
+    refetchOnWindowFocus: false,
+  });
+
+  useQuery({
+    queryKey: TASK_LIST_CACHE_KEY,
+    queryFn: async () => {
+      const tasks = await fetchTasks();
+      return Array.isArray(tasks) ? tasks.map(normalizeTaskEntity).filter(Boolean) : [];
+    },
+    enabled: includesTasks,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
@@ -187,50 +119,40 @@ export function useEntitySearchCache(type) {
     (entityInput) => {
       const entity =
         typeof entityInput === "string"
-          ? normalizeStringEntity(type, entityInput)
-          : normalizeEntity(entityInput);
+          ? normalizeActivityEntity({ name: entityInput, isOptimistic: true })
+          : normalizeActivityEntity(entityInput);
 
-      if (!entity) {
-        return null;
-      }
+      if (!entity) return null;
 
-      queryClient.setQueryData(config.queryKey, (currentEntities = []) =>
+      const updater = (currentEntities = []) =>
         dedupeEntities(
-          currentEntities.map((e) =>
-            getEntityCacheKey(e) === getEntityCacheKey(entity)
-              ? { ...e, frequency: (e.frequency || 0) + 1 }
-              : e
-          ).concat(entity.frequency > 0 ? [] : [entity])
-        )
-      );
+          currentEntities
+            .map((e) =>
+              getEntityCacheKey(e) === getEntityCacheKey(entity)
+                ? { ...e, frequency: (e.frequency || 0) + 1 }
+                : e
+            )
+            .concat(entity.frequency > 0 ? [] : [entity])
+        );
 
-      const listCacheKey = entity.source === "task"
-        ? TASK_LIST_CACHE_KEY
-        : ACTIVITY_LIST_CACHE_KEY;
-
-      queryClient.setQueryData(listCacheKey, (currentEntities = []) =>
-        dedupeEntities(
-          currentEntities.map((e) =>
-            getEntityCacheKey(e) === getEntityCacheKey(entity)
-              ? { ...e, frequency: (e.frequency || 0) + 1 }
-              : e
-          ).concat(entity.frequency > 0 ? [] : [entity])
-        )
-      );
+      queryClient.setQueryData(config.queryKey, updater);
+      queryClient.setQueryData(ACTIVITY_LIST_CACHE_KEY, updater);
 
       return entity;
     },
-    [config.queryKey, normalizeEntity, queryClient, type]
+    [config.queryKey, queryClient]
   );
 
   const activities = queryClient.getQueryData(ACTIVITY_LIST_CACHE_KEY) ?? [];
   const tasks = queryClient.getQueryData(TASK_LIST_CACHE_KEY) ?? [];
+  const entities = includesTasks
+    ? dedupeEntities([...(query.data ?? []), ...tasks])
+    : (query.data ?? []);
 
   return {
     ...query,
-    entities: query.data ?? [],
+    entities,
     activities,
-    tasks,
     addEntityToCache,
   };
 }

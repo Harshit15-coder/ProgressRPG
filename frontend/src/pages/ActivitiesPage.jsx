@@ -180,9 +180,9 @@ export default function ActivitiesPage() {
 
                 return (
                   <div key={dateKey}>
-                    <h3 style={{ margin: "1em 0 0.5em", fontSize: "0.95em", opacity: 0.7 }}>
+                    <h2 style={{ margin: "1em 0 0.5em", fontSize: "0.95em", opacity: 0.7 }}>
                       {headingLabel} ({dayActivities.length} {dayActivities.length === 1 ? 'activity' : 'activities'}, {formatDuration(dayDurationTotalSeconds)}, {dayXpTotal} XP)
-                    </h3>
+                    </h2>
                     <PlayerItemList
                       items={dayActivities}
                       itemLabel="activity"

@@ -120,10 +120,21 @@ class FetchInfoResponseSerializer(serializers.Serializer):
     login_event_at = serializers.DateTimeField(allow_null=True)
     login_reward_xp = serializers.IntegerField()
     free_timer_limit_seconds = serializers.IntegerField()
+    game_settings = serializers.JSONField()
 
 
 class GameSettingsSerializer(serializers.Serializer):
     free_timer_limit_seconds = serializers.IntegerField()
+    daily_login_base_xp = serializers.IntegerField()
+    daily_login_streak_step_xp = serializers.IntegerField()
+    daily_login_max_xp = serializers.IntegerField()
+    premium_activity_xp_multiplier = serializers.DecimalField(
+        max_digits=5, decimal_places=2
+    )
+    default_activity_xp_per_second = serializers.DecimalField(
+        max_digits=5, decimal_places=4
+    )
+    activity_search_includes_tasks = serializers.BooleanField()
 
 
 class DownloadUserDataPlayerSerializer(serializers.Serializer):

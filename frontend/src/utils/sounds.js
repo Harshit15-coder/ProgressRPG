@@ -2,32 +2,53 @@
 // Programmatic sound effects using the Web Audio API.
 // No audio assets required – tones are synthesised on demand.
 
-/**
- * Play a short note pattern. Silently does nothing if the Web Audio API is unavailable.
- */
+// Singleton context — created once and kept alive so Firefox's autoplay policy
+// doesn't block sounds that fire after async operations or timer callbacks.
+let _ctx = null;
+
+function getContext() {
+  const AC = window.AudioContext || window.webkitAudioContext;
+  if (!AC) return null;
+  if (!_ctx || _ctx.state === "closed") {
+    _ctx = new AC();
+  }
+  return _ctx;
+}
+
+// Call this synchronously inside a user-gesture handler (e.g. button click)
+// before any awaits. This unlocks the AudioContext in Firefox so that sounds
+// triggered later (after API calls or timer callbacks) play correctly.
+export function primeAudio() {
+  try {
+    const ctx = getContext();
+    if (ctx && ctx.state === "suspended") ctx.resume();
+  } catch {
+    // ignore
+  }
+}
+
 function playChime(noteSequence) {
   try {
-    const AudioContext = window.AudioContext || window.webkitAudioContext;
-    if (!AudioContext) return;
+    const ctx = getContext();
+    if (!ctx) return;
 
-    const ctx = new AudioContext();
+    if (ctx.state === "suspended") ctx.resume();
 
-    const playTone = (frequency, startTime, duration) => {
+    const nodes = []; // hold refs so Firefox doesn't GC nodes before playback ends
+    const t = ctx.currentTime;
+
+    noteSequence.forEach(({ frequency, offset, duration }) => {
       const osc = ctx.createOscillator();
       const gain = ctx.createGain();
       osc.connect(gain);
       gain.connect(ctx.destination);
       osc.type = "sine";
       osc.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.25, startTime);
-      gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration);
-      osc.start(startTime);
-      osc.stop(startTime + duration);
-    };
-
-    const t = ctx.currentTime;
-    noteSequence.forEach(({ frequency, offset, duration }) => {
-      playTone(frequency, t + offset, duration);
+      gain.gain.setValueAtTime(0.25, t + offset);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + offset + duration);
+      osc.start(t + offset);
+      osc.stop(t + offset + duration);
+      nodes.push(osc, gain);
     });
 
     const finalNoteEnd =
@@ -35,7 +56,8 @@ function playChime(noteSequence) {
         (latestEnd, note) => Math.max(latestEnd, note.offset + note.duration),
         0,
       ) * 1000;
-    setTimeout(() => ctx.close(), finalNoteEnd + 400);
+
+    setTimeout(() => { nodes.length = 0; }, finalNoteEnd + 400);
   } catch {
     // Silently ignore errors (e.g. browser blocks AudioContext creation).
   }
@@ -49,10 +71,6 @@ export function playActivityStartedSound() {
   ]);
 }
 
-/**
- * Play a short ascending chime to signal that the activity timer has reached
- * its limit.
- */
 export function playLimitReachedSound() {
   playChime([
     { frequency: 523, offset: 0, duration: 0.18 }, // C5

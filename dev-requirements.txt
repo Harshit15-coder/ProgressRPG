@@ -349,7 +349,7 @@ sqlparse==0.5.5
     #   django
 stripe==15.1.0
     # via -r requirements.in
-twisted[tls]==25.5.0
+twisted[tls]==26.4.0
     # via
     #   -r requirements.in
     #   daphne
