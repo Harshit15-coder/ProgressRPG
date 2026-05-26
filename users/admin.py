@@ -120,6 +120,12 @@ class CustomUserAdmin(UserAdmin):
     )
     search_fields = ["email"]
     ordering = ("-created_at",)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.is_confirmed = True
+        super().save_model(request, obj, form, change)
+
     readonly_fields = [
         "created_at",
         "last_login",
