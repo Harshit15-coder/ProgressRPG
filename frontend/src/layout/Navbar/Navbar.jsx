@@ -5,7 +5,7 @@ import Button from '../../components/Button/Button';
 import { Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-export default function Navbar({ onMenuClick }) {
+export default function Navbar({ onMenuClick, onHelpClick }) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
   const [accountOpenMobile, setAccountOpenMobile] = useState(false);
@@ -86,6 +86,16 @@ export default function Navbar({ onMenuClick }) {
               </Link>
             </>
           )}
+          {isAuthenticated && onHelpClick && (
+            <Button
+              variant="secondary"
+              className={styles.navLink}
+              onClick={onHelpClick}
+              ariaLabel="Open tutorial"
+            >
+              ?
+            </Button>
+          )}
           <div className={styles.account}>
             {/* Reserved for future icons or dropdowns */}
           </div>
@@ -138,22 +148,39 @@ export default function Navbar({ onMenuClick }) {
                   </svg>
                 </button>
                 {accountOpenMobile && (
-                  <div className={styles.accountDropdown} role="menu">
-                    <Link
-                      to="/account"
-                      role="menuitem"
-                      onClick={() => setAccountOpenMobile(false)}
-                    >
-                      Account
-                    </Link>
-                    <Link
-                      to="/logout"
-                      role="menuitem"
-                      onClick={() => setAccountOpenMobile(false)}
-                    >
-                      Log out
-                    </Link>
-                  </div>
+                  <ul className={styles.accountDropdown} role="menu">
+                    {onHelpClick && (
+                      <li role="none">
+                        <button
+                          role="menuitem"
+                          onClick={() => {
+                            setAccountOpenMobile(false);
+                            onHelpClick();
+                          }}
+                        >
+                          Tutorial
+                        </button>
+                      </li>
+                    )}
+                    <li role="none">
+                      <Link
+                        to="/account"
+                        role="menuitem"
+                        onClick={() => setAccountOpenMobile(false)}
+                      >
+                        Account
+                      </Link>
+                    </li>
+                    <li role="none">
+                      <Link
+                        to="/logout"
+                        role="menuitem"
+                        onClick={() => setAccountOpenMobile(false)}
+                      >
+                        Log out
+                      </Link>
+                    </li>
+                  </ul>
                 )}
               </div>
             </>

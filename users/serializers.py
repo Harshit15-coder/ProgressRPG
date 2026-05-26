@@ -1,7 +1,29 @@
 from rest_framework import serializers
 
-from .models import Player
+from .models import Player, TutorialStep
 from .validators import clean_player_name
+
+
+class TutorialStepSerializer(serializers.ModelSerializer):
+    image_url = serializers.SerializerMethodField()
+
+    def get_image_url(self, obj):
+        if not obj.image:
+            return None
+        request = self.context.get("request")
+        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+
+    class Meta:
+        model = TutorialStep
+        fields = [
+            "id",
+            "order",
+            "title",
+            "body",
+            "image_url",
+            "alt_text",
+            "youtube_url",
+        ]
 
 
 class PlayerSerializer(serializers.ModelSerializer):
@@ -11,6 +33,12 @@ class PlayerSerializer(serializers.ModelSerializer):
     login_streak = serializers.IntegerField(
         source="user.current_login_streak", read_only=True
     )
+    unseen_tutorial_step_ids = serializers.SerializerMethodField()
+
+    def get_unseen_tutorial_step_ids(self, obj):
+        seen_ids = set(obj.tutorial_steps_seen.values_list("id", flat=True))
+        all_ids = set(TutorialStep.objects.values_list("id", flat=True))
+        return sorted(all_ids - seen_ids)
 
     def validate_name(self, value):
         try:
@@ -33,6 +61,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "onboarding_step",
             "onboarding_completed",
             "login_streak",
+            "unseen_tutorial_step_ids",
         ]
         read_only_fields = [
             "id",
@@ -43,4 +72,5 @@ class PlayerSerializer(serializers.ModelSerializer):
             "total_time",
             "total_activities",
             "login_streak",
+            "unseen_tutorial_step_ids",
         ]
