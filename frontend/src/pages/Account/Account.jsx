@@ -170,7 +170,7 @@ export default function Account() {
               )}
             </div>
             <div className={styles.infoItem}>
-              <span className={styles.label}>Level</span>
+              <span className={styles.label}>Player level</span>
               <span className={styles.value}>{player?.level || 0}</span>
             </div>
             <div className={styles.infoItem}>

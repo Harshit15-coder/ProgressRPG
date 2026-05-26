@@ -1,7 +1,7 @@
 ACHIEVEMENT_DEFINITIONS = [
     {
         "type": "level",
-        "label": "Level",
+        "label": "Player level",
         "symbol": "⭐",
         "thresholds": [2, 5, 10, 20, 50],
     },
