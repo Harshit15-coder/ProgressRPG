@@ -62,7 +62,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
           disabled={isFirst}
           ariaLabel="Previous step"
         >
-          Previous
+          ←
         </Button>
         <span className={styles.stepCount}>
           {currentIndex + 1} / {steps.length}
@@ -72,7 +72,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
           disabled={isLast}
           ariaLabel="Next step"
         >
-          Next
+          →
         </Button>
       </div>
       <div className={styles.footerRight}>
@@ -87,6 +87,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
       onClose={onClose}
       footer={footer}
       id="tutorial-modal"
+      size="lg"
     >
       <div className={styles.content}>
         {step?.image_url && (
