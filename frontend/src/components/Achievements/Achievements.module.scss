@@ -23,8 +23,8 @@
 }
 
 .achievementBadge {
-  --achievement-color: #6f7782;
-  --achievement-bg: rgba(111, 119, 130, 0.12);
+  --achievement-color: #{c.$color-text-muted};
+  --achievement-bg: #{rgba(c.$color-text-muted, 0.12)};
 
   display: flex;
   flex-direction: column;
@@ -55,7 +55,7 @@
   }
 
   p {
-    color: rgba(0, 0, 0, 0.62);
+    color: c.$color-text-muted;
     @include t.apply-text-style(t.$text-body);
   }
 }
@@ -77,7 +77,7 @@
   align-items: center;
   justify-content: space-between;
   gap: v.$spacing-sm;
-  color: rgba(0, 0, 0, 0.72);
+  color: c.$color-text-body;
   @include t.apply-text-style(t.$text-body);
 }
 
@@ -85,7 +85,7 @@
   height: 0.45rem;
   overflow: hidden;
   border-radius: 999px;
-  background: rgba(0, 0, 0, 0.12);
+  background: c.$color-border-light;
 
   span {
     display: block;
@@ -96,19 +96,20 @@
 }
 
 .achievementComplete {
-  box-shadow: 0 0 0 1px rgba(255, 193, 7, 0.26);
+  box-shadow: 0 0 0 1px rgba(c.$color-warning, 0.4);
 }
 
 .tierGrey {
-  --achievement-color: #6f7782;
-  --achievement-bg: rgba(111, 119, 130, 0.12);
+  --achievement-color: #{c.$color-text-muted};
+  --achievement-bg: #{rgba(c.$color-text-muted, 0.12)};
 }
 
 .tierGreen {
-  --achievement-color: #2e7d32;
-  --achievement-bg: rgba(46, 125, 50, 0.12);
+  --achievement-color: #{c.$color-border-primary};
+  --achievement-bg: #{rgba(c.$color-border-primary, 0.12)};
 }
 
+// No blue or purple in the design system — intentional palette extensions for tiers 3 and 4
 .tierBlue {
   --achievement-color: #1565c0;
   --achievement-bg: rgba(21, 101, 192, 0.12);
@@ -120,8 +121,8 @@
 }
 
 .tierGold {
-  --achievement-color: #b7791f;
-  --achievement-bg: rgba(183, 121, 31, 0.14);
+  --achievement-color: #{c.$color-warning-dark};
+  --achievement-bg: #{rgba(c.$color-warning-dark, 0.14)};
 }
 
 @include m.respond-to(md, down) {
