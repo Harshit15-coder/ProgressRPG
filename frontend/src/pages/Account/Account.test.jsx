@@ -25,7 +25,7 @@ vi.mock("../../api/player", () => ({
 const tierOneAchievements = [
   {
     type: "level",
-    label: "Level",
+    label: "Player level",
     symbol: "⭐",
     tier: 1,
     complete: false,
@@ -61,7 +61,7 @@ const tierOneAchievements = [
 const tierTwoAchievements = [
   {
     type: "level",
-    label: "Level",
+    label: "Player level",
     symbol: "⭐",
     tier: 2,
     complete: false,
@@ -97,7 +97,7 @@ const tierTwoAchievements = [
 const completedAchievements = [
   {
     type: "level",
-    label: "Level",
+    label: "Player level",
     symbol: "⭐",
     tier: 5,
     complete: true,
@@ -252,7 +252,7 @@ describe("Account", () => {
     renderAccount();
 
     expect(screen.getByRole("heading", { name: "Achievements" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Level" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Player level" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Total time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Activities" })).toBeInTheDocument();
     expect(screen.getAllByText("Tier 2")).toHaveLength(3);

@@ -1,4 +1,3 @@
-import React from "react";
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
 
@@ -7,7 +6,7 @@ import Achievements from "./Achievements";
 const nextGoalAchievements = [
   {
     type: "level",
-    label: "Level",
+    label: "Player level",
     symbol: "⭐",
     tier: 2,
     complete: false,
@@ -45,7 +44,7 @@ describe("Achievements", () => {
     render(<Achievements achievements={nextGoalAchievements} />);
 
     expect(screen.getByRole("heading", { name: "Achievements" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Level" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Player level" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Total time" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Activities" })).toBeInTheDocument();
     expect(screen.getAllByText("Tier 2")).toHaveLength(3);
@@ -60,7 +59,7 @@ describe("Achievements", () => {
         achievements={[
           {
             type: "level",
-            label: "Level",
+            label: "Player level",
             symbol: "⭐",
             tier: 5,
             complete: true,
