@@ -7,7 +7,7 @@ import { useEntitySearchCache } from "../../hooks/useEntitySearchCache";
 import styles from "./ActivityInput.module.scss";
 import { useSupportFlow } from "../../hooks/useSupportFlow";
 import SupportFlowModal from "../SupportFlow/SupportFlowModal";
-import { playLimitReachedSound } from "../../utils/sounds";
+import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
 
 const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
 
@@ -155,6 +155,7 @@ export default function ActivityInput() {
   ]);
 
   async function handleToggle() {
+    primeAudio(); // unlock AudioContext while still in user-gesture context
     if (isActive) {
       const completedActivityName = (name || currentActivity?.name || "").trim();
       const completion = await stop({ activityName: completedActivityName });

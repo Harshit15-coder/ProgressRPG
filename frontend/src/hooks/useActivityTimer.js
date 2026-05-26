@@ -1,7 +1,7 @@
 // hooks/useActivityTimer.js
 import { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch } from "../utils/api.js";
-import { playActivityStartedSound } from "../utils/sounds.js";
+import { playActivityStartedSound, primeAudio } from "../utils/sounds.js";
 //import { useGame } from "../context/GameContext.jsx";
 
 
@@ -95,6 +95,8 @@ export default function useActivityTimer() {
         : newActivity || {};
 
     if (!text?.trim()) return null;
+
+    primeAudio(); // unlock AudioContext while still in user-gesture context
 
     // Optimistic local state
     setCurrentActivity({ text: text.trim(), taskId });
