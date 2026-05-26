@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from adminsortable2.admin import SortableAdminMixin
 
 from .models import (
     CustomUser,
@@ -286,8 +287,8 @@ class InviteCodeAdmin(admin.ModelAdmin):
 
 
 @admin.register(TutorialStep)
-class TutorialStepAdmin(admin.ModelAdmin):
-    list_display = ["title", "order", "image", "youtube_url", "updated_at"]
+class TutorialStepAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ["order", "title", "image", "youtube_url", "updated_at"]
     ordering = ["order"]
 
 

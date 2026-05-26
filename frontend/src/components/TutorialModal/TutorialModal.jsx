@@ -57,23 +57,25 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
     <>
       <div className={styles.footerLeft} />
       <div className={styles.footerCenter}>
-        <Button
-          onClick={() => setCurrentIndex((i) => i - 1)}
-          disabled={isFirst}
-          ariaLabel="Previous step"
-        >
-          ←
-        </Button>
-        <span className={styles.stepCount}>
+        <span className={isFirst ? styles.hidden : undefined} inert={isFirst}>
+          <Button
+            onClick={() => setCurrentIndex((i) => i - 1)}
+            ariaLabel="Previous step"
+          >
+            ←
+          </Button>
+        </span>
+        <span className={styles.stepCount} aria-live="polite" aria-atomic="true">
           {currentIndex + 1} / {steps.length}
         </span>
-        <Button
-          onClick={() => setCurrentIndex((i) => i + 1)}
-          disabled={isLast}
-          ariaLabel="Next step"
-        >
-          →
-        </Button>
+        <span className={isLast ? styles.hidden : undefined} inert={isLast}>
+          <Button
+            onClick={() => setCurrentIndex((i) => i + 1)}
+            ariaLabel="Next step"
+          >
+            →
+          </Button>
+        </span>
       </div>
       <div className={styles.footerRight}>
         <Button onClick={handleDone}>Done</Button>

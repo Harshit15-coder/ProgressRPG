@@ -22,4 +22,16 @@ class Migration(migrations.Migration):
             name="youtube_url",
             field=models.URLField(blank=True),
         ),
+        migrations.AlterField(
+            model_name="tutorialstep",
+            name="image",
+            field=models.ImageField(
+                blank=True, null=True, upload_to="images/tutorialstep/"
+            ),
+        ),
+        migrations.AlterField(
+            model_name="tutorialstep",
+            name="order",
+            field=models.PositiveIntegerField(db_index=True, default=0),
+        ),
     ]
