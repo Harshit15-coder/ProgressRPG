@@ -8,6 +8,7 @@ from .views import (
     CustomRegisterView,
     ConfirmEmailView,
     MeViewSet,
+    TutorialStepViewSet,
     FetchInfoAPIView,
     GameSettingsAPIView,
     DownloadUserDataAPIView,
@@ -54,6 +55,7 @@ register_converter(KeyConverter, "key")
 
 router = DefaultRouter()
 router.register(r"me", MeViewSet, basename="me")
+router.register(r"tutorial-steps", TutorialStepViewSet, basename="tutorial-step")
 router.register(r"player", PlayerViewSet, basename="player")
 router.register(r"character", CharacterViewSet, basename="character")
 router.register(r"skills", PlayerSkillViewSet, basename="skills")
