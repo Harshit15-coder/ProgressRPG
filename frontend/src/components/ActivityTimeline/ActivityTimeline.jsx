@@ -89,7 +89,7 @@ export default function ActivityTimeline() {
           renderItem={(act) => (
             <div className={styles.line}>
               <span className={styles.lineText}>
-                {act.player ? 'You' : character?.first_name || 'Character' } finished <strong>{act.name?.toLowerCase() || act.kind || "an activity"}</strong> —{" "}
+                <strong>{act.name || act.kind || "an activity"}</strong> —{" "}
                 {formatDuration(act.duration)}
               </span>
               <button
