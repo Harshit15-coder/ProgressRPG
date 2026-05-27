@@ -68,6 +68,8 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 COPY --chown=appuser:appuser . .
 COPY --chown=appuser:appuser --chmod=755 entrypoint.sh /app/entrypoint.sh
 
+RUN mkdir -p /app/staticfiles && chown appuser:appuser /app/staticfiles
+
 USER appuser
 
 ENTRYPOINT ["/app/entrypoint.sh"]
