@@ -102,6 +102,6 @@ test.describe('Authenticated page smoke tests', () => {
 
   test('Onboarding page loads', async ({ page }) => {
     await page.goto('/onboarding');
-    await expect(page.getByRole('heading', { name: /welcome/i })).toBeVisible();
+    await expect(page.getByRole('dialog')).toBeVisible();
   });
 });

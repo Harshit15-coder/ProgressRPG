@@ -1,0 +1,46 @@
+[
+  {
+    "model": "users.tutorialstep",
+    "pk": 1,
+    "fields": {
+      "image": null,
+      "title": "Welcome to Progress RPG",
+      "body": "Progress RPG turns real-life effort into progress. Use the tutorial arrows to see more instructions, then press Done when you are ready to play.",
+      "order": 1,
+      "youtube_url": ""
+    }
+  },
+  {
+    "model": "users.tutorialstep",
+    "pk": 2,
+    "fields": {
+      "image": null,
+      "title": "It's all about you",
+      "body": "As you log activity, you earn XP and level up. Keep returning to build steady progress.",
+      "order": 2,
+      "youtube_url": ""
+    }
+  },
+  {
+    "model": "users.tutorialstep",
+    "pk": 3,
+    "fields": {
+      "image": null,
+      "title": "Start a focus session",
+      "body": "Choose what you want to work on, start the timer, and stay with it. Completed focus time becomes activity that earns XP.",
+      "order": 3,
+      "youtube_url": ""
+    }
+  },
+  {
+    "model": "users.tutorialstep",
+    "pk": 4,
+    "fields": {
+      "image": null,
+      "title": "Recent activities",
+      "body": "Your completed sessions appear in recent activity. You can hover over individual activities and click the 'play' button to repeat them.",
+      "order": 4,
+      "youtube_url": ""
+    }
+  }
+]

@@ -55,7 +55,7 @@
   }
 
   p {
-    color: c.$color-text-muted;
+    color: c.$color-text-body;
     @include t.apply-text-style(t.$text-body);
   }
 }

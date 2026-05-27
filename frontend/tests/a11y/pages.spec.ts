@@ -80,7 +80,7 @@ test.describe('Authenticated Page Accessibility', () => {
 
   test('Onboarding page is accessible', async ({ page }) => {
     await page.goto('/onboarding');
-    await page.getByRole('heading', { name: /welcome/i }).waitFor();
+    await page.getByRole('dialog').waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });

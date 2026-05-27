@@ -49,7 +49,19 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
     onClose();
   }, [steps, currentIndex, onClose, onComplete]);
 
-  if (isLoading || !steps.length) return null;
+  if (isLoading) return null;
+
+  if (!steps.length) {
+    return (
+      <Modal
+        title="Tutorial"
+        onClose={onClose}
+        id="tutorial-modal"
+      >
+        <p className={styles.emptyState}>No tutorial content to display yet.</p>
+      </Modal>
+    );
+  }
 
   const embedUrl = step ? youtubeEmbedUrl(step.youtube_url) : null;
 

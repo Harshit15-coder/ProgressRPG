@@ -37,10 +37,18 @@ describe('TutorialModal', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('renders nothing when there are no steps', () => {
+  it('shows an empty-state message when there are no steps', () => {
     mockUseTutorialSteps.mockReturnValue({ steps: [], isLoading: false });
     render(<TutorialModal onClose={onClose} />);
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText('No tutorial content to display yet.')).toBeInTheDocument();
+  });
+
+  it('allows closing the modal in the empty state', () => {
+    mockUseTutorialSteps.mockReturnValue({ steps: [], isLoading: false });
+    render(<TutorialModal onClose={onClose} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Close modal' }));
+    expect(onClose).toHaveBeenCalledTimes(1);
   });
 
   // --- Basic rendering ---

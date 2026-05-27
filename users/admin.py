@@ -294,7 +294,7 @@ class InviteCodeAdmin(admin.ModelAdmin):
 
 @admin.register(TutorialStep)
 class TutorialStepAdmin(SortableAdminMixin, admin.ModelAdmin):
-    list_display = ["order", "title", "image", "youtube_url", "updated_at"]
+    list_display = ["order", "title", "image", "youtube_url"]
     ordering = ["order"]
 
 
