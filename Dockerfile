@@ -86,8 +86,7 @@ ENV PORT=8000
 ENV SECRET_KEY=dummy-build-secret-key
 ENV DJANGO_SETTINGS_MODULE=progress_rpg.settings.production
 
-# Note: collectstatic not needed at build time.
-# Frontend is built separately; serve static via volume or CDN at runtime.
+RUN python manage.py collectstatic --noinput --clear
 
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "progress_rpg.asgi:application"]
 
