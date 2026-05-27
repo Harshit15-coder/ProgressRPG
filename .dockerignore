@@ -1,0 +1,73 @@
+# Python cache and compiled files
+__pycache__
+*.pyc
+*.pyo
+*.pyd
+*.sqlite3
+.pytype
+.pytest_cache
+*.egg-info/
+.eggs/
+
+# Virtual environments
+.venv
+venv/
+venv-windows/
+venv-linux/
+env/
+
+# Version control and CI/CD
+.git
+.gitignore
+.github
+.worktrees
+.git-rebase-merge
+.git-rebase-apply
+
+# Development tools
+.vscode
+.idea
+.editorconfig
+.pre-commit-config.yaml
+.remember
+.claude
+
+# Node/Frontend (aggressive matching)
+node_modules/
+frontend/node_modules/
+frontend/.node_modules/
+**node_modules**
+.npm/
+dist/
+frontend/dist/
+.sass-cache/
+
+# Build artifacts
+build
+*.dump
+*.sql
+*.log
+logs/
+
+# Test and coverage artifacts
+playwright-report/
+coverage/
+test-results/
+.coverage
+celerybeat-schedule
+
+# Media and static (use volumes)
+media/
+staticfiles/
+
+# Documentation builds
+docs/_build/
+*.md
+!README.md
+
+# OS files
+.DS_Store
+*.swp
+*.swo
+*~
+Thumbs.db
