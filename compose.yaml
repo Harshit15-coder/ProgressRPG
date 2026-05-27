@@ -22,7 +22,9 @@ services:
         condition: service_healthy
 
   web:
-    build: .
+    build:
+      context: .
+      target: web
     command: ["daphne", "-b", "0.0.0.0", "-p", "${PORT:-8000}", "progress_rpg.asgi:application"]
     ports:
       - "8000:8000"
@@ -30,9 +32,9 @@ services:
       - .:/app
     environment:
       - PORT=8000
-      - DOCKER="true"
+      - DOCKER=true
     env_file:
-     - .env
+      - .env
     depends_on:
       redis:
         condition: service_healthy
@@ -53,7 +55,7 @@ services:
       - POSTGRES_DB=progress
       - DB_PORT=5432
     healthcheck:
-      test: [ "CMD", "pg_isready", "-U", "progress"]
+      test: ["CMD", "pg_isready", "-U", "progress"]
       interval: 10s
       timeout: 5s
       retries: 5

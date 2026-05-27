@@ -13,10 +13,11 @@ projects:
             envVars:
               - fromGroup: Staging env
             region: frankfurt
-            preDeployCommand: python manage.py migrate
+            preDeployCommand: python manage.py collectstatic --noinput && python manage.py migrate
             dockerCommand: daphne -b 0.0.0.0 -p $PORT progress_rpg.asgi:application
             dockerContext: .
             dockerfilePath: ./Dockerfile
+            dockerTarget: web
             autoDeployTrigger: commit
             buildFilter:
               ignoredPaths:
@@ -34,6 +35,7 @@ projects:
             dockerCommand: celery -A progress_rpg worker --loglevel=info --concurrency=1 --prefetch-multiplier=1 --max-tasks-per-child=1000
             dockerContext: .
             dockerfilePath: ./Dockerfile
+            dockerTarget: celery
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
@@ -51,6 +53,7 @@ projects:
             dockerCommand: celery -A progress_rpg beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler --max-interval=30
             dockerContext: .
             dockerfilePath: ./Dockerfile
+            dockerTarget: celery-beat
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
