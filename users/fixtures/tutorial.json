@@ -4,8 +4,8 @@
     "pk": 1,
     "fields": {
       "image": null,
-      "title": "Welcome to ProgressRPG",
-      "body": "ProgressRPG turns real-life effort into character progress. Use the tutorial arrows to see the core loop, then press Done when you are ready to play.",
+      "title": "Welcome to Progress RPG",
+      "body": "Progress RPG turns real-life effort into progress. Use the tutorial arrows to see more instructions, then press Done when you are ready to play.",
       "order": 1,
       "youtube_url": ""
     }
@@ -15,8 +15,8 @@
     "pk": 2,
     "fields": {
       "image": null,
-      "title": "Watch Your Character Grow",
-      "body": "As you log activity, your character earns XP and levels up. Keep returning to build a streak of steady progress.",
+      "title": "It's all about you",
+      "body": "As you log activity, you earn XP and level up. Keep returning to build steady progress.",
       "order": 2,
       "youtube_url": ""
     }
@@ -26,8 +26,8 @@
     "pk": 3,
     "fields": {
       "image": null,
-      "title": "Start a Focus Session",
-      "body": "Choose what you want to work on, start the timer, and stay with it. Completed focus time becomes activity that can earn XP.",
+      "title": "Start a focus session",
+      "body": "Choose what you want to work on, start the timer, and stay with it. Completed focus time becomes activity that earns XP.",
       "order": 3,
       "youtube_url": ""
     }
@@ -37,8 +37,8 @@
     "pk": 4,
     "fields": {
       "image": null,
-      "title": "Review Recent Activity",
-      "body": "Your completed sessions appear in recent activity. Use them to check what you have done and keep your progress honest.",
+      "title": "Recent activities",
+      "body": "Your completed sessions appear in recent activity. You can hover over individual activities and click the 'play' button to repeat them.",
       "order": 4,
       "youtube_url": ""
     }
