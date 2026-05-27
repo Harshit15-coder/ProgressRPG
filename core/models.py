@@ -1,13 +1,58 @@
+import io
+import uuid
+
 from django.core.exceptions import ValidationError
+from django.core.files.storage import Storage
 from django.db import models
+from django.urls import reverse
+from django.utils.deconstruct import deconstructible
 
 
-def image_upload_path(instance, filename):
-    return f"images/{instance.__class__.__name__.lower()}/{filename}"
+class StoredFile(models.Model):
+    """Raw file data stored in the database. Served via core:stored-file."""
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    data = models.BinaryField()
+    filename = models.CharField(max_length=255)
+    content_type = models.CharField(max_length=100, default="application/octet-stream")
+
+    def __str__(self):
+        return self.filename
+
+
+@deconstructible
+class DatabaseFileStorage(Storage):
+    def _save(self, name, content):
+        import mimetypes
+
+        content_type, _ = mimetypes.guess_type(name)
+        stored = StoredFile.objects.create(
+            data=content.read(),
+            filename=name.rsplit("/", 1)[-1],
+            content_type=content_type or "application/octet-stream",
+        )
+        return str(stored.pk)
+
+    def _open(self, name, mode="rb"):
+        stored = StoredFile.objects.get(pk=name)
+        return io.BytesIO(bytes(stored.data))
+
+    def exists(self, name):
+        return StoredFile.objects.filter(pk=name).exists()
+
+    def url(self, name):
+        return reverse("core:stored-file", args=[name])
+
+    def delete(self, name):
+        StoredFile.objects.filter(pk=name).delete()
+
+    def size(self, name):
+        stored = StoredFile.objects.get(pk=name)
+        return len(stored.data)
 
 
 class Image(models.Model):
-    image = models.ImageField(upload_to=image_upload_path)
+    image = models.ImageField(storage=DatabaseFileStorage(), upload_to="")
     alt_text = models.CharField(max_length=255, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
