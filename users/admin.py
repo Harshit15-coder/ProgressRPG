@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from adminsortable2.admin import SortableAdminMixin
 
 from .models import (
     CustomUser,
@@ -119,6 +120,12 @@ class CustomUserAdmin(UserAdmin):
     )
     search_fields = ["email"]
     ordering = ("-created_at",)
+
+    def save_model(self, request, obj, form, change):
+        if not change:
+            obj.is_confirmed = True
+        super().save_model(request, obj, form, change)
+
     readonly_fields = [
         "created_at",
         "last_login",
@@ -286,8 +293,8 @@ class InviteCodeAdmin(admin.ModelAdmin):
 
 
 @admin.register(TutorialStep)
-class TutorialStepAdmin(admin.ModelAdmin):
-    list_display = ["order", "title", "image", "updated_at"]
+class TutorialStepAdmin(SortableAdminMixin, admin.ModelAdmin):
+    list_display = ["order", "title", "image", "youtube_url", "updated_at"]
     ordering = ["order"]
 
 

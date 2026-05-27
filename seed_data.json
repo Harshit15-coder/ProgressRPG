@@ -1,16 +1,6 @@
 [
 {
   "model": "payments.subscriptionplan",
-  "pk": 1,
-  "fields": {
-    "name": "Free (sandbox)",
-    "price": "0.00",
-    "interval": "monthly",
-    "stripe_price_id": ""
-  }
-},
-{
-  "model": "payments.subscriptionplan",
   "pk": 2,
   "fields": {
     "name": "Premium monthly (sandbox)",

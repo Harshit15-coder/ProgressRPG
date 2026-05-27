@@ -104,11 +104,18 @@ def calculate_daily_login_reward(login_state: str, streak: int) -> int:
     if login_state == LOGIN_STATE_ALREADY_LOGGED_TODAY:
         return 0
 
-    if login_state == LOGIN_STATE_STREAK_CONTINUES:
-        streak_bonus = max(streak - 1, 0) * LOGIN_REWARD_STREAK_STEP_XP
-        return min(LOGIN_REWARD_BASE_XP + streak_bonus, LOGIN_REWARD_MAX_XP)
+    from core.models import GameSettings
 
-    return LOGIN_REWARD_BASE_XP
+    settings = GameSettings.current()
+    base_xp = settings.daily_login_base_xp
+    streak_step = settings.daily_login_streak_step_xp
+    max_xp = settings.daily_login_max_xp
+
+    if login_state == LOGIN_STATE_STREAK_CONTINUES:
+        streak_bonus = max(streak - 1, 0) * streak_step
+        return min(base_xp + streak_bonus, max_xp)
+
+    return base_xp
 
 
 def handle_first_login_of_day(user):

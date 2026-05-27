@@ -20,6 +20,7 @@ const AccountPage = lazy(() => import("../pages/Account/Account"));
 const EditAccount = lazy(() => import("../pages/EditAccount/EditAccount"));
 //const VillagePage = lazy(() => import("../pages/VillagePage/VillagePage"));
 const MaintenancePage = lazy(() => import("../pages/MaintenancePage/MaintenancePage"));
+const UnavailablePage = lazy(() => import("../pages/UnavailablePage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage/NotFoundPage"));
 // const SkillsPage = lazy(() => import("../pages/SkillsPage/SkillsPage"));
 const TasksPage = lazy(() => import("../pages/TasksPage/TasksPage"));
@@ -78,6 +79,10 @@ export const routes = [
   {
     path: "/maintenance",
     element: <MaintenancePage />,
+  },
+  {
+    path: "/unavailable",
+    element: <UnavailablePage />,
   },
   {
     path: "/onboarding",

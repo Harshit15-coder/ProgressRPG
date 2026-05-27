@@ -241,9 +241,6 @@ export default function EntitySearchInput({
                   onClick={() => commitSelection(entity)}
                 >
                   {entity.name}
-                  {entity.source === "task" && (
-                    <span className={styles.optionSourceLabel}> (from Tasks)</span>
-                  )}
                 </button>
               </li>
             );

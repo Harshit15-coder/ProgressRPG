@@ -8,6 +8,7 @@ from .views import (
     CustomRegisterView,
     ConfirmEmailView,
     MeViewSet,
+    TutorialStepViewSet,
     FetchInfoAPIView,
     GameSettingsAPIView,
     DownloadUserDataAPIView,
@@ -27,6 +28,7 @@ from progression.views import (
     CharacterQuestViewSet,
     PlayerSkillViewSet,
     CategoryViewSet,
+    ProjectViewSet,
     TaskViewSet,
 )
 from server_management.views import maintenance_status
@@ -53,9 +55,11 @@ register_converter(KeyConverter, "key")
 
 router = DefaultRouter()
 router.register(r"me", MeViewSet, basename="me")
+router.register(r"tutorial-steps", TutorialStepViewSet, basename="tutorial-step")
 router.register(r"player", PlayerViewSet, basename="player")
 router.register(r"character", CharacterViewSet, basename="character")
 router.register(r"skills", PlayerSkillViewSet, basename="skills")
+router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"tasks", TaskViewSet, basename="tasks")
 router.register(r"player-activities", PlayerActivityViewSet, basename="playeractivity")
 router.register(
