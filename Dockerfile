@@ -68,35 +68,17 @@ ENV PATH="/home/appuser/.local/bin:$PATH"
 COPY --chown=appuser:appuser . .
 COPY --chown=appuser:appuser --chmod=755 entrypoint.sh /app/entrypoint.sh
 
+RUN mkdir -p /app/staticfiles && chown appuser:appuser /app/staticfiles
+
 USER appuser
 
 ENTRYPOINT ["/app/entrypoint.sh"]
 
 
 # --------------------------
-# Web service: Django ASGI server
-# --------------------------
-FROM runtime-base AS web
-
-EXPOSE 8000
-
-ENV PORT=8000
-ENV SECRET_KEY=dummy-build-secret-key
-ENV DJANGO_SETTINGS_MODULE=progress_rpg.settings.production
-
-# Note: collectstatic not needed at build time.
-# Frontend is built separately; serve static via volume or CDN at runtime.
-
-CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "progress_rpg.asgi:application"]
-
-
-# --------------------------
 # Celery worker service
 # --------------------------
 FROM runtime-base AS celery
-
-# Strip web-only artifacts (runs as root before USER, so permissions OK)
-RUN rm -rf /app/staticfiles /app/static 2>/dev/null || true
 
 CMD ["celery", "-A", "progress_rpg", "worker", "--loglevel=info"]
 
@@ -106,7 +88,19 @@ CMD ["celery", "-A", "progress_rpg", "worker", "--loglevel=info"]
 # --------------------------
 FROM runtime-base AS celery-beat
 
-# Strip web-only artifacts (runs as root before USER, so permissions OK)
-RUN rm -rf /app/staticfiles /app/static 2>/dev/null || true
-
 CMD ["celery", "-A", "progress_rpg", "beat", "--loglevel=info", "--scheduler", "django_celery_beat.schedulers:DatabaseScheduler"]
+
+
+# --------------------------
+# Web service: Django ASGI server (must be last — Render builds final stage by default)
+# --------------------------
+FROM runtime-base AS web
+
+EXPOSE 8000
+
+ENV PORT=8000
+ENV DJANGO_SETTINGS_MODULE=progress_rpg.settings.prod
+
+RUN SECRET_KEY=dummy DATABASE_URL=postgres://dummy:dummy@localhost/dummy python manage.py collectstatic --noinput --clear
+
+CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "progress_rpg.asgi:application"]
