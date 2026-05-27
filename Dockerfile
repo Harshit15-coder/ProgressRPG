@@ -24,7 +24,7 @@ COPY requirements.txt /tmp/requirements.txt
 
 # Use BuildKit cache mount for pip (persistent across builds)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --user --no-warn-script-location --no-compile \
+    python -m pip install --user --no-warn-script-location --no-compile --root-user-action=ignore \
     -r /tmp/requirements.txt
 
 
@@ -84,8 +84,8 @@ ENV PORT=8000
 ENV SECRET_KEY=dummy-build-secret-key
 ENV DJANGO_SETTINGS_MODULE=progress_rpg.settings.production
 
-# Note: collectstatic runs at deployment time (via preDeployCommand in Render)
-# Skipping during build avoids database/settings dependency issues
+# Note: collectstatic not needed at build time.
+# Frontend is built separately; serve static via volume or CDN at runtime.
 
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "progress_rpg.asgi:application"]
 

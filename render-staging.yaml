@@ -13,7 +13,7 @@ projects:
             envVars:
               - fromGroup: Staging env
             region: frankfurt
-            preDeployCommand: python manage.py collectstatic --noinput && python manage.py migrate
+            preDeployCommand: python manage.py collectstatic --noinput --clear && python manage.py migrate
             dockerCommand: daphne -b 0.0.0.0 -p $PORT progress_rpg.asgi:application
             dockerContext: .
             dockerfilePath: ./Dockerfile
