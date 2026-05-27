@@ -41,6 +41,10 @@ class DatabaseFileStorage(Storage):
         return StoredFile.objects.filter(pk=name).exists()
 
     def url(self, name):
+        try:
+            uuid.UUID(name)
+        except (ValueError, AttributeError):
+            return ""
         return reverse("core:stored-file", args=[name])
 
     def delete(self, name):
