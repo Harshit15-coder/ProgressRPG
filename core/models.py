@@ -34,10 +34,17 @@ class DatabaseFileStorage(Storage):
         return str(stored.pk)
 
     def _open(self, name, mode="rb"):
-        stored = StoredFile.objects.get(pk=name)
+        try:
+            stored = StoredFile.objects.get(pk=name)
+        except (StoredFile.DoesNotExist, ValueError):
+            return io.BytesIO(b"")
         return io.BytesIO(bytes(stored.data))
 
     def exists(self, name):
+        try:
+            uuid.UUID(name)
+        except (ValueError, AttributeError):
+            return False
         return StoredFile.objects.filter(pk=name).exists()
 
     def url(self, name):
@@ -51,7 +58,10 @@ class DatabaseFileStorage(Storage):
         StoredFile.objects.filter(pk=name).delete()
 
     def size(self, name):
-        stored = StoredFile.objects.get(pk=name)
+        try:
+            stored = StoredFile.objects.get(pk=name)
+        except (StoredFile.DoesNotExist, ValueError):
+            return 0
         return len(stored.data)
 
 
