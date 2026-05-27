@@ -1,4 +1,3 @@
-import core.models
 from django.db import migrations, models
 
 
@@ -21,7 +20,7 @@ class Migration(migrations.Migration):
                         verbose_name="ID",
                     ),
                 ),
-                ("image", models.ImageField(upload_to=core.models.image_upload_path)),
+                ("image", models.ImageField(upload_to="")),
                 ("alt_text", models.CharField(blank=True, max_length=255)),
                 ("created_at", models.DateTimeField(auto_now_add=True)),
                 ("updated_at", models.DateTimeField(auto_now=True)),

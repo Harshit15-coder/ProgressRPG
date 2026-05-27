@@ -25,6 +25,7 @@ from progress_rpg.settings.base import FRONTEND_URL
 
 urlpatterns = [
     path("admin/", admin.site.urls),
+    path("files/", include("core.urls")),
     path("api/v1/", include("api.urls")),
     path("", include("payments.urls")),
     path("", include("gameworld.urls")),
