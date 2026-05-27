@@ -83,10 +83,9 @@ FROM runtime-base AS web
 EXPOSE 8000
 
 ENV PORT=8000
-ENV SECRET_KEY=dummy-build-secret-key
 ENV DJANGO_SETTINGS_MODULE=progress_rpg.settings.production
 
-RUN python manage.py collectstatic --noinput --clear
+RUN SECRET_KEY=dummy python manage.py collectstatic --noinput --clear
 
 CMD ["daphne", "-b", "0.0.0.0", "-p", "8000", "progress_rpg.asgi:application"]
 
