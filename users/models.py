@@ -32,7 +32,6 @@ from typing import TYPE_CHECKING, Optional
 import logging
 from timezone_field import TimeZoneField
 
-from core.models import ImageBase
 from gameplay.models import Currency, CurrencyAccountBase, ServerMessage
 
 if TYPE_CHECKING:
@@ -421,8 +420,14 @@ class Player(Person):
         self.save()
 
 
-class TutorialStep(ImageBase):
-    image = models.ImageField(upload_to="images/tutorialstep/", blank=True, null=True)
+class TutorialStep(models.Model):
+    image = models.ForeignKey(
+        "core.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tutorial_steps",
+    )
     title = models.CharField(max_length=200)
     body = models.TextField(blank=True)
     order = models.PositiveIntegerField(default=0, db_index=True)

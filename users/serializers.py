@@ -7,12 +7,17 @@ from .validators import clean_player_name
 
 class TutorialStepSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
+    alt_text = serializers.SerializerMethodField()
 
     def get_image_url(self, obj):
         if not obj.image:
             return None
         request = self.context.get("request")
-        return request.build_absolute_uri(obj.image.url) if request else obj.image.url
+        url = obj.image.image.url
+        return request.build_absolute_uri(url) if request else url
+
+    def get_alt_text(self, obj):
+        return obj.image.alt_text if obj.image else ""
 
     class Meta:
         model = TutorialStep
