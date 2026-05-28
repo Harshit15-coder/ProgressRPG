@@ -13,7 +13,7 @@ projects:
             envVars:
               - fromGroup: Prod env
             region: frankfurt
-            preDeployCommand: python manage.py migrate
+            preDeployCommand: ./scripts/pre-deploy.sh
             dockerCommand: daphne -b 0.0.0.0 -p $PORT progress_rpg.asgi:application
             dockerContext: .
             dockerfilePath: ./Dockerfile
@@ -76,7 +76,7 @@ projects:
                 sync: false
               - fromGroup: Prod env
             staticPublishPath: dist
-            buildCommand: npm install && npm run build:production
+            buildCommand: npm ci && npm run build:production
             routes:
             - type: rewrite
               source: /*

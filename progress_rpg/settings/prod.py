@@ -197,3 +197,6 @@ SECURE_HSTS_PRELOAD = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 SECURE_BROWSER_XSS_FILTER = True
 SECURE_REFERRER_POLICY = "strict-origin-when-cross-origin"
+
+# Frontend is a separate static site; the Vite manifest won't exist in this container
+SILENCED_SYSTEM_CHECKS = ["django_vite.W001"]

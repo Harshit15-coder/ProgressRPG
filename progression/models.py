@@ -403,12 +403,10 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
         self.save(update_fields=["name"])
 
     def calculate_base_xp(self, duration: int) -> int:
-        """
-        Calculate and store the XP reward based on duration.
-        Currently, XP gained equals total duration in seconds.
-        """
-        xp = duration
-        return xp
+        from core.models import GameSettings
+
+        xp_per_second = GameSettings.current().default_activity_xp_per_second
+        return int(Decimal(duration) * xp_per_second)
 
     def get_xp_reward_summary(self) -> Dict[str, Any]:
         base_xp = self.calculate_base_xp(self.duration)

@@ -8,6 +8,7 @@ export const routePaths = [
   "/terms-of-service",
   "/support",
   "/maintenance",
+  "/unavailable",
   "/onboarding",
   "/timer",
   "/account",

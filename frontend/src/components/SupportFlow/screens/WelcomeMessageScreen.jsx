@@ -7,9 +7,9 @@ function getWelcomeMessage(loginState, loginStreak) {
     case "first_login_ever":
       return "Welcome to Progress RPG. Let's get started!";
     case "already_logged_today":
-      return `Welcome back! You logged in earlier today. Your login streak is ${loginStreak} days.`;
+      return `Welcome back! You logged in earlier today. You have logged in for ${loginStreak} day${loginStreak !== 1 ? "s" : ""} in a row.`;
     case "streak_continues":
-      return `Welcome back! Your login streak is now ${loginStreak} days.`;
+      return `Welcome back! Your login streak is now ${loginStreak} day${loginStreak !== 1 ? "s" : ""}.`;
     case "streak_reset":
       return "Welcome back, we missed you! Your login streak has been reset.";
     default:

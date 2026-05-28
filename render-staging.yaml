@@ -13,14 +13,14 @@ projects:
             envVars:
               - fromGroup: Staging env
             region: frankfurt
-            preDeployCommand: python manage.py migrate
+            preDeployCommand: ./scripts/pre-deploy.sh
             dockerCommand: daphne -b 0.0.0.0 -p $PORT progress_rpg.asgi:application
             dockerContext: .
             dockerfilePath: ./Dockerfile
             autoDeployTrigger: commit
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: worker
             name: celery-staging
@@ -37,7 +37,7 @@ projects:
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: worker
             name: celery-beat-staging
@@ -54,7 +54,7 @@ projects:
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: keyvalue
             name: redis-staging
@@ -76,7 +76,7 @@ projects:
                 sync: false
               - fromGroup: Staging env
             staticPublishPath: dist
-            buildCommand: npm install && npm run build:production
+            buildCommand: npm ci && npm run build:production
             routes:
             - type: rewrite
               source: /*

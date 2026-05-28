@@ -32,7 +32,6 @@ from typing import TYPE_CHECKING, Optional
 import logging
 from timezone_field import TimeZoneField
 
-from core.models import ImageBase
 from gameplay.models import Currency, CurrencyAccountBase, ServerMessage
 
 if TYPE_CHECKING:
@@ -306,6 +305,9 @@ class Player(Person):
     onboarding_step = models.PositiveIntegerField(choices=ONBOARDING_STEPS, default=0)
 
     onboarding_completed = models.BooleanField(default=False)
+    tutorial_steps_seen = models.ManyToManyField(
+        "TutorialStep", blank=True, related_name="seen_by"
+    )
     # onboarding = models.JSONField(default=dict, blank=True)
 
     @property
@@ -317,7 +319,11 @@ class Player(Person):
         return self.user.is_premium
 
     def get_activity_xp_multiplier(self):
-        return Decimal("2.0") if self.is_premium else Decimal("1.0")
+        if not self.is_premium:
+            return Decimal("1.0")
+        from core.models import GameSettings
+
+        return GameSettings.current().premium_activity_xp_multiplier
 
     @property
     def group_name(self):
@@ -414,10 +420,18 @@ class Player(Person):
         self.save()
 
 
-class TutorialStep(ImageBase):
+class TutorialStep(models.Model):
+    image = models.ForeignKey(
+        "core.Image",
+        null=True,
+        blank=True,
+        on_delete=models.SET_NULL,
+        related_name="tutorial_steps",
+    )
     title = models.CharField(max_length=200)
     body = models.TextField(blank=True)
-    order = models.PositiveIntegerField(unique=True)
+    order = models.PositiveIntegerField(default=0, db_index=True)
+    youtube_url = models.URLField(blank=True)
 
     class Meta:
         ordering = ["order"]

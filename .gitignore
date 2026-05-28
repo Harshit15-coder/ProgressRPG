@@ -10,7 +10,6 @@ env
 node_modules/
 /frontend/dist/
 test-results/
-.dockerignore
 gunicorn_config.py
 backup_file.sql
 backup_file.dump

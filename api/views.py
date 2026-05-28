@@ -75,7 +75,8 @@ from locations.serializers import PopulationCentreSerializer
 
 from progression.serializers import PlayerActivitySerializer
 
-from users.serializers import PlayerSerializer
+from users.models import TutorialStep
+from users.serializers import PlayerSerializer, TutorialStepSerializer
 from users.utils import send_email_to_users
 
 from progress_rpg.settings.utils import get_build_number
@@ -287,6 +288,37 @@ class MeViewSet(viewsets.ViewSet):
             {"onboarding_completed": True},
             status=status.HTTP_200_OK,
         )
+
+    @extend_schema(
+        request=inline_serializer(
+            name="MarkTutorialStepsSeenRequest",
+            fields={
+                "step_ids": drf_serializers.ListField(
+                    child=drf_serializers.IntegerField()
+                )
+            },
+        ),
+        responses=inline_serializer(
+            name="MarkTutorialStepsSeenResponse",
+            fields={"marked": drf_serializers.IntegerField()},
+        ),
+    )
+    @action(detail=False, methods=["post"])
+    def mark_tutorial_steps_seen(self, request):
+        step_ids = request.data.get("step_ids", [])
+        player = request.user.player
+        steps = TutorialStep.objects.filter(id__in=step_ids)
+        player.tutorial_steps_seen.add(*steps)
+        return Response({"marked": steps.count()})
+
+
+class TutorialStepViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = TutorialStep.objects.all()
+    serializer_class = TutorialStepSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_serializer_context(self):
+        return {**super().get_serializer_context(), "request": self.request}
 
 
 class CustomRegisterView(RegisterView):
@@ -506,6 +538,7 @@ class FetchInfoAPIView(APIView):
             )
 
         # --- Serialize everything ---
+        game_settings = GameSettings.current()
         try:
             data = {
                 "success": True,
@@ -530,9 +563,8 @@ class FetchInfoAPIView(APIView):
                 "login_streak": login_state_data["login_streak"],
                 "login_event_at": login_state_data["login_event_at"],
                 "login_reward_xp": login_state_data["login_reward_xp"],
-                "free_timer_limit_seconds": (
-                    GameSettings.current().free_timer_limit_seconds
-                ),
+                "free_timer_limit_seconds": game_settings.free_timer_limit_seconds,
+                "game_settings": GameSettingsSerializer(game_settings).data,
             }
             return Response(data)
 

@@ -91,6 +91,7 @@ INSTALLED_APPS = [
     "server_management",
     "users",
     "metrics",
+    "adminsortable2",
     "django_ratelimit",
     "decouple",
 ]

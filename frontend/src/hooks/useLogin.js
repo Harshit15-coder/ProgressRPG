@@ -54,13 +54,12 @@ export default function useLogin() {
           : error?.message?.toLowerCase?.() || '';
 
 
-      if (message.includes('no active account')) {
+      if (error instanceof TypeError) {
+        return { success: false, error: 'The server is unavailable. Please try again in a moment.' };
+      } else if (message.includes('no active account')) {
         return { success: false, error: 'Invalid email or password; please try again.' };
       } else {
-        return {
-          success: false,
-          error: 'Login failed. Please try again.'
-        };
+        return { success: false, error: 'Login failed. Please try again.' };
       }
     }
   }, []);
