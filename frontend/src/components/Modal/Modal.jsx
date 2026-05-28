@@ -12,6 +12,7 @@ export default function Modal({
   backLabel = "Back",
   id = 'modal',
   size,
+  className,
 }) {
   const modalRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -80,7 +81,7 @@ export default function Modal({
     <div className={styles.modalBackdrop} onClick={handleBackdropClick} role="presentation">
       <div
         ref={modalRef}
-        className={[styles.modal, size ? styles[size] : ''].join(' ').trim()}
+        className={[styles.modal, size ? styles[size] : '', className || ''].join(' ').trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
