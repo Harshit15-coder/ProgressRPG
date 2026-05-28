@@ -6,10 +6,12 @@ import Button from "../Button/Button"
 export default function Modal({
   title,
   children,
+  footer,
   onClose,
   onBack,
   backLabel = "Back",
   id = 'modal',
+  size,
 }) {
   const modalRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -78,7 +80,7 @@ export default function Modal({
     <div className={styles.modalBackdrop} onClick={handleBackdropClick} role="presentation">
       <div
         ref={modalRef}
-        className={styles.modal}
+        className={[styles.modal, size ? styles[size] : ''].join(' ').trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
@@ -111,6 +113,11 @@ export default function Modal({
         <div className={styles.modalContent}>
           {children}
         </div>
+        {footer && (
+          <div className={styles.modalFooter}>
+            {footer}
+          </div>
+        )}
       </div>
     </div>,
     document.body,

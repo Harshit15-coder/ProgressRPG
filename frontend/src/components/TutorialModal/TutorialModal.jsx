@@ -53,13 +53,43 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
 
   const embedUrl = step ? youtubeEmbedUrl(step.youtube_url) : null;
 
+  const footer = (
+    <>
+      <div className={styles.footerLeft} />
+      <div className={styles.footerCenter}>
+        <span className={isFirst ? styles.hidden : undefined} inert={isFirst}>
+          <Button
+            onClick={() => setCurrentIndex((i) => i - 1)}
+            ariaLabel="Previous step"
+          >
+            ←
+          </Button>
+        </span>
+        <span className={styles.stepCount} aria-live="polite" aria-atomic="true">
+          {currentIndex + 1} / {steps.length}
+        </span>
+        <span className={isLast ? styles.hidden : undefined} inert={isLast}>
+          <Button
+            onClick={() => setCurrentIndex((i) => i + 1)}
+            ariaLabel="Next step"
+          >
+            →
+          </Button>
+        </span>
+      </div>
+      <div className={styles.footerRight}>
+        <Button onClick={handleDone}>Done</Button>
+      </div>
+    </>
+  );
+
   return (
     <Modal
       title={step?.title ?? ""}
       onClose={onClose}
-      onBack={!isFirst ? () => setCurrentIndex((i) => i - 1) : undefined}
-      backLabel="Previous"
+      footer={footer}
       id="tutorial-modal"
+      size="lg"
     >
       <div className={styles.content}>
         {step?.image_url && (
@@ -80,17 +110,6 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
           </div>
         )}
         {step?.body && <p className={styles.body}>{step.body}</p>}
-      </div>
-
-      <div className={styles.footer}>
-        <span className={styles.stepCount}>
-          {currentIndex + 1} / {steps.length}
-        </span>
-        {isLast ? (
-          <Button onClick={handleDone}>Done</Button>
-        ) : (
-          <Button onClick={() => setCurrentIndex((i) => i + 1)}>Next</Button>
-        )}
       </div>
     </Modal>
   );

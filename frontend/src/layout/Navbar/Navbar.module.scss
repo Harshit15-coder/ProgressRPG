@@ -130,13 +130,18 @@
   z-index: v.$z-indexdropdown;
   display: flex;
   flex-direction: column;
+  list-style: none;
+  margin: 0;
 }
 
-.accountDropdown a {
+.accountDropdown a,
+.accountDropdown button {
   text-decoration: none;
   padding: v.$spacing-sm v.$spacing-md;
   @include t.apply-text-style(t.$text-body);
   @include c.apply-text-tone(map.get(c.$text-tone, default));
+  width: 100%;
+  text-align: left;
 
   &:hover {
     background: rgba(c.$color-border-primary, 0.08);
