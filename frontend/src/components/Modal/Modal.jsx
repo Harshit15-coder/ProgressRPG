@@ -13,6 +13,7 @@ export default function Modal({
   id = 'modal',
   size,
   className,
+  style,
 }) {
   const modalRef = useRef(null);
   const previousFocusRef = useRef(null);
@@ -82,6 +83,7 @@ export default function Modal({
       <div
         ref={modalRef}
         className={[styles.modal, size ? styles[size] : '', className || ''].join(' ').trim()}
+        style={style}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
