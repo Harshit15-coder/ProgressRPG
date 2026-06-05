@@ -97,6 +97,7 @@ class AppConfigView(APIView):
         return Response(
             {
                 "stripe_live_mode": settings.STRIPE_LIVE_MODE,
+                "stripe_billing_portal_url": settings.STRIPE_BILLING_PORTAL_URL,
                 "feature_flags": FeatureFlag.as_dict(),
             }
         )

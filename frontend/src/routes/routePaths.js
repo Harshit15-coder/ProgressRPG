@@ -9,7 +9,6 @@ export const routePaths = [
   "/support",
   "/maintenance",
   "/unavailable",
-  "/onboarding",
   "/timer",
   "/account",
   "/upgrade",

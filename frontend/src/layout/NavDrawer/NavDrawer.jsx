@@ -63,13 +63,13 @@ export default function NavDrawer({ drawerOpen, onClose }) {
         <ul className={styles["nav-drawer-links"]} role="list">
           {isAuthenticated ? (
             <>
-              <li><Link to="/timer" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>Timer</Link></li>
-              <li><Link to="/activities" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>Activities</Link></li>
+              <li><Link to="/timer" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}><span aria-hidden="true">⏱ </span>Timer</Link></li>
+              <li><Link to="/activities" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}><span aria-hidden="true">📋 </span>Activities</Link></li>
             </>
           ) : (
             <>
-              <li><Link to="/" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>Home</Link></li>
-              <li><Link to="/login" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>Log in</Link></li>
+              <li><Link to="/" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}><span aria-hidden="true">🏠 </span>Home</Link></li>
+              <li><Link to="/login" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}><span aria-hidden="true">🔑 </span>Log in</Link></li>
               <li><Link to="/register" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>Join the waiting list</Link></li>
             </>
           )}

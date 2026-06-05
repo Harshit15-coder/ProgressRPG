@@ -177,7 +177,7 @@
   }
 }
 
-@include m.respond-to(sm) {
+@include m.respond-to(md) {
   .leftLinks,
   .rightLinks {
     display: flex;

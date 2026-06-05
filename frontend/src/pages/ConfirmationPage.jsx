@@ -25,7 +25,7 @@ export default function ConfirmationPage() {
       if (confirmedKey === key) {
         setStatus("success");
         setMessage("Email already confirmed! Redirecting...");
-        setTimeout(() => navigate("/onboarding"), 2000);
+        setTimeout(() => navigate("/"), 2000);
         return;
       }
 
@@ -43,12 +43,12 @@ export default function ConfirmationPage() {
           }
 
           sessionStorage.setItem("confirmedKey", key);
-          setTimeout(() => navigate("/onboarding"), 2000);
+          setTimeout(() => navigate("/"), 2000);
         } else if (res.status === 400 && data?.code === "already_confirmed") {
           // Handle already confirmed message
           setStatus("success");
           setMessage("Email already confirmed! Redirecting...");
-          setTimeout(() => navigate("/onboarding"), 2000);
+          setTimeout(() => navigate("/"), 2000);
 
 
         } else {

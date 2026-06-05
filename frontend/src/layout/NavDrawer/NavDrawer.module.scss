@@ -69,7 +69,6 @@
 }
 
 .nav-drawer-links li {
-    padding: v.$padding-base;
     @include m.border(c.$color-border-light);
     border-width: 0 0 1px 0;
 }
@@ -78,8 +77,16 @@
     text-decoration: none;
     width: 100%;
     padding: v.$padding-base;
-    display: block;
+    display: flex;
+    align-items: center;
+    gap: v.$spacing-xs;
     @include t.apply-text-style(t.$text-body);
+
+    span[aria-hidden] {
+        display: inline-block;
+        width: 1.5em;
+        text-align: center;
+    }
 }
 
 /* Overlay */
@@ -110,7 +117,7 @@
     z-index: 1500;
 }
 
-@include m.respond-to(sm) {
+@include m.respond-to(md) {
     .nav-drawer,
     .overlay {
         display: none;

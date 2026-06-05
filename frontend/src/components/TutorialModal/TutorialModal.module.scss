@@ -1,9 +1,5 @@
 @use '../../styles/semantic/colors' as c;
 
-.tutorialModal {
-  height: min(85vh, 600px);
-}
-
 .content {
   display: flex;
   flex-direction: column;
