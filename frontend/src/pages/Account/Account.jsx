@@ -197,7 +197,11 @@ export default function Account() {
           <div className={styles.billingRow}>
             <div className={styles.infoItem}>
               <span className={styles.label}>Account type</span>
-              <span className={styles.value}>{accountType}</span>
+              {player?.is_premium ? (
+                <span className={styles.premiumBadge}>Premium</span>
+              ) : (
+                <span className={styles.value}>Free</span>
+              )}
             </div>
             <div className={styles.billingAction}>
               {player?.is_premium ? (

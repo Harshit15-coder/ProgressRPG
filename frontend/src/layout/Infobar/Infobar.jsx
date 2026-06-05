@@ -42,7 +42,10 @@ export default function Infobar() {
   return (
     <div className={styles.infoBar}>
       <div className={`${styles.infoBox} ${styles.player}`}>
-        <div className={styles.accountIcon} aria-hidden="true">
+        <div
+          className={`${styles.accountIcon}${player.is_premium ? ` ${styles.accountIconPremium}` : ''}`}
+          aria-hidden="true"
+        >
           <svg viewBox="0 0 24 24" focusable="false">
             <circle cx="12" cy="8" r="4" />
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
