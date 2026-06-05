@@ -73,7 +73,7 @@ describe("SupportFlowModal", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
     expect(
       screen.getByText(
-        "Welcome back! You logged in earlier today. Your login streak is 4 days."
+        "Welcome back! You logged in earlier today. You have logged in for 4 days in a row."
       )
     ).toBeInTheDocument();
     expect(

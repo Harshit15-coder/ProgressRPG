@@ -99,7 +99,7 @@ export default function Modal({
               ariaLabel={backLabel}
               className={styles.backButton}
             >
-              {backLabel}
+              ← {backLabel}
             </Button>
           ) : null}
           <h2 id={titleId}>{title}</h2>

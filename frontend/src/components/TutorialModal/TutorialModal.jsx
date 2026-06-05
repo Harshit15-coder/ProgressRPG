@@ -57,7 +57,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
         title="Tutorial"
         onClose={onClose}
         id="tutorial-modal"
-        style={{ height: '90vh' }}
+        style={{ height: 'min(90vh, 800px)' }}
       >
         <p className={styles.emptyState}>No tutorial content to display yet.</p>
       </Modal>
@@ -91,7 +91,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
         </span>
       </div>
       <div className={styles.footerRight}>
-        <Button onClick={handleDone}>Done</Button>
+        <Button onClick={handleDone}>✓ Done</Button>
       </div>
     </>
   );
@@ -103,7 +103,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
       footer={footer}
       id="tutorial-modal"
       size="lg"
-      style={{ height: '90vh' }}
+      style={{ height: 'min(90vh, 800px)' }}
     >
       <div className={styles.content}>
         {step?.image_url && (

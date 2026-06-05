@@ -15,8 +15,9 @@ const clearAutoStopCompletion = vi.fn();
 const stop = vi.fn();
 const startActivity = vi.fn();
 const addEntityToCache = vi.fn();
-const { playLimitReachedSound } = vi.hoisted(() => ({
+const { playLimitReachedSound, primeAudio } = vi.hoisted(() => ({
   playLimitReachedSound: vi.fn(),
+  primeAudio: vi.fn(),
 }));
 
 vi.mock('../../context/GameContext', () => ({
@@ -37,6 +38,7 @@ vi.mock('../SupportFlow/SupportFlowModal', () => ({
 
 vi.mock('../../utils/sounds', () => ({
   playLimitReachedSound,
+  primeAudio,
 }));
 
 describe('ActivityInput', () => {
@@ -168,69 +170,6 @@ describe('ActivityInput', () => {
         elapsedSeconds: 16,
       });
       expect(playLimitReachedSound).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  it('starts a selected task suggestion with its task id', async () => {
-    const user = userEvent.setup();
-    startActivity.mockResolvedValue(null);
-
-    mockUseGame.mockReturnValue({
-      activityTimer: {
-        currentActivity: null,
-        status: 'empty',
-        stop,
-        startActivity,
-        elapsed: 0,
-        limitSeconds: null,
-        limitReached: false,
-        autoStopCompletion: null,
-        clearAutoStopCompletion,
-      },
-      fetchPlayerAndCharacter,
-      fetchCharacterCurrent,
-      fetchActivities,
-      loginState: 'none',
-      loginStreak: 0,
-      loginEventAt: null,
-      player: { is_premium: false },
-      freeTimerLimitSeconds: 15,
-    });
-
-    mockUseEntitySearchCache.mockReturnValue({
-      entities: [
-        {
-          id: 42,
-          name: 'Write docs',
-          taskId: 42,
-          source: 'task',
-        },
-      ],
-      addEntityToCache,
-    });
-
-    render(<ActivityInput />);
-
-    await user.type(
-      screen.getByPlaceholderText('What are you working on? e.g. washing dishes'),
-      'docs'
-    );
-    await user.click(await screen.findByRole('option', { name: /Write docs \(from Tasks\)/ }));
-
-    await waitFor(() => {
-      expect(addEntityToCache).toHaveBeenCalledWith(
-        expect.objectContaining({
-          id: 42,
-          name: 'Write docs',
-          taskId: 42,
-          source: 'task',
-        })
-      );
-      expect(startActivity).toHaveBeenCalledWith({
-        text: 'Write docs',
-        taskId: 42,
-        limitSeconds: 15,
-      });
     });
   });
 

@@ -1,0 +1,132 @@
+@use '../styles/semantic/colors' as c;
+@use '../styles/base/variables' as v;
+@use '../styles/utilities/mixins' as m;
+@use '../styles/tokens/colors' as tc;
+@use 'sass:map';
+
+.page {
+  max-width: 720px;
+  margin: 0 auto;
+  padding: 2rem;
+}
+
+.hero {
+  background: linear-gradient(
+    150deg,
+    map.get(tc.$primary-scale, 700) 0%,
+    map.get(tc.$primary-scale, 500) 60%,
+    map.get(tc.$primary-scale, 300) 100%
+  );
+  color: tc.$color-light;
+  border-radius: v.$border-radius;
+  padding: 2.5rem 2rem;
+  @include m.fade-in(0.4s);
+}
+
+.heroBadge {
+  display: inline-block;
+  background: tc.$color-accent;
+  color: map.get(tc.$dark-scale, 300);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.7rem;
+  border-radius: 2rem;
+  margin-bottom: 1rem;
+}
+
+.heroHeading {
+  margin: 0 0 0.5rem;
+  font-size: 2.2rem;
+  font-weight: 400;
+  line-height: 1.15;
+}
+
+.heroSubheading {
+  margin: 0;
+  font-size: 1.05rem;
+  opacity: 0.9;
+  max-width: 480px;
+}
+
+.sectionHeading {
+  margin: 2rem 0 0;
+  font-size: 1rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: c.$color-text-muted;
+}
+
+.perkGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 0.75rem;
+}
+
+.perkCard {
+  background: c.$color-bg;
+  border: 1px solid rgba(c.$color-border-primary, 0.2);
+  border-radius: v.$border-radius;
+  padding: 1.1rem 1.25rem;
+  display: flex;
+  gap: 1rem;
+  align-items: flex-start;
+  @include m.fade-in-up(0.3s);
+}
+
+.perkIcon {
+  font-size: 1.6rem;
+  line-height: 1;
+  flex-shrink: 0;
+  margin-top: 0.05rem;
+}
+
+.perkLabel {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: c.$color-text-heading;
+}
+
+.perkDescription {
+  margin: 0;
+  font-size: 0.9rem;
+  color: c.$color-text-muted;
+  line-height: 1.45;
+}
+
+.ctaRow {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+  margin-top: 2rem;
+}
+
+.syncingState {
+  text-align: center;
+  padding: 3rem 2rem;
+  color: c.$color-text-muted;
+  @include m.pulse();
+}
+
+.errorSection {
+  margin-top: 1.5rem;
+  padding: 1rem 1.25rem;
+  border: 1px solid rgba(c.$color-status-danger, 0.3);
+  border-radius: v.$border-radius;
+  background: c.$color-error-bg;
+  color: c.$color-text-error;
+}
+
+@include m.respond-to(sm, down) {
+  .heroHeading {
+    font-size: 1.8rem;
+  }
+
+  .ctaRow {
+    flex-direction: column;
+  }
+}

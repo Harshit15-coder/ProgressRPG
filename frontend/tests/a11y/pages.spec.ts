@@ -1,5 +1,10 @@
 import { test } from '@playwright/test';
 import { checkA11y, expectNoA11yViolations } from '../utils/a11y';
+import {
+  mockSuccessfulSubscriptionSync,
+  stabilizeTimerPage,
+  visitAuthenticatedPage,
+} from '../utils/authenticatedPage';
 
 test.describe('Page Accessibility', () => {
   test('Home page is accessible', async ({ page }) => {
@@ -62,73 +67,92 @@ test.describe('Page Accessibility', () => {
 test.describe('Authenticated Page Accessibility', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
-
   test('Timer page is accessible', async ({ page }) => {
-    await page.goto('/timer');
-    await page.getByRole('heading', { name: /timer/i }).waitFor();
-    const results = await checkA11y(page);
-    expectNoA11yViolations(results);
+    await stabilizeTimerPage(page);
+
+    try {
+      await page.goto('/timer');
+      await page.getByRole('heading', { name: 'Timer', exact: true }).waitFor();
+      const results = await checkA11y(page);
+      expectNoA11yViolations(results);
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 
 
   test('Account page is accessible', async ({ page }) => {
-    await page.goto('/account');
+    await visitAuthenticatedPage(page, '/account');
     await page.getByRole('heading', { name: 'Account', exact: true }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
-  test('Onboarding page is accessible', async ({ page }) => {
-    await page.goto('/onboarding');
-    await page.getByRole('dialog').waitFor();
-    const results = await checkA11y(page);
-    expectNoA11yViolations(results);
+  test('Tutorial modal is accessible when opened from the navbar', async ({ page }) => {
+    await stabilizeTimerPage(page);
+
+    try {
+      await page.goto('/timer');
+      await page.getByRole('heading', { name: 'Timer', exact: true }).waitFor();
+      await page.getByRole('button', { name: 'Open tutorial' }).click();
+      await page.getByRole('dialog').waitFor();
+      const results = await checkA11y(page);
+      expectNoA11yViolations(results);
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 
   test('Upgrade page is accessible', async ({ page }) => {
-    await page.goto('/upgrade');
+    await visitAuthenticatedPage(page, '/upgrade');
     await page.getByRole('heading', { name: /upgrade to premium/i }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Payment success page is accessible', async ({ page }) => {
-    await page.goto('/payment-success');
-    await page.getByRole('heading', { name: /payment successful/i }).waitFor();
-    const results = await checkA11y(page);
-    expectNoA11yViolations(results);
+    await mockSuccessfulSubscriptionSync(page);
+
+    try {
+      await visitAuthenticatedPage(page, '/payment-success');
+      await page.getByRole('heading', { name: /you're premium/i }).waitFor();
+      const results = await checkA11y(page);
+      expectNoA11yViolations(results);
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 
   test('Payment cancelled page is accessible', async ({ page }) => {
-    await page.goto('/payment-cancelled');
+    await visitAuthenticatedPage(page, '/payment-cancelled');
     await page.getByRole('heading', { name: /payment cancelled/i }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Edit account page is accessible', async ({ page }) => {
-    await page.goto('/edit-account');
+    await visitAuthenticatedPage(page, '/edit-account');
     await page.getByRole('heading', { name: /edit account/i }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Tasks page is accessible', async ({ page }) => {
-    await page.goto('/tasks');
+    await visitAuthenticatedPage(page, '/tasks');
     await page.getByRole('heading', { name: 'Tasks', exact: true }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Projects page is accessible', async ({ page }) => {
-    await page.goto('/projects');
+    await visitAuthenticatedPage(page, '/projects');
     await page.getByRole('heading', { name: 'Projects', exact: true }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
 
   test('Activities page is accessible', async ({ page }) => {
-    await page.goto('/activities');
+    await visitAuthenticatedPage(page, '/activities');
     await page.getByRole('heading', { name: 'Activities', exact: true }).waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);

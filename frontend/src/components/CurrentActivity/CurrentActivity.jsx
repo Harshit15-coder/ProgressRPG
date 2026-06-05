@@ -9,7 +9,7 @@ export default function CurrentActivity() {
 
   return (
     <section className={classNames(styles.wrapper, { [styles.isActive]: isActive })}>
-      <h3 className={styles.heading}>Activity timer</h3>
+      <h2 className={styles.heading}>Activity timer</h2>
       <div className={styles.playerCard}>
         <ActivityInput />
       </div>

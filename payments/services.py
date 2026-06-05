@@ -26,12 +26,22 @@ def end_active_subscription(user):
         return None
 
     if active_sub.stripe_subscription_id:
-        stripe.Subscription.cancel(active_sub.stripe_subscription_id)
-        logger.info(
-            "[PAYMENTS.SERVICES] Cancelled Stripe subscription %s for user_id=%s",
-            active_sub.stripe_subscription_id,
-            user.id,
-        )
+        try:
+            stripe.Subscription.cancel(active_sub.stripe_subscription_id)
+            logger.info(
+                "[PAYMENTS.SERVICES] Cancelled Stripe subscription %s for user_id=%s",
+                active_sub.stripe_subscription_id,
+                user.id,
+            )
+        except stripe.error.InvalidRequestError as exc:
+            # Subscription no longer exists in Stripe (e.g. deleted manually,
+            # or created in a different environment). Deactivate locally anyway.
+            logger.warning(
+                "[PAYMENTS.SERVICES] Stripe subscription %s not found for user_id=%s, deactivating locally only: %s",
+                active_sub.stripe_subscription_id,
+                user.id,
+                exc,
+            )
 
     active_sub.deactivate()
     logger.info(

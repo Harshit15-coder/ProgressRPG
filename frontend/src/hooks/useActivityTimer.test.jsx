@@ -12,6 +12,7 @@ vi.mock("../utils/api.js", () => ({
 
 vi.mock("../utils/sounds.js", () => ({
   playActivityStartedSound: (...args) => mockPlayActivityStartedSound(...args),
+  primeAudio: vi.fn(),
 }));
 
 describe('useActivityTimer', () => {

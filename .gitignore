@@ -25,4 +25,5 @@ user_data.json
 *.dump
 *.sql
 playwright-report/
+/playwright/.auth/
 media/

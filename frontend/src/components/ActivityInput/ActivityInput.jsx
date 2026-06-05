@@ -103,6 +103,10 @@ export default function ActivityInput() {
   useEffect(() => () => timeoutRef.current && clearTimeout(timeoutRef.current), []);
 
   useEffect(() => {
+    if (isActive) document.activeElement?.blur();
+  }, [isActive]);
+
+  useEffect(() => {
     if (!autoStopCompletion) return;
 
     let cancelled = false;
