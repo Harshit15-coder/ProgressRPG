@@ -96,9 +96,6 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
               </Link>
             </>
           )}
-          <div className={styles.account}>
-            {/* Reserved for future icons or dropdowns */}
-          </div>
         </div>
 
         <div className={styles.icons} role="navigation" aria-label="Mobile navigation">
@@ -158,7 +155,7 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
                             onHelpClick();
                           }}
                         >
-                          Tutorial
+                          <span aria-hidden="true">❓ </span>Tutorial
                         </button>
                       </li>
                     )}
@@ -168,7 +165,7 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
                         role="menuitem"
                         onClick={() => setAccountOpenMobile(false)}
                       >
-                        Account
+                        <span aria-hidden="true">👤 </span>Account
                       </Link>
                     </li>
                     <li role="none">
@@ -177,7 +174,7 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
                         role="menuitem"
                         onClick={() => setAccountOpenMobile(false)}
                       >
-                        Log out
+                        <span aria-hidden="true">👋 </span>Log out
                       </Link>
                     </li>
                   </ul>
@@ -188,7 +185,7 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
             <>
               <Link to="/login" aria-label="Log in to your account">
                 <Button variant="primary" className={styles.navLink}>
-                  Log in
+                  <span aria-hidden="true">🔑 </span>Log in
                 </Button>
               </Link>
             </>
