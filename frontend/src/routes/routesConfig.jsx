@@ -15,7 +15,6 @@ const PrivacyPolicyPage = lazy(() => import("../pages/PrivacyPolicyPage/PrivacyP
 const TermsOfServicePage = lazy(() => import("../pages/TermsOfServicePage/TermsOfServicePage"));
 const SupportPage = lazy(() => import("../pages/SupportPage/SupportPage"));
 const ConfirmationPage = lazy(() => import("../pages/ConfirmationPage"));
-const OnboardingPage = lazy(() => import("../pages/OnboardingPage/OnboardingPage"));
 const AccountPage = lazy(() => import("../pages/Account/Account"));
 const EditAccount = lazy(() => import("../pages/EditAccount/EditAccount"));
 //const VillagePage = lazy(() => import("../pages/VillagePage/VillagePage"));
@@ -33,7 +32,6 @@ const CancelPage = lazy(() => import("../pages/CancelPage"));
 const UpgradePage = lazy(() => import("../pages/Checkout/UpgradePage"));
 
 import PrivateRoute from "../components/PrivateRoute";
-import RequireOnboardingComplete from "../components/RequireOnboardingComplete";
 
 export const routes = [
   {
@@ -85,20 +83,10 @@ export const routes = [
     element: <UnavailablePage />,
   },
   {
-    path: "/onboarding",
-    element: (
-      <PrivateRoute>
-        <OnboardingPage />
-      </PrivateRoute>
-    ),
-  },
-  {
     path: "/timer",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <ActivityTimelinePage />
-        </RequireOnboardingComplete>
+        <ActivityTimelinePage />
       </PrivateRoute>
     ),
   },
@@ -116,9 +104,7 @@ export const routes = [
     path: "/account",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <AccountPage />
-        </RequireOnboardingComplete>
+        <AccountPage />
       </PrivateRoute>
     ),
   },
@@ -126,9 +112,7 @@ export const routes = [
     path: "/upgrade",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <UpgradePage />
-        </RequireOnboardingComplete>
+        <UpgradePage />
       </PrivateRoute>
     ),
   },
@@ -140,9 +124,7 @@ export const routes = [
     path: "/payment-success",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <SuccessPage />
-        </RequireOnboardingComplete>
+        <SuccessPage />
       </PrivateRoute>
     ),
   },
@@ -150,9 +132,7 @@ export const routes = [
     path: "/payment-cancelled",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <CancelPage />
-        </RequireOnboardingComplete>
+        <CancelPage />
       </PrivateRoute>
     ),
   },
@@ -160,9 +140,7 @@ export const routes = [
     path: "/edit-account",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <EditAccount />
-        </RequireOnboardingComplete>
+        <EditAccount />
       </PrivateRoute>
     ),
   },
@@ -180,13 +158,9 @@ export const routes = [
     path: "/tasks",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <FeatureToggle
-            flag="tasksPage"
-          >
-            <TasksPage />
-          </FeatureToggle>
-        </RequireOnboardingComplete>
+        <FeatureToggle flag="tasksPage">
+          <TasksPage />
+        </FeatureToggle>
       </PrivateRoute>
     ),
   },
@@ -194,11 +168,9 @@ export const routes = [
     path: "/projects",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <FeatureToggle flag="projectsPage">
-            <ProjectsPage />
-          </FeatureToggle>
-        </RequireOnboardingComplete>
+        <FeatureToggle flag="projectsPage">
+          <ProjectsPage />
+        </FeatureToggle>
       </PrivateRoute>
     ),
   },
@@ -206,9 +178,7 @@ export const routes = [
     path: "/activities",
     element: (
       <PrivateRoute>
-        <RequireOnboardingComplete>
-          <ActivitiesPage />
-        </RequireOnboardingComplete>
+        <ActivitiesPage />
       </PrivateRoute>
     ),
   },

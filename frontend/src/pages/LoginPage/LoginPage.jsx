@@ -25,13 +25,8 @@ export default function LoginPage() {
 
     if (result1.success) {
       try {
-        const result2 = await login(result1.tokens.access_token, result1.tokens.refresh_token);
-        //console.log('[HANDLE SUBMIT] result2:', result2);
-        if (result2.onboarding_step && result2.onboarding_step < 4) {
-          navigate('/onboarding');
-        } else {
-          navigate('/timer');
-        }
+        await login(result1.tokens.access_token, result1.tokens.refresh_token);
+        navigate('/');
 
       } catch (err) {
         setError("Login succeeded but failed to fetch user info.");

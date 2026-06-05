@@ -10,6 +10,7 @@ import FeedbackWidget from './components/FeedbackWidget/FeedbackWidget';
 import TutorialModal from './components/TutorialModal/TutorialModal';
 import { useAuth } from './context/AuthContext';
 import { useGame } from './context/GameContext';
+import { apiFetch } from './utils/api';
 
 const announcement = `Progress RPG is in alpha status, and under active development. Bugs may appear, and data may be lost. Thank you for testing!`;
 
@@ -24,18 +25,25 @@ export default function AppContent() {
   const [tutorialForced, setTutorialForced] = useState(false);
   const hideBanner = !isAuthenticated && location.pathname === '/';
 
-  const onOnboardingPage = location.pathname === '/onboarding';
   const hasUnseenSteps = (player?.unseen_tutorial_step_ids?.length ?? 0) > 0;
 
-  // Auto-open when there are unseen steps for an already-onboarded user.
+  // Auto-open for first-time users (not yet onboarded) or when there are unseen steps.
   // Also opens when forced via the help button.
   const tutorialOpen =
     tutorialForced ||
-    (player?.onboarding_completed && hasUnseenSteps && !onOnboardingPage && !tutorialDismissed);
+    (isAuthenticated && player && !player.onboarding_completed && !tutorialDismissed) ||
+    (player?.onboarding_completed && hasUnseenSteps && !tutorialDismissed);
 
   const firstUnseenId = player?.unseen_tutorial_step_ids?.[0] ?? null;
 
   const handleTutorialComplete = async () => {
+    if (!player?.onboarding_completed) {
+      try {
+        await apiFetch("/me/complete_onboarding/", { method: "POST" });
+      } catch {
+        // Non-fatal
+      }
+    }
     await fetchPlayerAndCharacter?.();
     setTutorialDismissed(false);
     setTutorialForced(false);

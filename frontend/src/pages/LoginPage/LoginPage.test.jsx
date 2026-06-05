@@ -52,7 +52,7 @@ describe("LoginPage", () => {
         refresh_token: "refresh-123",
       },
     });
-    mockAuthLogin.mockResolvedValue({ onboarding_step: 4 });
+    mockAuthLogin.mockResolvedValue({});
 
     renderLoginPage();
 
@@ -64,29 +64,7 @@ describe("LoginPage", () => {
       expect(mockLoginWithJwt).toHaveBeenCalledWith("player@example.com", "secretpass");
     });
     expect(mockAuthLogin).toHaveBeenCalledWith("access-123", "refresh-123");
-    expect(mockNavigate).toHaveBeenCalledWith("/game");
-  });
-
-  it("navigates to onboarding when the authenticated user is still onboarding", async () => {
-    const user = userEvent.setup();
-    mockLoginWithJwt.mockResolvedValue({
-      success: true,
-      tokens: {
-        access_token: "access-123",
-        refresh_token: "refresh-123",
-      },
-    });
-    mockAuthLogin.mockResolvedValue({ onboarding_step: 2 });
-
-    renderLoginPage();
-
-    await user.type(screen.getByPlaceholderText("Email"), "player@example.com");
-    await user.type(screen.getByPlaceholderText("Password"), "secretpass");
-    await user.click(screen.getByRole("button", { name: "Log In" }));
-
-    await waitFor(() => {
-      expect(mockNavigate).toHaveBeenCalledWith("/onboarding");
-    });
+    expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 
   it("shows a login error when JWT login fails", async () => {
