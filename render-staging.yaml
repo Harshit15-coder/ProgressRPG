@@ -20,7 +20,7 @@ projects:
             autoDeployTrigger: commit
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: worker
             name: celery-staging
@@ -37,7 +37,7 @@ projects:
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: worker
             name: celery-beat-staging
@@ -54,7 +54,7 @@ projects:
             autoDeployTrigger: checksPass
             buildFilter:
               ignoredPaths:
-              - frontend/*
+              - frontend/**
 
           - type: keyvalue
             name: redis-staging
