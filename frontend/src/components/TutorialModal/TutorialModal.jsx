@@ -91,7 +91,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
         </span>
       </div>
       <div className={styles.footerRight}>
-        <Button onClick={handleDone}>Done</Button>
+        <Button onClick={handleDone}>✓ Done</Button>
       </div>
     </>
   );

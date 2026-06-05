@@ -40,7 +40,9 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
               variant={isAuthenticated && isTimerPage ? "primary" : "secondary"}
               className={styles.navLink}
             >
-              {isAuthenticated ? 'Timer' : 'Home'}
+              {isAuthenticated
+                ? <><span aria-hidden="true">⏱ </span>Timer</>
+                : <><span aria-hidden="true">🏠 </span>Home</>}
             </Button>
           </Link>
 
@@ -51,7 +53,7 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
                   variant={isActivitiesPage ? 'primary' : 'secondary'}
                   className={styles.navLink}
                 >
-                  Activities
+                  <span aria-hidden="true">📋 </span>Activities
                 </Button>
               </Link>
             </>
@@ -61,19 +63,27 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
         <div className={styles.rightLinks} role="navigation" aria-label="User account">
           {isAuthenticated ? (
             <>
-              <div className={styles.link}>
-                <Link to="/logout" aria-label="Log out of your account">
-                  <Button variant="secondary" className={styles.navLink}>
-                    Log out
-                  </Button>
-                </Link>
-              </div>
+              {onHelpClick && (
+                <Button
+                  variant="secondary"
+                  className={styles.navLink}
+                  onClick={onHelpClick}
+                  ariaLabel="Open tutorial"
+                >
+                  ❓
+                </Button>
+              )}
               <Link to="/account" aria-label="Go to your account">
                 <Button
                   className={styles.navLink}
                   variant={isAccountPage ? 'primary' : 'secondary'}
                 >
-                  Account
+                  <span aria-hidden="true">👤 </span>Account
+                </Button>
+              </Link>
+              <Link to="/logout" aria-label="Log out of your account">
+                <Button variant="secondary" className={styles.navLink}>
+                  <span aria-hidden="true">👋 </span>Log out
                 </Button>
               </Link>
             </>
@@ -81,20 +91,10 @@ export default function Navbar({ onMenuClick, onHelpClick }) {
             <>
               <Link to="/login" aria-label="Log in to your account">
                 <Button variant="primary" className={styles.navLink}>
-                  Log in
+                  <span aria-hidden="true">🔑 </span>Log in
                 </Button>
               </Link>
             </>
-          )}
-          {isAuthenticated && onHelpClick && (
-            <Button
-              variant="secondary"
-              className={styles.navLink}
-              onClick={onHelpClick}
-              ariaLabel="Open tutorial"
-            >
-              ?
-            </Button>
           )}
           <div className={styles.account}>
             {/* Reserved for future icons or dropdowns */}
