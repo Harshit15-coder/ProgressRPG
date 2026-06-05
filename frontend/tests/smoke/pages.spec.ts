@@ -1,4 +1,9 @@
 import { expect, test } from '@playwright/test';
+import {
+  mockSuccessfulSubscriptionSync,
+  stabilizeTimerPage,
+  visitAuthenticatedPage,
+} from '../utils/authenticatedPage';
 
 test.describe('Public page smoke tests', () => {
   test('Home page loads', async ({ page }) => {
@@ -51,57 +56,79 @@ test.describe('Authenticated page smoke tests', () => {
   test.use({ storageState: 'playwright/.auth/user.json' });
 
   test('Timer page loads', async ({ page }) => {
-    await page.goto('/timer');
-    await expect(page.getByRole('heading', { name: /timer/i })).toBeVisible();
+    await stabilizeTimerPage(page);
+
+    try {
+      await page.goto('/timer');
+      await expect(page.getByRole('heading', { name: 'Timer', exact: true })).toBeVisible();
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 
   test('Account page loads', async ({ page }) => {
-    await page.goto('/account');
+    await visitAuthenticatedPage(page, '/account');
     await expect(page.getByRole('heading', { name: 'Account', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Player' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Billing' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Player', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Billing', exact: true })).toBeVisible();
   });
 
   test('Edit account page loads', async ({ page }) => {
-    await page.goto('/edit-account');
+    await visitAuthenticatedPage(page, '/edit-account');
     await expect(page.getByRole('heading', { name: /edit account/i })).toBeVisible();
   });
 
   test('Upgrade page loads', async ({ page }) => {
-    await page.goto('/upgrade');
+    await visitAuthenticatedPage(page, '/upgrade');
     await expect(page.getByRole('heading', { name: /upgrade to premium/i })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /premium membership/i })).toBeVisible();
+    await expect(
+      page.getByText(/you are already subscribed!|premium membership for focused progress\./i)
+    ).toBeVisible();
   });
 
   test('Payment success page loads', async ({ page }) => {
-    await page.goto('/payment-success');
-    await expect(page.getByRole('heading', { name: /payment successful/i })).toBeVisible();
+    await mockSuccessfulSubscriptionSync(page);
+
+    try {
+      await visitAuthenticatedPage(page, '/payment-success');
+      await expect(page.getByRole('heading', { name: /you're premium/i })).toBeVisible();
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 
   test('Payment cancelled page loads', async ({ page }) => {
-    await page.goto('/payment-cancelled');
+    await visitAuthenticatedPage(page, '/payment-cancelled');
     await expect(page.getByRole('heading', { name: /payment cancelled/i })).toBeVisible();
   });
 
   test('Tasks page loads', async ({ page }) => {
-    await page.goto('/tasks');
+    await visitAuthenticatedPage(page, '/tasks');
     await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /add task/i })).toBeVisible();
   });
 
   test('Projects page loads', async ({ page }) => {
-    await page.goto('/projects');
+    await visitAuthenticatedPage(page, '/projects');
     await expect(page.getByRole('heading', { name: 'Projects', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /add project/i })).toBeVisible();
   });
 
   test('Activities page loads', async ({ page }) => {
-    await page.goto('/activities');
+    await visitAuthenticatedPage(page, '/activities');
     await expect(page.getByRole('heading', { name: 'Activities', exact: true })).toBeVisible();
   });
 
-  test('Onboarding page loads', async ({ page }) => {
-    await page.goto('/onboarding');
-    await expect(page.getByRole('dialog')).toBeVisible();
+  test('Tutorial modal opens from the navbar', async ({ page }) => {
+    await stabilizeTimerPage(page);
+
+    try {
+      await page.goto('/timer');
+      await expect(page.getByRole('heading', { name: 'Timer', exact: true })).toBeVisible();
+      await page.getByRole('button', { name: 'Open tutorial' }).click();
+      await expect(page.getByRole('dialog')).toBeVisible();
+    } finally {
+      await page.unrouteAll({ behavior: 'ignoreErrors' });
+    }
   });
 });

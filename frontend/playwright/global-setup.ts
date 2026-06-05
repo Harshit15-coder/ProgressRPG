@@ -1,11 +1,18 @@
+import { mkdir } from 'node:fs/promises';
+import { dirname } from 'node:path';
 import { chromium } from '@playwright/test';
 
-const BASE_URL = 'http://localhost:5173';
-const API_URL = 'http://localhost:8000/api/v1';
-const TEST_EMAIL = 'gaidheal01+test1@gmail.com';
-const TEST_PASSWORD = 'correcthorsebatterystaple';
+import {
+  API_URL,
+  BASE_URL,
+  TEST_EMAIL,
+  TEST_PASSWORD,
+  TEST_USER_STORAGE_STATE_PATH,
+} from './testUser';
 
 export default async function globalSetup() {
+  await mkdir(dirname(TEST_USER_STORAGE_STATE_PATH), { recursive: true });
+
   const response = await fetch(`${API_URL}/auth/jwt/create/`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -13,7 +20,13 @@ export default async function globalSetup() {
   });
 
   if (!response.ok) {
-    throw new Error(`Login failed: ${response.status} ${await response.text()}`);
+    throw new Error(
+      [
+        `Login failed for Playwright test user ${TEST_EMAIL}.`,
+        `Run "npm run test:e2e:setup-user" from the frontend directory first.`,
+        `Response: ${response.status} ${await response.text()}`,
+      ].join(' '),
+    );
   }
 
   const data = await response.json();
@@ -34,6 +47,6 @@ export default async function globalSetup() {
     localStorage.setItem('refreshToken', refresh);
   }, { access: accessToken, refresh: refreshToken });
 
-  await context.storageState({ path: 'playwright/.auth/user.json' });
+  await context.storageState({ path: TEST_USER_STORAGE_STATE_PATH });
   await browser.close();
 }
