@@ -11,6 +11,8 @@ export async function handleGlobalWebSocketEvent(data, { showToast, maintenanceR
     case 'pong':
       console.log('[WS] Pong!');
       break;
+    case 'server_message':
+      break;
 
     case 'action':
       switch (data.action) {
