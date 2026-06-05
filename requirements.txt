@@ -103,6 +103,7 @@ django==5.2.14
     #   channels
     #   dj-database-url
     #   dj-rest-auth
+    #   django-admin-sortable2
     #   django-allauth
     #   django-celery-beat
     #   django-cf-turnstile
@@ -238,7 +239,7 @@ referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.33.1
+requests==2.34.0
     # via
     #   -r requirements.in
     #   stripe
@@ -248,7 +249,7 @@ rpds-py==0.30.0
     #   referencing
 sendgrid==6.12.5
     # via -r requirements.in
-sentry-sdk==2.59.0
+sentry-sdk==2.60.0
     # via -r requirements.in
 service-identity==24.2.0
     # via twisted
@@ -260,7 +261,7 @@ sqlparse==0.5.5
     #   django
 stripe==15.1.0
     # via -r requirements.in
-twisted[tls]==25.5.0
+twisted[tls]==26.4.0
     # via
     #   -r requirements.in
     #   daphne

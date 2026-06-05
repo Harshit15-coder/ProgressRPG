@@ -57,7 +57,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
         title="Tutorial"
         onClose={onClose}
         id="tutorial-modal"
-        style={{ height: '90vh' }}
+        className={styles.tutorialModal}
       >
         <p className={styles.emptyState}>No tutorial content to display yet.</p>
       </Modal>
@@ -103,7 +103,7 @@ export default function TutorialModal({ onClose, startAtStepId, onComplete }) {
       footer={footer}
       id="tutorial-modal"
       size="lg"
-      style={{ height: '90vh' }}
+      className={styles.tutorialModal}
     >
       <div className={styles.content}>
         {step?.image_url && (
