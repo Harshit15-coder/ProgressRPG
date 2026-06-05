@@ -34,6 +34,12 @@
   padding: v.$padding-base;
 }
 
+.modal:focus,
+.modal:focus-visible {
+  outline: 2px solid c.$color-glowing-outline;
+  outline-offset: -1px;
+}
+
 .modal.sm { max-width: min(95vw, 400px); }
 .modal.lg { max-width: min(95vw, 720px); }
 
