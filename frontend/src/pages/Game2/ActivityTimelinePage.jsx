@@ -8,6 +8,7 @@ export default function ActivityTimelinePage() {
   return (
     <div className={styles.page}>
       <div className={styles.content}>
+        <h1 className="sr-only">Timer</h1>
         <Infobar />
         <CurrentActivity />
         <ActivityTimeline />

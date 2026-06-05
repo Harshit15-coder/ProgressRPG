@@ -1,7 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const TEST_EMAIL = 'gaidheal01+test1@gmail.com';
-const TEST_PASSWORD = 'correcthorsebatterystaple';
+import { TEST_EMAIL, TEST_PASSWORD } from '../../playwright/testUser';
 
 test.describe('Login flow', () => {
   test('valid credentials redirect to timer or onboarding', async ({ page }) => {
