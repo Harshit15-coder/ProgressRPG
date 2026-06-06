@@ -261,3 +261,267 @@ def sync_subscription_from_stripe(user):
         user.id,
     )
     return _reconcile_subscriptions(user, subscriptions_data)
+
+
+# ---------------------------------------------------------------------------
+# Full account sync (use after switching between Stripe sandbox / live keys)
+# ---------------------------------------------------------------------------
+
+
+def _sync_plans(dry_run=False):
+    """
+    Pull all active Stripe prices and update local SubscriptionPlan.stripe_price_id
+    and price where they differ. Plans are matched by (name, interval) — never created.
+    Returns {"updated": int, "skipped": int, "warnings": list[str]}.
+    """
+    interval_map = {"month": "monthly", "year": "annual"}
+    result = {"updated": 0, "skipped": 0, "warnings": []}
+
+    prices = stripe.Price.list(active=True, expand=["data.product"], limit=100)
+    for price in prices.auto_paging_iter():
+        product = getattr(price, "product", None)
+        if not product or isinstance(product, str):
+            continue
+        product_name = getattr(product, "name", "").strip()
+        recurring = getattr(price, "recurring", None)
+        if not recurring:
+            continue
+        raw_interval = getattr(recurring, "interval", "")
+        interval = interval_map.get(raw_interval)
+        if not interval:
+            continue
+
+        plan = SubscriptionPlan.objects.filter(
+            name__iexact=product_name, interval=interval
+        ).first()
+        if plan is None:
+            msg = (
+                f"No local SubscriptionPlan for Stripe price {price.id} "
+                f"(product={product_name!r}, interval={interval})"
+            )
+            result["warnings"].append(msg)
+            logger.warning("[PAYMENTS.FULLSYNC] %s", msg)
+            continue
+
+        unit_amount = getattr(price, "unit_amount", None)
+        new_price_dollars = round(unit_amount / 100, 2) if unit_amount else None
+        fields_changed = []
+        if plan.stripe_price_id != price.id:
+            fields_changed.append(
+                f"stripe_price_id: {plan.stripe_price_id!r} → {price.id!r}"
+            )
+            if not dry_run:
+                plan.stripe_price_id = price.id
+        if new_price_dollars is not None and float(plan.price) != new_price_dollars:
+            from decimal import Decimal
+
+            fields_changed.append(f"price: {plan.price} → {new_price_dollars}")
+            if not dry_run:
+                plan.price = Decimal(str(new_price_dollars))
+
+        if fields_changed:
+            if not dry_run:
+                update_fields = []
+                if "stripe_price_id" in " ".join(fields_changed):
+                    update_fields.append("stripe_price_id")
+                if "price" in " ".join(fields_changed):
+                    update_fields.append("price")
+                plan.save(update_fields=update_fields)
+            logger.info(
+                "[PAYMENTS.FULLSYNC] %sUpdated plan %r: %s",
+                "[DRY RUN] " if dry_run else "",
+                plan.name,
+                ", ".join(fields_changed),
+            )
+            result["updated"] += 1
+        else:
+            result["skipped"] += 1
+
+    return result
+
+
+def _sync_customers(dry_run=False):
+    """
+    Pull all Stripe customers and update CustomUser.stripe_customer_id where it
+    differs or is missing. Matched by email. Returns {"updated": int, "skipped": int}.
+    """
+    from users.models import CustomUser
+
+    result = {"updated": 0, "skipped": 0}
+    customers = stripe.Customer.list(limit=100)
+    for customer in customers.auto_paging_iter():
+        email = getattr(customer, "email", None)
+        if not email:
+            continue
+        user = CustomUser.objects.filter(email=email).first()
+        if user is None:
+            logger.debug(
+                "[PAYMENTS.FULLSYNC] No local user for Stripe customer %s (email=%s)",
+                customer.id,
+                email,
+            )
+            continue
+        if user.stripe_customer_id == customer.id:
+            result["skipped"] += 1
+            continue
+        logger.info(
+            "[PAYMENTS.FULLSYNC] %sUpdating stripe_customer_id for user_id=%s: %r → %r",
+            "[DRY RUN] " if dry_run else "",
+            user.id,
+            user.stripe_customer_id,
+            customer.id,
+        )
+        if not dry_run:
+            user.stripe_customer_id = customer.id
+            user.save(update_fields=["stripe_customer_id"])
+        result["updated"] += 1
+
+    return result
+
+
+def _sync_subscriptions(dry_run=False):
+    """
+    Pull all Stripe subscriptions (all statuses) and reconcile local UserSubscription
+    records. Depends on stripe_price_id and stripe_customer_id being up to date, so
+    run _sync_plans and _sync_customers first.
+    Returns {"created": int, "updated": int, "deactivated": int, "skipped": int}.
+    """
+    from users.models import CustomUser
+
+    result = {"created": 0, "updated": 0, "deactivated": 0, "skipped": 0}
+
+    subscriptions = stripe.Subscription.list(
+        status="all",
+        limit=100,
+        expand=["data.customer", "data.items.data.price"],
+    )
+    for stripe_sub in subscriptions.auto_paging_iter():
+        customer = getattr(stripe_sub, "customer", None)
+        email = (
+            getattr(customer, "email", None) if not isinstance(customer, str) else None
+        )
+        customer_id = customer.id if not isinstance(customer, str) else customer
+
+        user = CustomUser.objects.filter(stripe_customer_id=customer_id).first()
+        if user is None and email:
+            user = CustomUser.objects.filter(email=email).first()
+        if user is None:
+            logger.debug(
+                "[PAYMENTS.FULLSYNC] No local user for subscription %s (customer=%s)",
+                stripe_sub.id,
+                customer_id,
+            )
+            result["skipped"] += 1
+            continue
+
+        price_id = extract_price_id(stripe_sub)
+        plan = (
+            SubscriptionPlan.objects.filter(stripe_price_id=price_id).first()
+            if price_id
+            else None
+        )
+
+        status = stripe_sub.status
+        local_sub = UserSubscription.objects.filter(
+            stripe_subscription_id=stripe_sub.id
+        ).first()
+
+        if status in ACTIVE_STATUSES:
+            if local_sub is None:
+                if not dry_run:
+                    UserSubscription.deactivate_all_for_user(user)
+                    UserSubscription.objects.create(
+                        user=user,
+                        plan=plan,
+                        stripe_subscription_id=stripe_sub.id,
+                        active=True,
+                    )
+                logger.info(
+                    "[PAYMENTS.FULLSYNC] %sCreated UserSubscription for user_id=%s stripe_sub=%s",
+                    "[DRY RUN] " if dry_run else "",
+                    user.id,
+                    stripe_sub.id,
+                )
+                result["created"] += 1
+            else:
+                changes = []
+                if plan and local_sub.plan != plan:
+                    changes.append(f"plan: {local_sub.plan} → {plan}")
+                    if not dry_run:
+                        local_sub.plan = plan
+                if not local_sub.active:
+                    changes.append("active: False → True")
+                    if not dry_run:
+                        local_sub.activate()
+                    result["updated"] += 1
+                if changes:
+                    if not dry_run and "plan" in " ".join(changes):
+                        local_sub.save(update_fields=["plan"])
+                    logger.info(
+                        "[PAYMENTS.FULLSYNC] %sUpdated subscription id=%s for user_id=%s: %s",
+                        "[DRY RUN] " if dry_run else "",
+                        local_sub.id,
+                        user.id,
+                        ", ".join(changes),
+                    )
+                    result["updated"] += 1
+                else:
+                    result["skipped"] += 1
+
+        elif status in DEAD_STATUSES:
+            if local_sub and local_sub.active:
+                logger.info(
+                    "[PAYMENTS.FULLSYNC] %sDeactivating subscription id=%s for user_id=%s (Stripe status=%s)",
+                    "[DRY RUN] " if dry_run else "",
+                    local_sub.id,
+                    user.id,
+                    status,
+                )
+                if not dry_run:
+                    local_sub.deactivate()
+                result["deactivated"] += 1
+            else:
+                result["skipped"] += 1
+        else:
+            result["skipped"] += 1
+
+    return result
+
+
+def run_full_sync(plans=True, customers=True, subscriptions=True, dry_run=False):
+    """
+    Sync the local database against the currently-configured Stripe account.
+    Run this after switching between sandbox and live Stripe keys.
+
+    Phases run in dependency order: plans → customers → subscriptions.
+    With dry_run=True, fetches from Stripe and logs what would change but
+    makes no database writes.
+
+    Returns a summary dict:
+        {
+            "plans":         {"updated": int, "skipped": int, "warnings": list},
+            "customers":     {"updated": int, "skipped": int},
+            "subscriptions": {"created": int, "updated": int, "deactivated": int, "skipped": int},
+        }
+    """
+    summary = {}
+    if plans:
+        logger.info("[PAYMENTS.FULLSYNC] Starting plan sync (dry_run=%s)", dry_run)
+        summary["plans"] = _sync_plans(dry_run=dry_run)
+        logger.info("[PAYMENTS.FULLSYNC] Plan sync complete: %s", summary["plans"])
+    if customers:
+        logger.info("[PAYMENTS.FULLSYNC] Starting customer sync (dry_run=%s)", dry_run)
+        summary["customers"] = _sync_customers(dry_run=dry_run)
+        logger.info(
+            "[PAYMENTS.FULLSYNC] Customer sync complete: %s", summary["customers"]
+        )
+    if subscriptions:
+        logger.info(
+            "[PAYMENTS.FULLSYNC] Starting subscription sync (dry_run=%s)", dry_run
+        )
+        summary["subscriptions"] = _sync_subscriptions(dry_run=dry_run)
+        logger.info(
+            "[PAYMENTS.FULLSYNC] Subscription sync complete: %s",
+            summary["subscriptions"],
+        )
+    return summary
