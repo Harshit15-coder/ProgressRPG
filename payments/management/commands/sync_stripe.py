@@ -35,9 +35,15 @@ class Command(BaseCommand):
             action="store_true",
             help="Fetch from Stripe and log what would change; make no DB writes.",
         )
+        parser.add_argument(
+            "--verbose",
+            action="store_true",
+            help="Print each individual change in addition to the summary.",
+        )
 
     def handle(self, *args, **options):
         dry_run = options["dry_run"]
+        verbose = options["verbose"]
         plans_only = options["plans_only"]
         customers_only = options["customers_only"]
         subscriptions_only = options["subscriptions_only"]
@@ -72,11 +78,12 @@ class Command(BaseCommand):
             p = summary["plans"]
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Plans:         updated={p['updated']}  skipped={p['skipped']}"
+                    f"Plans:         created={p['created']}  updated={p['updated']}  skipped={p['skipped']}"
                 )
             )
-            for warning in p.get("warnings", []):
-                self.stdout.write(self.style.WARNING(f"  WARNING: {warning}"))
+            if verbose:
+                for line in p.get("changes", []):
+                    self.stdout.write(line)
 
         if "customers" in summary:
             c = summary["customers"]
@@ -85,6 +92,9 @@ class Command(BaseCommand):
                     f"Customers:     updated={c['updated']}  skipped={c['skipped']}"
                 )
             )
+            if verbose:
+                for line in c.get("changes", []):
+                    self.stdout.write(line)
 
         if "subscriptions" in summary:
             s = summary["subscriptions"]
@@ -94,6 +104,9 @@ class Command(BaseCommand):
                     f"deactivated={s['deactivated']}  skipped={s['skipped']}"
                 )
             )
+            if verbose:
+                for line in s.get("changes", []):
+                    self.stdout.write(line)
 
         if dry_run:
             self.stdout.write(

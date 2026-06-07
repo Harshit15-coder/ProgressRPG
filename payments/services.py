@@ -270,12 +270,14 @@ def sync_subscription_from_stripe(user):
 
 def _sync_plans(dry_run=False):
     """
-    Pull all active Stripe prices and update local SubscriptionPlan.stripe_price_id
-    and price where they differ. Plans are matched by (name, interval) — never created.
-    Returns {"updated": int, "skipped": int, "warnings": list[str]}.
+    Pull all active Stripe prices and reconcile local SubscriptionPlan records.
+    Plans are matched by (name, interval); missing plans are created from Stripe data.
+    Returns {"created": int, "updated": int, "skipped": int}.
     """
+    from decimal import Decimal
+
     interval_map = {"month": "monthly", "year": "annual"}
-    result = {"updated": 0, "skipped": 0, "warnings": []}
+    result = {"created": 0, "updated": 0, "skipped": 0, "changes": []}
 
     prices = stripe.Price.list(active=True, expand=["data.product"], limit=100)
     for price in prices.auto_paging_iter():
@@ -291,20 +293,39 @@ def _sync_plans(dry_run=False):
         if not interval:
             continue
 
-        plan = SubscriptionPlan.objects.filter(
-            name__iexact=product_name, interval=interval
-        ).first()
+        unit_amount = getattr(price, "unit_amount", None)
+        new_price_dollars = (
+            Decimal(str(round(unit_amount / 100, 2))) if unit_amount else Decimal("0")
+        )
+
+        plan = (
+            SubscriptionPlan.objects.filter(
+                name__iexact=product_name, interval=interval
+            ).first()
+            or SubscriptionPlan.objects.filter(stripe_price_id=price.id).first()
+        )
+
         if plan is None:
-            msg = (
-                f"No local SubscriptionPlan for Stripe price {price.id} "
-                f"(product={product_name!r}, interval={interval})"
+            logger.info(
+                "[PAYMENTS.FULLSYNC] %sCreating SubscriptionPlan %r interval=%s price_id=%s",
+                "[DRY RUN] " if dry_run else "",
+                product_name,
+                interval,
+                price.id,
             )
-            result["warnings"].append(msg)
-            logger.warning("[PAYMENTS.FULLSYNC] %s", msg)
+            if not dry_run:
+                SubscriptionPlan.objects.create(
+                    name=product_name,
+                    interval=interval,
+                    stripe_price_id=price.id,
+                    price=new_price_dollars,
+                )
+            result["created"] += 1
+            result["changes"].append(
+                f"  [create] plan {product_name!r} ({interval}) price_id={price.id} price={new_price_dollars}"
+            )
             continue
 
-        unit_amount = getattr(price, "unit_amount", None)
-        new_price_dollars = round(unit_amount / 100, 2) if unit_amount else None
         fields_changed = []
         if plan.stripe_price_id != price.id:
             fields_changed.append(
@@ -312,20 +333,18 @@ def _sync_plans(dry_run=False):
             )
             if not dry_run:
                 plan.stripe_price_id = price.id
-        if new_price_dollars is not None and float(plan.price) != new_price_dollars:
-            from decimal import Decimal
-
+        if unit_amount is not None and plan.price != new_price_dollars:
             fields_changed.append(f"price: {plan.price} → {new_price_dollars}")
             if not dry_run:
-                plan.price = Decimal(str(new_price_dollars))
+                plan.price = new_price_dollars
 
         if fields_changed:
             if not dry_run:
-                update_fields = []
-                if "stripe_price_id" in " ".join(fields_changed):
-                    update_fields.append("stripe_price_id")
-                if "price" in " ".join(fields_changed):
-                    update_fields.append("price")
+                update_fields = [
+                    f
+                    for f in ("stripe_price_id", "price")
+                    if any(f in change for change in fields_changed)
+                ]
                 plan.save(update_fields=update_fields)
             logger.info(
                 "[PAYMENTS.FULLSYNC] %sUpdated plan %r: %s",
@@ -334,6 +353,9 @@ def _sync_plans(dry_run=False):
                 ", ".join(fields_changed),
             )
             result["updated"] += 1
+            result["changes"].append(
+                f"  [update] plan {plan.name!r}: {', '.join(fields_changed)}"
+            )
         else:
             result["skipped"] += 1
 
@@ -347,7 +369,7 @@ def _sync_customers(dry_run=False):
     """
     from users.models import CustomUser
 
-    result = {"updated": 0, "skipped": 0}
+    result = {"updated": 0, "skipped": 0, "changes": []}
     customers = stripe.Customer.list(limit=100)
     for customer in customers.auto_paging_iter():
         email = getattr(customer, "email", None)
@@ -375,6 +397,9 @@ def _sync_customers(dry_run=False):
             user.stripe_customer_id = customer.id
             user.save(update_fields=["stripe_customer_id"])
         result["updated"] += 1
+        result["changes"].append(
+            f"  [update] customer {email}: {user.stripe_customer_id!r} → {customer.id!r}"
+        )
 
     return result
 
@@ -388,7 +413,7 @@ def _sync_subscriptions(dry_run=False):
     """
     from users.models import CustomUser
 
-    result = {"created": 0, "updated": 0, "deactivated": 0, "skipped": 0}
+    result = {"created": 0, "updated": 0, "deactivated": 0, "skipped": 0, "changes": []}
 
     subscriptions = stripe.Subscription.list(
         status="all",
@@ -443,6 +468,9 @@ def _sync_subscriptions(dry_run=False):
                     stripe_sub.id,
                 )
                 result["created"] += 1
+                result["changes"].append(
+                    f"  [create] subscription for {getattr(user, 'email', user.id)} stripe_sub={stripe_sub.id} status={status}"
+                )
             else:
                 changes = []
                 if plan and local_sub.plan != plan:
@@ -465,6 +493,9 @@ def _sync_subscriptions(dry_run=False):
                         ", ".join(changes),
                     )
                     result["updated"] += 1
+                    result["changes"].append(
+                        f"  [update] subscription for {getattr(user, 'email', user.id)}: {', '.join(changes)}"
+                    )
                 else:
                     result["skipped"] += 1
 
@@ -480,6 +511,9 @@ def _sync_subscriptions(dry_run=False):
                 if not dry_run:
                     local_sub.deactivate()
                 result["deactivated"] += 1
+                result["changes"].append(
+                    f"  [deactivate] subscription for {getattr(user, 'email', user.id)} stripe_sub={stripe_sub.id} (Stripe status={status})"
+                )
             else:
                 result["skipped"] += 1
         else:
@@ -499,7 +533,7 @@ def run_full_sync(plans=True, customers=True, subscriptions=True, dry_run=False)
 
     Returns a summary dict:
         {
-            "plans":         {"updated": int, "skipped": int, "warnings": list},
+            "plans":         {"created": int, "updated": int, "skipped": int},
             "customers":     {"updated": int, "skipped": int},
             "subscriptions": {"created": int, "updated": int, "deactivated": int, "skipped": int},
         }
