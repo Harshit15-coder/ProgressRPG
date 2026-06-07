@@ -8,11 +8,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from .base import *
 from urllib.parse import quote
-from .utils import (
-    get_postgres_host,
-    get_redis_url,
-    is_running_in_docker,
-)
+from .utils import get_redis_url
 
 LOGGING = {
     "version": 1,
