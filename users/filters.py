@@ -1,6 +1,4 @@
-# gameplay/filters.py
 import django_filters
-from django.conf import settings
 
 from django.db.models import Q
 from .models import Player
@@ -16,21 +14,7 @@ class PlayerFilter(django_filters.FilterSet):
     def filter_is_premium(self, queryset, name, value):
         if value is None:
             return queryset
-
-        premium_price_ids = {
-            getattr(settings, "STRIPE_PRICE_ID_PREMIUM_MONTHLY", ""),
-            getattr(settings, "STRIPE_PRICE_ID_PREMIUM_ANNUAL", ""),
-        }
-        premium_price_ids.discard("")
-
         premium_q = Q(user__subscriptions__active=True)
-        if premium_price_ids:
-            premium_q &= Q(
-                user__subscriptions__plan__stripe_price_id__in=premium_price_ids
-            )
-        else:
-            premium_q &= Q(pk__in=[])
-
         if value:
             return queryset.filter(premium_q).distinct()
         return queryset.exclude(premium_q).distinct()

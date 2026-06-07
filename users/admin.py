@@ -1,5 +1,6 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
+from django.contrib.admin import SimpleListFilter
 from adminsortable2.admin import SortableAdminMixin
 
 from .models import (
@@ -14,6 +15,34 @@ from character.models import PlayerCharacterLink, Character
 from payments.models import UserSubscription
 
 # Register your models here.
+
+
+class IsPremiumFilter(SimpleListFilter):
+    title = "premium"
+    parameter_name = "is_premium"
+
+    def lookups(self, request, model_admin):
+        return [("yes", "Premium"), ("no", "Free")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(usersubscription__active=True)
+        if self.value() == "no":
+            return queryset.exclude(usersubscription__active=True)
+
+
+class IsOnlineFilter(SimpleListFilter):
+    title = "online"
+    parameter_name = "is_online"
+
+    def lookups(self, request, model_admin):
+        return [("yes", "Online"), ("no", "Offline")]
+
+    def queryset(self, request, queryset):
+        if self.value() == "yes":
+            return queryset.filter(player__is_online=True)
+        if self.value() == "no":
+            return queryset.filter(player__is_online=False)
 
 
 class PlayerInline(admin.TabularInline):
@@ -38,7 +67,7 @@ class PlayerInline(admin.TabularInline):
 class UserLoginInline(admin.TabularInline):
     model = UserLogin
     extra = 0
-    max_num = 10
+    max_num = 5
     readonly_fields = ("timestamp", "is_first_login_of_day")
     can_delete = False
 
@@ -53,6 +82,7 @@ class PlayerCurrencyInline(admin.TabularInline):
 class UserSubscriptionInline(admin.TabularInline):
     model = UserSubscription
     extra = 0
+    max_num = 2
     fields = (
         "plan",
         "stripe_subscription_id",
@@ -68,29 +98,34 @@ class CustomUserAdmin(UserAdmin):
     model = CustomUser
     list_display = [
         "email",
-        "is_staff",
+        "get_is_premium",
         "get_player_online",
         "last_recorded_login",
-        "is_active",
+        "current_login_streak",
+        "days_logged_in",
         "created_at",
     ]
     list_filter = [
         "is_staff",
         "is_active",
+        IsPremiumFilter,
+        IsOnlineFilter,
     ]
+    date_hierarchy = "created_at"
     fieldsets = (
-        (None, {"fields": ("email", "password")}),
+        (None, {"fields": ("email", "password", "stripe_customer_id")}),
         ("Personal Info", {"fields": ("date_of_birth",)}),
         (
             "Logins",
             {
+                "classes": ("collapse",),
                 "fields": (
                     "last_login",
                     "last_recorded_login",
                     "days_logged_in",
                     "current_login_streak",
                     "max_login_streak",
-                )
+                ),
             },
         ),
         (
@@ -152,6 +187,13 @@ class CustomUserAdmin(UserAdmin):
     def max_login_streak(self, obj):
         return obj.max_login_streak
 
+    @admin.display(boolean=True, description="Premium")
+    def get_is_premium(self, obj):
+        try:
+            return obj.player.is_premium
+        except Player.DoesNotExist:
+            return None
+
     @admin.display(boolean=True, description="Player online")
     def get_player_online(self, obj):
         try:
@@ -165,6 +207,7 @@ class PlayerAdmin(admin.ModelAdmin):
     list_display = [
         "user",
         "name",
+        "is_online",
         "get_character",
         "current_login_streak",
         "days_logged_in",
@@ -172,6 +215,7 @@ class PlayerAdmin(admin.ModelAdmin):
         "level",
     ]
     list_filter = [
+        "is_online",
         "last_seen",
     ]
 

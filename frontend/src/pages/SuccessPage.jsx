@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../utils/api.js";
 import { useGame } from "../context/GameContext.jsx";
 import Button from "../components/Button/Button";
@@ -32,8 +32,13 @@ export default function SuccessPage() {
   const [status, setStatus] = useState("syncing");
   const { fetchPlayerAndCharacter } = useGame();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   useEffect(() => {
+    if (!searchParams.get("session_id")) {
+      navigate("/", { replace: true });
+      return;
+    }
     apiFetch("/payments/sync-subscription/", { method: "POST" })
       .then((data) => {
         const resolved =

@@ -18,7 +18,6 @@ import os
 from dotenv import load_dotenv
 import logging, ssl, sentry_sdk
 
-from .utils import is_vite_running
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
@@ -224,12 +223,7 @@ USE_TZ = True
 
 # Vite settings
 
-django_vite_dev_mode = os.getenv("DJANGO_VITE_DEV_MODE")
-if django_vite_dev_mode is None:
-    DEV_MODE = is_vite_running()
-else:
-    DEV_MODE = django_vite_dev_mode.lower() in ("true", "1", "yes")
-
+DEV_MODE = os.getenv("DJANGO_VITE_DEV_MODE", "").lower() in ("true", "1", "yes")
 print("DEV_MODE =", DEV_MODE, file=sys.stderr)
 
 DJANGO_VITE = {
@@ -245,14 +239,7 @@ DJANGO_VITE = {
 FRONTEND_URL = (os.getenv("FRONTEND_URL") or "").rstrip("/")
 
 if not FRONTEND_URL:
-    FRONTEND_URL = "http://localhost"
-
-    if is_vite_running():
-        FRONTEND_URL = f"{FRONTEND_URL}:5173"
-        print("Vite status: Vite server is running!", file=sys.stderr)
-    else:
-        FRONTEND_URL = f"{FRONTEND_URL}:8000"
-        print("Vite status: Django serving React from static files", file=sys.stderr)
+    FRONTEND_URL = "http://localhost:5173" if DEV_MODE else "http://localhost:8000"
 
 
 # Static files
@@ -293,24 +280,32 @@ LOGIN_REDIRECT_URL = "/"  # Or wherever you want to go after login
 LOGIN_URL = "/login/"  # Customize the login URL
 
 # Stripe
-STRIPE_PUBLISHABLE_KEY = os.getenv("STRIPE_PUBLISHABLE_KEY", "")
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY", "")
-STRIPE_WEBHOOK_SECRET = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+STRIPE_MODE = os.getenv("STRIPE_MODE", "test").lower()  # "test" or "live"
+STRIPE_LIVE_MODE = STRIPE_MODE == "live"
 
-STRIPE_LIVE_MODE = STRIPE_SECRET_KEY.startswith("sk_live_")
+STRIPE_LIVE_PUBLISHABLE_KEY = os.getenv("STRIPE_LIVE_PUBLISHABLE_KEY", "")
+STRIPE_LIVE_SECRET_KEY = os.getenv("STRIPE_LIVE_SECRET_KEY", "")
+STRIPE_LIVE_WEBHOOK_SECRET = os.getenv("STRIPE_LIVE_WEBHOOK_SECRET", "")
 
-# Canonical Stripe price IDs
-STRIPE_PRICE_ID_PREMIUM_MONTHLY = os.getenv("STRIPE_PRICE_ID_PREMIUM_MONTHLY", "")
-STRIPE_PRICE_ID_PREMIUM_ANNUAL = os.getenv("STRIPE_PRICE_ID_PREMIUM_ANNUAL", "")
-STRIPE_PRICE_ID_FREE = os.getenv("STRIPE_PRICE_ID_FREE", "")
+STRIPE_TEST_PUBLISHABLE_KEY = os.getenv("STRIPE_TEST_PUBLISHABLE_KEY", "")
+STRIPE_TEST_SECRET_KEY = os.getenv("STRIPE_TEST_SECRET_KEY", "")
+STRIPE_TEST_WEBHOOK_SECRET = os.getenv("STRIPE_TEST_WEBHOOK_SECRET", "")
 
-# Free-tier activity timer cap (seconds). Override via env var for local testing.
-FREE_TIMER_LIMIT_SECONDS = int(os.getenv("FREE_TIMER_LIMIT_SECONDS", 1800))
+# Active keys — selected by STRIPE_MODE
+STRIPE_PUBLISHABLE_KEY = (
+    STRIPE_LIVE_PUBLISHABLE_KEY if STRIPE_LIVE_MODE else STRIPE_TEST_PUBLISHABLE_KEY
+)
+STRIPE_SECRET_KEY = (
+    STRIPE_LIVE_SECRET_KEY if STRIPE_LIVE_MODE else STRIPE_TEST_SECRET_KEY
+)
+STRIPE_WEBHOOK_SECRET = (
+    STRIPE_LIVE_WEBHOOK_SECRET if STRIPE_LIVE_MODE else STRIPE_TEST_WEBHOOK_SECRET
+)
 
-# App URLs for Stripe redirects
+# App URLs for Stripe
 STRIPE_SUCCESS_URL = os.getenv(
     "STRIPE_SUCCESS_URL",
-    f"{FRONTEND_URL}/payment-success",
+    f"{FRONTEND_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
 )
 STRIPE_CANCEL_URL = os.getenv(
     "STRIPE_CANCEL_URL",
