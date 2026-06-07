@@ -416,6 +416,7 @@ def _sync_subscriptions(dry_run=False):
     from users.models import CustomUser
 
     result = {"created": 0, "updated": 0, "deactivated": 0, "skipped": 0, "changes": []}
+    seen_stripe_ids = set()
 
     subscriptions = stripe.Subscription.list(
         status="all",
@@ -423,6 +424,7 @@ def _sync_subscriptions(dry_run=False):
         expand=["data.customer", "data.items.data.price"],
     )
     for stripe_sub in subscriptions.auto_paging_iter():
+        seen_stripe_ids.add(stripe_sub.id)
         customer = getattr(stripe_sub, "customer", None)
         email = (
             getattr(customer, "email", None) if not isinstance(customer, str) else None
@@ -520,6 +522,28 @@ def _sync_subscriptions(dry_run=False):
                 result["skipped"] += 1
         else:
             result["skipped"] += 1
+
+    # Deactivate local active subscriptions with no counterpart in Stripe
+    orphaned = UserSubscription.objects.filter(active=True).exclude(
+        stripe_subscription_id__in=seen_stripe_ids
+    )
+    for local_sub in orphaned.select_related("user"):
+        logger.info(
+            "[PAYMENTS.FULLSYNC] %sDeactivating orphaned subscription id=%s "
+            "for user_id=%s (stripe_sub=%s not found in Stripe)",
+            "[DRY RUN] " if dry_run else "",
+            local_sub.id,
+            local_sub.user_id,
+            local_sub.stripe_subscription_id,
+        )
+        if not dry_run:
+            local_sub.deactivate()
+        result["deactivated"] += 1
+        result["changes"].append(
+            f"  [deactivate] orphaned subscription for "
+            f"{getattr(local_sub.user, 'email', local_sub.user_id)} "
+            f"stripe_sub={local_sub.stripe_subscription_id} (not found in Stripe)"
+        )
 
     return result
 
