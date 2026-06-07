@@ -156,6 +156,7 @@ class CreateCheckoutSessionView(APIView):
             session_kwargs = {
                 "mode": "subscription",
                 "payment_method_types": ["card"],
+                "payment_method_collection": "if_required",
                 "client_reference_id": str(request.user.id),
                 "line_items": [{"price": premium_price_id, "quantity": 1}],
                 "subscription_data": {
@@ -163,7 +164,6 @@ class CreateCheckoutSessionView(APIView):
                         "user_id": str(request.user.id),
                         "billing_plan": "annual" if interval == "annual" else "monthly",
                     },
-                    "trial_period_days": 30,
                     "trial_settings": {
                         "end_behavior": {
                             "missing_payment_method": "cancel",
