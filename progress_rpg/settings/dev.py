@@ -14,9 +14,6 @@ from .utils import (
 import sys
 
 
-BRANCH_NAME = os.getenv("BRANCH_NAME", "default")
-print("BRANCH_NAME is:", BRANCH_NAME, file=sys.stderr)
-
 ROOT_URLCONF = "progress_rpg.urls"
 
 
