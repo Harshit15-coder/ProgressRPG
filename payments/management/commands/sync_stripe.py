@@ -78,7 +78,7 @@ class Command(BaseCommand):
             p = summary["plans"]
             self.stdout.write(
                 self.style.SUCCESS(
-                    f"Plans:         created={p['created']}  updated={p['updated']}  skipped={p['skipped']}"
+                    f"Plans:         created={p['created']}  updated={p['updated']}  removed={p['removed']}  skipped={p['skipped']}"
                 )
             )
             if verbose:

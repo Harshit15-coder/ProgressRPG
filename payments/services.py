@@ -278,10 +278,12 @@ def _sync_plans(dry_run=False):
     from decimal import Decimal
 
     interval_map = {"month": "monthly", "year": "annual"}
-    result = {"created": 0, "updated": 0, "skipped": 0, "changes": []}
+    result = {"created": 0, "updated": 0, "skipped": 0, "removed": 0, "changes": []}
+    seen_price_ids = set()
 
     prices = stripe.Price.list(active=True, expand=["data.product"], limit=100)
     for price in prices.auto_paging_iter():
+        seen_price_ids.add(price.id)
         product = getattr(price, "product", None)
         if not product or isinstance(product, str):
             continue
@@ -365,6 +367,40 @@ def _sync_plans(dry_run=False):
             )
         else:
             result["skipped"] += 1
+
+    # Remove stale plans whose price_id is no longer active in Stripe
+    stale = SubscriptionPlan.objects.exclude(
+        Q(stripe_price_id__isnull=True) | Q(stripe_price_id="")
+    ).exclude(stripe_price_id__in=seen_price_ids)
+    for plan in stale:
+        has_subs = plan.usersubscription_set.exists()
+        if has_subs:
+            logger.warning(
+                "[PAYMENTS.FULLSYNC] %sStale plan %r (price_id=%s) has subscriptions — "
+                "clearing stripe_price_id only",
+                "[DRY RUN] " if dry_run else "",
+                plan.name,
+                plan.stripe_price_id,
+            )
+            if not dry_run:
+                plan.stripe_price_id = None
+                plan.save(update_fields=["stripe_price_id"])
+            result["changes"].append(
+                f"  [clear] plan {plan.name!r} price_id={plan.stripe_price_id} (has subscriptions)"
+            )
+        else:
+            logger.info(
+                "[PAYMENTS.FULLSYNC] %sDeleting stale plan %r (price_id=%s)",
+                "[DRY RUN] " if dry_run else "",
+                plan.name,
+                plan.stripe_price_id,
+            )
+            if not dry_run:
+                plan.delete()
+            result["changes"].append(
+                f"  [delete] plan {plan.name!r} price_id={plan.stripe_price_id}"
+            )
+        result["removed"] += 1
 
     return result
 

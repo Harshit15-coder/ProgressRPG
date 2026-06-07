@@ -315,7 +315,11 @@ STRIPE_BILLING_RETURN_URL = os.getenv(
     "STRIPE_BILLING_RETURN_URL",
     f"{FRONTEND_URL}/account",
 )
-STRIPE_BILLING_PORTAL_URL = os.getenv("STRIPE_BILLING_PORTAL_URL", "")
+STRIPE_BILLING_PORTAL_URL = (
+    "https://billing.stripe.com/p/login/bIY6os0pagzFcdGcMM"
+    if STRIPE_LIVE_MODE
+    else "https://billing.stripe.com/p/login/test_eVq3co4fLdlNa6ndsldZ600"
+)
 
 MAILCHIMP_API_KEY = os.getenv("MAILCHIMP_API_KEY", "")
 MAILCHIMP_AUDIENCE_ID = os.getenv("MAILCHIMP_AUDIENCE_ID", "")
