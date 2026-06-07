@@ -37,6 +37,8 @@ export default function UpgradePage() {
     }
   };
 
+  const trialDays = appConfig?.trial_period_days ?? 0;
+  const hasTrial = trialDays > 0;
   const isAlreadyPremium = Boolean(player?.is_premium);
 
   return (
@@ -53,11 +55,32 @@ export default function UpgradePage() {
         <>
           <p className={styles.subtitle}>Premium membership for focused progress.</p>
 
+          {hasTrial && (
+            <ol className={styles.trialSteps}>
+              <li>
+                <span className={styles.trialStepLabel}>Today</span>
+                <span className={styles.trialStepDetail}>Start your {trialDays}-day free trial. <strong>No payment details required.</strong></span>
+              </li>
+              <li>
+                <span className={styles.trialStepLabel}>Day {trialDays}</span>
+                <span className={styles.trialStepDetail}>Reminder that your trial is ending soon.</span>
+              </li>
+              <li>
+                <span className={styles.trialStepLabel}>Day {trialDays + 1}</span>
+                <span className={styles.trialStepDetail}>If you choose to continue, billing starts at £5/month. Cancel anytime.</span>
+              </li>
+            </ol>
+          )}
+
           <div className={styles.planGrid}>
             <div className={`${styles.planCard} ${styles.planCardActive}`}>
               <h2 className={styles.planHeading}>Premium membership</h2>
               <p className={styles.planPrice}>£5 / month</p>
-              <p className={styles.planDescription}>Billed monthly. Cancel anytime.</p>
+              <p className={styles.planDescription}>
+                {hasTrial
+                  ? `${trialDays}-day free trial, no card required. Then £5/month — cancel anytime.`
+                  : "Billed monthly. Cancel anytime."}
+              </p>
               <h3 className={styles.benefitsHeading}>Premium benefits</h3>
               <ul className={styles.benefitsList}>
                 <li>Double XP on all activity rewards.</li>
@@ -69,7 +92,7 @@ export default function UpgradePage() {
           </div>
 
           <Button onClick={handleCheckout} disabled={loading}>
-            {loading ? "Redirecting..." : "Go to checkout"}
+            {loading ? "Redirecting..." : hasTrial ? `Start ${trialDays}-day free trial` : "Go to checkout"}
           </Button>
         </>
       )}
