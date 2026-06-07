@@ -284,6 +284,8 @@ def _sync_plans(dry_run=False):
         product = getattr(price, "product", None)
         if not product or isinstance(product, str):
             continue
+        if not getattr(product, "active", True):
+            continue
         product_name = getattr(product, "name", "").strip()
         recurring = getattr(price, "recurring", None)
         if not recurring:
