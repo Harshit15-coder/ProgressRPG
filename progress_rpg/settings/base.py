@@ -310,7 +310,7 @@ FREE_TIMER_LIMIT_SECONDS = int(os.getenv("FREE_TIMER_LIMIT_SECONDS", 1800))
 # App URLs for Stripe redirects
 STRIPE_SUCCESS_URL = os.getenv(
     "STRIPE_SUCCESS_URL",
-    f"{FRONTEND_URL}/payment-success",
+    f"{FRONTEND_URL}/payment-success?session_id={{CHECKOUT_SESSION_ID}}",
 )
 STRIPE_CANCEL_URL = os.getenv(
     "STRIPE_CANCEL_URL",
