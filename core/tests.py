@@ -1,4 +1,5 @@
 from decimal import Decimal
+from unittest.mock import patch, PropertyMock
 
 from django.core.exceptions import ValidationError
 from django.test import TestCase
@@ -136,23 +137,26 @@ class PremiumXpMultiplierFromSettingsTest(TestCase):
         self.user = User.objects.create_user(email="test@example.com", password="pass")
 
     def test_free_player_gets_1x(self):
-        self.user.is_premium = False
-        self.user.save()
-        multiplier = self.user.player.get_activity_xp_multiplier()
+        with patch.object(
+            User, "is_premium", new_callable=PropertyMock, return_value=False
+        ):
+            multiplier = self.user.player.get_activity_xp_multiplier()
         self.assertEqual(multiplier, Decimal("1.0"))
 
     def test_premium_player_uses_configured_multiplier(self):
         self.settings.premium_activity_xp_multiplier = Decimal("3.00")
         self.settings.save()
-        self.user.is_premium = True
-        self.user.save()
-        multiplier = self.user.player.get_activity_xp_multiplier()
+        with patch.object(
+            User, "is_premium", new_callable=PropertyMock, return_value=True
+        ):
+            multiplier = self.user.player.get_activity_xp_multiplier()
         self.assertEqual(multiplier, Decimal("3.00"))
 
     def test_premium_player_uses_default_multiplier(self):
-        self.user.is_premium = True
-        self.user.save()
-        multiplier = self.user.player.get_activity_xp_multiplier()
+        with patch.object(
+            User, "is_premium", new_callable=PropertyMock, return_value=True
+        ):
+            multiplier = self.user.player.get_activity_xp_multiplier()
         self.assertEqual(multiplier, Decimal("2.00"))
 
 
