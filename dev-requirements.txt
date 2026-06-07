@@ -155,7 +155,7 @@ django-redis==6.0.0
     # via -r requirements.in
 django-stubs==5.2.9
     # via -r dev-requirements.in
-django-stubs-ext==6.0.4
+django-stubs-ext==6.0.5
     # via
     #   -r dev-requirements.in
     #   django-stubs
@@ -189,7 +189,7 @@ hyperlink==21.0.0
     #   twisted
 identify==2.6.19
     # via pre-commit
-idna==3.13
+idna==3.15
     # via
     #   hyperlink
     #   requests
@@ -315,7 +315,7 @@ referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.34.0
+requests==2.34.2
     # via
     #   -r requirements.in
     #   sphinx
@@ -328,7 +328,7 @@ rpds-py==0.30.0
     #   referencing
 sendgrid==6.12.5
     # via -r requirements.in
-sentry-sdk==2.60.0
+sentry-sdk==2.61.1
     # via -r requirements.in
 service-identity==24.2.0
     # via twisted
