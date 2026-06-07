@@ -3,6 +3,7 @@ import logging
 import stripe
 from django.conf import settings
 from django.db import transaction
+from django.db.models import Q
 
 from payments.models import SubscriptionPlan, UserSubscription
 from payments.utils import extract_price_id
@@ -300,12 +301,16 @@ def _sync_plans(dry_run=False):
             Decimal(str(round(unit_amount / 100, 2))) if unit_amount else Decimal("0")
         )
 
-        plan = (
-            SubscriptionPlan.objects.filter(
-                name__iexact=product_name, interval=interval
-            ).first()
-            or SubscriptionPlan.objects.filter(stripe_price_id=price.id).first()
-        )
+        plan = SubscriptionPlan.objects.filter(stripe_price_id=price.id).first()
+        if plan is None:
+            plan = (
+                SubscriptionPlan.objects.filter(
+                    name__iexact=product_name,
+                    interval=interval,
+                )
+                .filter(Q(stripe_price_id__isnull=True) | Q(stripe_price_id=""))
+                .first()
+            )
 
         if plan is None:
             logger.info(
