@@ -9,6 +9,7 @@ from .utils import (
     resolve_subscription_payload_and_model,
     resolve_user_from_checkout_session,
     extract_price_id,
+    get_user_from_customer_id,
 )
 
 logger = logging.getLogger("general")
@@ -22,6 +23,7 @@ def process_stripe_event(event):
         "checkout.session.completed": handle_checkout_session_completed,
         "customer.subscription.updated": handle_subscription_updated,
         "customer.subscription.deleted": handle_subscription_deleted,
+        "customer.subscription.trial_will_end": handle_trial_will_end,
         "invoice.payment_failed": handle_payment_failed,
     }
 
@@ -175,6 +177,31 @@ def handle_subscription_deleted(event):
         subscription.stripe_subscription_id,
         subscription.user_id,
     )
+
+
+def handle_trial_will_end(event):
+    subscription_payload = event.data.object
+    subscription_id = subscription_payload.id
+    customer_id = subscription_payload.customer
+
+    user = get_user_from_customer_id(customer_id)
+    if not user:
+        logger.warning(
+            "[PAYMENTS.WEBHOOK] customer.subscription.trial_will_end for unknown "
+            "customer_id=%s subscription_id=%s",
+            customer_id,
+            subscription_id,
+        )
+        return
+
+    logger.info(
+        "[PAYMENTS.WEBHOOK] Trial ending soon for user_id=%s subscription_id=%s "
+        "trial_end=%s",
+        user.id,
+        subscription_id,
+        subscription_payload.trial_end,
+    )
+    # TODO: send trial-ending reminder email
 
 
 def handle_payment_failed(event):

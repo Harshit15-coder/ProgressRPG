@@ -15,6 +15,7 @@ from .serializers import (
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
 )
+from core.models import GameSettings
 from .models import StripeEvent, SubscriptionPlan, UserSubscription
 from .services import sync_subscription_from_stripe
 from .webhooks import process_stripe_event
@@ -152,24 +153,30 @@ class CreateCheckoutSessionView(APIView):
         success_url = getattr(settings, "STRIPE_SUCCESS_URL", "")
         cancel_url = getattr(settings, "STRIPE_CANCEL_URL", "")
 
+        trial_period_days = GameSettings.current().trial_period_days
+
         try:
+            subscription_data = {
+                "metadata": {
+                    "user_id": str(request.user.id),
+                    "billing_plan": "annual" if interval == "annual" else "monthly",
+                },
+                "trial_settings": {
+                    "end_behavior": {
+                        "missing_payment_method": "cancel",
+                    },
+                },
+            }
+            if trial_period_days > 0:
+                subscription_data["trial_period_days"] = trial_period_days
+
             session_kwargs = {
                 "mode": "subscription",
                 "payment_method_types": ["card"],
+                "payment_method_collection": "if_required",
                 "client_reference_id": str(request.user.id),
                 "line_items": [{"price": premium_price_id, "quantity": 1}],
-                "subscription_data": {
-                    "metadata": {
-                        "user_id": str(request.user.id),
-                        "billing_plan": "annual" if interval == "annual" else "monthly",
-                    },
-                    "trial_period_days": 30,
-                    "trial_settings": {
-                        "end_behavior": {
-                            "missing_payment_method": "cancel",
-                        },
-                    },
-                },
+                "subscription_data": subscription_data,
                 "success_url": success_url,
                 "cancel_url": cancel_url,
             }

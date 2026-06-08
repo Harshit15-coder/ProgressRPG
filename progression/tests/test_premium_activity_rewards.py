@@ -1,15 +1,10 @@
 from django.contrib.auth import get_user_model
-from django.test import TestCase, override_settings
+from django.test import TestCase
 
 from payments.models import SubscriptionPlan, UserSubscription
 from progression.models import PlayerActivity
 
 
-@override_settings(
-    STRIPE_PRICE_ID_FREE="",
-    STRIPE_PRICE_ID_PREMIUM_MONTHLY="price_premium_monthly",
-    STRIPE_PRICE_ID_PREMIUM_ANNUAL="price_premium_annual",
-)
 class PlayerActivityPremiumRewardTests(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(
