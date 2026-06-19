@@ -80,7 +80,7 @@ cron-descriptor==1.4.5
     # via
     #   -r requirements.in
     #   django-celery-beat
-cryptography==48.0.0
+cryptography==48.0.1
     # via
     #   -r requirements.in
     #   autobahn
@@ -206,7 +206,7 @@ pyasn1-modules==0.4.2
     # via service-identity
 pycparser==3.0
     # via cffi
-pyjwt==2.12.1
+pyjwt==2.13.0
     # via
     #   -r requirements.in
     #   djangorestframework-simplejwt
