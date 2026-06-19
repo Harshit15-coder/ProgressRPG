@@ -9,7 +9,6 @@ from .utils import (
     resolve_subscription_payload_and_model,
     resolve_user_from_checkout_session,
     extract_price_id,
-    get_user_from_customer_id,
 )
 
 logger = logging.getLogger("general")
@@ -23,13 +22,18 @@ def process_stripe_event(event):
         "checkout.session.completed": handle_checkout_session_completed,
         "customer.subscription.updated": handle_subscription_updated,
         "customer.subscription.deleted": handle_subscription_deleted,
-        "customer.subscription.trial_will_end": handle_trial_will_end,
         "invoice.payment_failed": handle_payment_failed,
     }
 
     handler = handlers.get(event_type)
     if handler:
         handler(event)
+    else:
+        logger.info(
+            "[PAYMENTS.WEBHOOK] Unhandled event type=%s event_id=%s — no action taken",
+            event_type,
+            getattr(event, "id", None),
+        )
 
 
 @transaction.atomic
@@ -103,9 +107,11 @@ def handle_checkout_session_completed(event):
 
 
 def handle_subscription_updated(event):
-    _, _, subscription_payload, subscription = resolve_subscription_payload_and_model(
-        event,
-        "subscription.updated",
+    user, _, subscription_payload, subscription = (
+        resolve_subscription_payload_and_model(
+            event,
+            "subscription.updated",
+        )
     )
 
     if not subscription_payload or not subscription:
@@ -129,6 +135,15 @@ def handle_subscription_updated(event):
                 plan.name,
             )
 
+    previous_attrs = getattr(event.data, "previous_attributes", None) or {}
+    prev_status = (
+        previous_attrs.get("status")
+        if isinstance(previous_attrs, dict)
+        else getattr(previous_attrs, "status", None)
+    )
+    if prev_status == "trialing" and status != "trialing":
+        _handle_trial_has_ended(user, subscription, status)
+
     if status in ["active", "trialing"]:
         subscription.activate()
         logger.info(
@@ -137,7 +152,7 @@ def handle_subscription_updated(event):
             subscription.user_id,
             status,
         )
-    elif status in ["canceled", "incomplete_expired", "unpaid"]:
+    elif status in ["canceled", "incomplete", "incomplete_expired", "unpaid"]:
         subscription.deactivate()
         logger.info(
             "[PAYMENTS.WEBHOOK] Deactivated stripe_subscription_id=%s user_id=%s status=%s",
@@ -160,8 +175,6 @@ def handle_subscription_updated(event):
             subscription.user_id,
         )
 
-    return
-
 
 def handle_subscription_deleted(event):
     _, _, _, subscription = resolve_subscription_payload_and_model(
@@ -179,37 +192,43 @@ def handle_subscription_deleted(event):
     )
 
 
-def handle_trial_will_end(event):
-    subscription_payload = event.data.object
-    subscription_id = subscription_payload.id
-    customer_id = subscription_payload.customer
-
-    user = get_user_from_customer_id(customer_id)
-    if not user:
-        logger.warning(
-            "[PAYMENTS.WEBHOOK] customer.subscription.trial_will_end for unknown "
-            "customer_id=%s subscription_id=%s",
-            customer_id,
-            subscription_id,
-        )
-        return
-
+def _handle_trial_has_ended(user, subscription, new_status):
     logger.info(
-        "[PAYMENTS.WEBHOOK] Trial ending soon for user_id=%s subscription_id=%s "
-        "trial_end=%s",
-        user.id,
-        subscription_id,
-        subscription_payload.trial_end,
+        "[PAYMENTS.WEBHOOK] Trial ended for user_id=%s stripe_subscription_id=%s "
+        "new_status=%s",
+        user.id if user else None,
+        subscription.stripe_subscription_id,
+        new_status,
     )
-    # TODO: send trial-ending reminder email
+    # TODO: send trial-ended email
 
 
 def handle_payment_failed(event):
-    _, _, _, subscription = resolve_subscription_payload_and_model(
+    _, subscription_id, _, subscription = resolve_subscription_payload_and_model(
         event, "invoice.payment_failed"
     )
 
+    # invoice.payment_failed sends subscription as a bare ID (not expanded).
+    # The resolver returns the ID as subscription_id but None for subscription.
+    if subscription is None and isinstance(subscription_id, str):
+        try:
+            stripe.Subscription.retrieve(subscription_id)
+        except stripe.error.StripeError:
+            logger.exception(
+                "[PAYMENTS.WEBHOOK] Failed to retrieve subscription for payment failure "
+                "subscription_id=%s",
+                subscription_id,
+            )
+            return
+        subscription = UserSubscription.objects.filter(
+            stripe_subscription_id=subscription_id
+        ).first()
+
     if not subscription:
+        logger.warning(
+            "[PAYMENTS.WEBHOOK] Payment failed for unknown subscription_id=%s",
+            subscription_id,
+        )
         return
 
     logger.warning(
@@ -217,3 +236,4 @@ def handle_payment_failed(event):
         subscription.stripe_subscription_id,
         subscription.user_id,
     )
+    # TODO: notify user of payment failure

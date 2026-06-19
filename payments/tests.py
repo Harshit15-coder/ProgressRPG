@@ -13,6 +13,7 @@ from payments.webhooks import (
     handle_checkout_session_completed,
     handle_subscription_updated,
     handle_subscription_deleted,
+    handle_payment_failed,
     process_stripe_event,
 )
 
@@ -218,6 +219,127 @@ class HandleSubscriptionEventTests(TestCase):
         subscription.refresh_from_db()
         self.assertFalse(subscription.active)
         self.assertIsNotNone(subscription.end_date)
+
+    def test_trial_has_ended_logged_when_status_transitions_from_trialing(self):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_trial_end",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_trial_end_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_trial_end",
+                        "customer": "cus_test_123",
+                        "status": "active",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {"status": "trialing"},
+                },
+            }
+        )
+
+        with self.assertLogs("general", level="INFO") as cm:
+            handle_subscription_updated(event)
+
+        self.assertTrue(
+            any("Trial ended" in line for line in cm.output),
+            msg=f"Expected 'Trial ended' in logs, got: {cm.output}",
+        )
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.active)
+
+    def test_incomplete_status_deactivates_subscription(self):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_incomplete",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_incomplete_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_incomplete",
+                        "customer": "cus_test_123",
+                        "status": "incomplete",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {},
+                },
+            }
+        )
+
+        handle_subscription_updated(event)
+
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.active)
+
+    def test_unhandled_event_type_logs_info(self):
+        event = make_event(
+            {
+                "id": "evt_unknown_1",
+                "type": "payment_intent.created",
+            }
+        )
+
+        with self.assertLogs("general", level="INFO") as cm:
+            process_stripe_event(event)
+
+        self.assertTrue(
+            any("Unhandled event" in line for line in cm.output),
+            msg=f"Expected 'Unhandled event' in logs, got: {cm.output}",
+        )
+
+    @patch("payments.webhooks.stripe.Subscription.retrieve")
+    def test_payment_failed_retrieves_unexpanded_subscription(self, mock_retrieve):
+        mock_retrieve.return_value = make_event(
+            {
+                "id": "sub_payment_failed",
+                "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+            }
+        )
+        UserSubscription.deactivate_all_for_user(self.user)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_payment_failed",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_payment_failed_1",
+                "type": "invoice.payment_failed",
+                "data": {
+                    "object": {
+                        "id": "in_test_1",
+                        "customer": "cus_test_123",
+                        # subscription is a bare string (unexpanded)
+                        "subscription": "sub_payment_failed",
+                    }
+                },
+            }
+        )
+
+        with self.assertLogs("general", level="WARNING") as cm:
+            handle_payment_failed(event)
+
+        mock_retrieve.assert_called_once_with("sub_payment_failed")
+        self.assertTrue(
+            any("Payment failed" in line for line in cm.output),
+            msg=f"Expected 'Payment failed' in logs, got: {cm.output}",
+        )
 
 
 class UserPremiumPropertyTests(TestCase):
