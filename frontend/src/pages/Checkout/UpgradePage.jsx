@@ -53,47 +53,33 @@ export default function UpgradePage() {
         <p className={styles.subscribedNotice}>You are already subscribed!</p>
       ) : (
         <>
-          <p className={styles.subtitle}>Premium membership for focused progress.</p>
-
-          {hasTrial && (
-            <ol className={styles.trialSteps}>
-              <li>
-                <span className={styles.trialStepLabel}>Today</span>
-                <span className={styles.trialStepDetail}>Start your {trialDays}-day free trial. <strong>No payment details required.</strong></span>
-              </li>
-              <li>
-                <span className={styles.trialStepLabel}>Day {trialDays}</span>
-                <span className={styles.trialStepDetail}>Reminder that your trial is ending soon.</span>
-              </li>
-              <li>
-                <span className={styles.trialStepLabel}>Day {trialDays + 1}</span>
-                <span className={styles.trialStepDetail}>If you choose to continue, billing starts at £5/month. Cancel anytime.</span>
-              </li>
-            </ol>
-          )}
+          <p className={styles.subtitle}>Focused progress, unlocked.</p>
 
           <div className={styles.planGrid}>
             <div className={`${styles.planCard} ${styles.planCardActive}`}>
-              <h2 className={styles.planHeading}>Premium membership</h2>
-              <p className={styles.planPrice}>£5 / month</p>
+              <ul className={styles.benefitsList}>
+                <li>Double XP on all activity rewards</li>
+                <li>Unlimited timer sessions</li>
+                <li>Early access to new features</li>
+                <li>Help reach more people who need this</li>
+              </ul>
               <p className={styles.planDescription}>
                 {hasTrial
-                  ? `${trialDays}-day free trial, no card required. Then £5/month — cancel anytime.`
-                  : "Billed monthly. Cancel anytime."}
+                  ? `£5/month — ${trialDays}-day free trial, no card required. Cancel anytime.`
+                  : "£5/month — cancel anytime."}
               </p>
-              <h3 className={styles.benefitsHeading}>Premium benefits</h3>
-              <ul className={styles.benefitsList}>
-                <li>Double XP on all activity rewards.</li>
-                <li>Unlimited timer sessions.</li>
-                <li>Early access to new features as they roll out.</li>
-                <li>Help this project reach those in need quicker.</li>
-              </ul>
             </div>
           </div>
 
           <Button onClick={handleCheckout} disabled={loading}>
             {loading ? "Redirecting..." : hasTrial ? `Start ${trialDays}-day free trial` : "Go to checkout"}
           </Button>
+
+          {hasTrial && (
+            <p className={styles.trialSmallPrint}>
+              Today: trial starts. Day {trialDays}: reminder. Day {trialDays + 1}: billing begins if you continue.
+            </p>
+          )}
         </>
       )}
       {error ? <p className={styles.error}>{error}</p> : null}
