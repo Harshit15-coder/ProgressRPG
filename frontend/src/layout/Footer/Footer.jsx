@@ -22,6 +22,7 @@ export default function Footer() {
         </a>
       )}
       <nav className={styles.links} aria-label="Footer links">
+        <a href="https://blog.progressrpg.com/" target="_blank" rel="noopener noreferrer">Blog</a>
         <Link to="/support" onClick={scrollToTop}>Support</Link>
         <Link to="/terms-of-service" onClick={scrollToTop}>Terms of Service</Link>
         <Link to="/privacy-policy" onClick={scrollToTop}>Privacy Policy</Link>
