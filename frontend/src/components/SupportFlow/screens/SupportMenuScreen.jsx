@@ -6,7 +6,7 @@ export default function SupportMenuScreen({ onReady, onNotReady }) {
   return (
     <div className={styles.supportOptionList}>
       <div className={styles.supportOptionRow}>
-        <Button onClick={onReady}>I&apos;m ready to start</Button>
+        <Button onClick={onReady}>Ready for next step</Button>
         <p className={styles.supportOptionText}>
           I have enough energy to begin. Help me pick and start the next task.
         </p>
