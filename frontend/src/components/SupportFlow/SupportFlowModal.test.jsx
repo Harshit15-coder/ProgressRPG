@@ -101,7 +101,7 @@ describe("SupportFlowModal", () => {
     expect(screen.getByText("Total XP gained")).toBeInTheDocument();
     expect(screen.getByText("+27 XP")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "Continue with support in 3.." })
+      screen.getByRole("button", { name: "Continue with support" })
     ).toBeInTheDocument();
     expect(
       screen.getByRole("button", { name: "Back to timer" })
@@ -140,7 +140,7 @@ describe("SupportFlowModal", () => {
     const user = userEvent.setup();
     render(<Fixture initialEvent="OPEN_ACTIVITY_REWARD" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
-    await user.click(screen.getByRole("button", { name: "Continue with support in 3.." }));
+    await user.click(screen.getByRole("button", { name: "Continue with support" }));
     await user.click(screen.getByRole("button", { name: "Back" }));
     expect(screen.getByText("Activity complete!")).toBeInTheDocument();
     expect(
@@ -239,7 +239,7 @@ describe("SupportFlowModal", () => {
     const user = userEvent.setup();
     render(<Fixture initialEvent="OPEN_ACTIVITY_REWARD" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
-    await user.click(screen.getByRole("button", { name: "Continue with support in 3.." }));
+    await user.click(screen.getByRole("button", { name: "Continue with support" }));
     await user.click(
       screen.getByRole("button", { name: "I'm not ready yet" })
     );
@@ -258,7 +258,7 @@ describe("SupportFlowModal", () => {
     const user = userEvent.setup();
     render(<Fixture initialEvent="OPEN_ACTIVITY_REWARD" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
-    await user.click(screen.getByRole("button", { name: "Continue with support in 3.." }));
+    await user.click(screen.getByRole("button", { name: "Continue with support" }));
     await user.click(screen.getByRole("button", { name: "I'm not ready yet" }));
     await user.click(
       screen.getByRole("button", { name: "Breathing exercise" })
