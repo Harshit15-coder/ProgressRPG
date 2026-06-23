@@ -29,7 +29,6 @@ export default function ActivityTimeline() {
     playerActivities,
     characterActivities,
     fetchActivities,
-    character,
     player,
     freeTimerLimitSeconds,
     activityTimer,

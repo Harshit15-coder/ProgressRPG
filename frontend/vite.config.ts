@@ -1,4 +1,4 @@
-// vite.config.js
+// vite.config.ts
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { fileURLToPath } from 'url'
@@ -30,7 +30,7 @@ export default defineConfig(() => {
       environment: 'happy-dom',
       setupFiles: './src/test/setup.js',
       css: true,
-      exclude: ['node_modules', 'dist', 'tests/**', '**/*.spec.{js,jsx}'],
+      exclude: ['node_modules', 'dist', 'tests/**', '**/*.spec.{js,jsx,ts,tsx}'],
     },
   }
 })
