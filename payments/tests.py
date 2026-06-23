@@ -13,6 +13,7 @@ from payments.webhooks import (
     handle_checkout_session_completed,
     handle_subscription_updated,
     handle_subscription_deleted,
+    handle_payment_failed,
     process_stripe_event,
 )
 
@@ -218,6 +219,127 @@ class HandleSubscriptionEventTests(TestCase):
         subscription.refresh_from_db()
         self.assertFalse(subscription.active)
         self.assertIsNotNone(subscription.end_date)
+
+    def test_trial_has_ended_logged_when_status_transitions_from_trialing(self):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_trial_end",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_trial_end_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_trial_end",
+                        "customer": "cus_test_123",
+                        "status": "active",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {"status": "trialing"},
+                },
+            }
+        )
+
+        with self.assertLogs("general", level="INFO") as cm:
+            handle_subscription_updated(event)
+
+        self.assertTrue(
+            any("Trial ended" in line for line in cm.output),
+            msg=f"Expected 'Trial ended' in logs, got: {cm.output}",
+        )
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.active)
+
+    def test_incomplete_status_deactivates_subscription(self):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_incomplete",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_incomplete_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_incomplete",
+                        "customer": "cus_test_123",
+                        "status": "incomplete",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {},
+                },
+            }
+        )
+
+        handle_subscription_updated(event)
+
+        subscription.refresh_from_db()
+        self.assertFalse(subscription.active)
+
+    def test_unhandled_event_type_logs_info(self):
+        event = make_event(
+            {
+                "id": "evt_unknown_1",
+                "type": "payment_intent.created",
+            }
+        )
+
+        with self.assertLogs("general", level="INFO") as cm:
+            process_stripe_event(event)
+
+        self.assertTrue(
+            any("Unhandled event" in line for line in cm.output),
+            msg=f"Expected 'Unhandled event' in logs, got: {cm.output}",
+        )
+
+    @patch("payments.webhooks.stripe.Subscription.retrieve")
+    def test_payment_failed_retrieves_unexpanded_subscription(self, mock_retrieve):
+        mock_retrieve.return_value = make_event(
+            {
+                "id": "sub_payment_failed",
+                "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+            }
+        )
+        UserSubscription.deactivate_all_for_user(self.user)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_payment_failed",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_payment_failed_1",
+                "type": "invoice.payment_failed",
+                "data": {
+                    "object": {
+                        "id": "in_test_1",
+                        "customer": "cus_test_123",
+                        # subscription is a bare string (unexpanded)
+                        "subscription": "sub_payment_failed",
+                    }
+                },
+            }
+        )
+
+        with self.assertLogs("general", level="WARNING") as cm:
+            handle_payment_failed(event)
+
+        mock_retrieve.assert_called_once_with("sub_payment_failed")
+        self.assertTrue(
+            any("Payment failed" in line for line in cm.output),
+            msg=f"Expected 'Payment failed' in logs, got: {cm.output}",
+        )
 
 
 class UserPremiumPropertyTests(TestCase):
@@ -495,6 +617,79 @@ class CreateCheckoutSessionViewTests(TestCase):
         STRIPE_CANCEL_URL="https://example.com/cancel",
     )
     @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    def test_includes_trial_for_new_user_with_trial_configured(
+        self, mock_game_settings, mock_create_session
+    ):
+        mock_game_settings.return_value.trial_period_days = 7
+        user = get_user_model().objects.create_user(
+            email="new-trial@example.com",
+            password="testpass123",
+        )
+
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_trial_new",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        create_kwargs = mock_create_session.call_args.kwargs
+        self.assertEqual(create_kwargs["subscription_data"]["trial_period_days"], 7)
+
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    def test_suppresses_trial_for_returning_subscriber(
+        self, mock_game_settings, mock_create_session
+    ):
+        mock_game_settings.return_value.trial_period_days = 7
+        user = get_user_model().objects.create_user(
+            email="returning@example.com",
+            password="testpass123",
+        )
+        # Returning user: has a past (inactive) subscription
+        UserSubscription.objects.create(
+            user=user,
+            plan=self.monthly_plan,
+            active=False,
+            stripe_subscription_id="sub_old_cancelled",
+        )
+
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_no_trial",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        create_kwargs = mock_create_session.call_args.kwargs
+        self.assertNotIn("trial_period_days", create_kwargs["subscription_data"])
+
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
     def test_reuses_existing_customer_for_checkout(self, mock_create_session):
         user = get_user_model().objects.create_user(
             email="existing-customer@example.com",
@@ -520,6 +715,42 @@ class CreateCheckoutSessionViewTests(TestCase):
         create_kwargs = mock_create_session.call_args.kwargs
         self.assertEqual(create_kwargs["customer"], "cus_existing_123")
         self.assertNotIn("customer_email", create_kwargs)
+
+
+class HasPreviousSubscriptionTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="prev-sub@example.com",
+            password="testpass123",
+        )
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium Monthly",
+            description="",
+            price="9.99",
+            interval="monthly",
+            stripe_price_id="price_monthly_prev",
+        )
+
+    def test_false_when_no_subscriptions(self):
+        self.assertFalse(self.user.has_previous_subscription)
+
+    def test_true_when_inactive_subscription_exists(self):
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=False,
+            stripe_subscription_id="sub_cancelled",
+        )
+        self.assertTrue(self.user.has_previous_subscription)
+
+    def test_true_when_active_subscription_exists(self):
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=True,
+            stripe_subscription_id="sub_active",
+        )
+        self.assertTrue(self.user.has_previous_subscription)
 
 
 class EndActiveSubscriptionTests(TestCase):

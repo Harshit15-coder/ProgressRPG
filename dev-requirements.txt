@@ -93,7 +93,7 @@ cron-descriptor==1.4.5
     # via
     #   -r requirements.in
     #   django-celery-beat
-cryptography==48.0.0
+cryptography==48.0.1
     # via
     #   -r requirements.in
     #   autobahn
@@ -218,7 +218,7 @@ markupsafe==3.0.3
     # via
     #   jinja2
     #   werkzeug
-msgpack==1.1.2
+msgpack==1.2.1
     # via
     #   -r requirements.in
     #   autobahn
@@ -274,7 +274,7 @@ pycparser==3.0
     # via cffi
 pygments==2.20.0
     # via sphinx
-pyjwt==2.12.1
+pyjwt==2.13.0
     # via
     #   -r requirements.in
     #   djangorestframework-simplejwt
@@ -383,7 +383,7 @@ tzdata==2026.2
     #   kombu
 tzlocal==5.3.1
     # via celery
-ujson==5.12.1
+ujson==5.13.0
     # via autobahn
 uritemplate==4.2.0
     # via

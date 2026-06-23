@@ -73,7 +73,7 @@ def resolve_subscription_payload_and_model(event, event_name):
         )
         return None, subscription_payload, None, None
 
-    if not subscription_payload or isinstance(subscription_payload, str):
+    if not subscription_payload:
         logger.warning(f"[PAYMENTS.WEBHOOK] {event_name} missing subscription payload")
         return None, None, None, None
 
@@ -104,29 +104,3 @@ def resolve_subscription_payload_and_model(event, event_name):
         )
 
     return user, subscription_id, subscription_payload, subscription
-
-
-def resolve_subscription_from_event(event, event_name):
-    stripe_object = event.data.object
-
-    subscription_id = stripe_object.id
-    customer_id = stripe_object.customer
-
-    user = get_user_from_customer_id(customer_id)
-
-    subscription = (
-        UserSubscription.objects.filter(
-            user=user,
-            stripe_subscription_id=subscription_id,
-        )
-        .select_related("plan")
-        .first()
-    )
-
-    if not subscription:
-        logger.warning(
-            f"[PAYMENTS.WEBHOOK] {event_name} for unknown (subscription_id={subscription_id}, customer_id={customer_id})"
-        )
-        return None, subscription_id, None
-
-    return user, subscription_id, subscription
