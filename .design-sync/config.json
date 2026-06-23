@@ -1,0 +1,13 @@
+{
+  "projectId": "53a90b3e-6574-419d-a8e1-4af3ae413270",
+  "pkg": "frontend",
+  "globalName": "progressRPG",
+  "shape": "package",
+  "srcDir": "src/components/Button",
+  "cssEntry": "dist-ds/frontend.css",
+  "buildCmd": "cd frontend && npx vite build --config vite.ds.config.js",
+  "componentSrcMap": {
+    "Button": "src/components/Button/Button.jsx",
+    "ButtonFrame": "src/components/Button/ButtonFrame.jsx"
+  }
+}
