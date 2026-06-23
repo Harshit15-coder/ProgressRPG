@@ -272,6 +272,14 @@ export default function useActivityTimer() {
   // ----------------------------
 
 
+  // Block tab close / refresh / external navigation while timer is active
+  useEffect(() => {
+    if (status !== 'active') return;
+    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    window.addEventListener('beforeunload', handler);
+    return () => window.removeEventListener('beforeunload', handler);
+  }, [status]);
+
   // Cleanup on unmount
   useEffect(() => {
     //console.log(`[useActivityTimer] mounted`);
