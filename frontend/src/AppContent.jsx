@@ -61,7 +61,7 @@ export default function AppContent() {
         <AppRoutes />
       </main>
       <Footer />
-      {isAuthenticated && <FeedbackWidget />}
+      {isAuthenticated && !tutorialOpen && <FeedbackWidget />}
       {tutorialOpen && (
         <TutorialModal
           startAtStepId={tutorialForced ? null : firstUnseenId}
