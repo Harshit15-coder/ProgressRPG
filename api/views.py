@@ -94,10 +94,15 @@ class AppConfigView(APIView):
     permission_classes = []
 
     def get(self, request):
+        from core.models import GameSettings
+
+        game_settings = GameSettings.current()
         return Response(
             {
                 "stripe_live_mode": settings.STRIPE_LIVE_MODE,
+                "stripe_billing_portal_url": settings.STRIPE_BILLING_PORTAL_URL,
                 "feature_flags": FeatureFlag.as_dict(),
+                "trial_period_days": game_settings.trial_period_days,
             }
         )
 

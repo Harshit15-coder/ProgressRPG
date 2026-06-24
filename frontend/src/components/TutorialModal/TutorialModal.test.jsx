@@ -187,7 +187,7 @@ describe('TutorialModal', () => {
 
   it('Done marks remaining steps as seen, calls onComplete then onClose', async () => {
     render(<TutorialModal onClose={onClose} onComplete={onComplete} startAtStepId={2} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: '✓ Done' }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
 
@@ -204,7 +204,7 @@ describe('TutorialModal', () => {
   it('Done still closes the modal if the API call fails', async () => {
     mockApiFetch.mockRejectedValue(new Error('Network error'));
     render(<TutorialModal onClose={onClose} />);
-    fireEvent.click(screen.getByRole('button', { name: 'Done' }));
+    fireEvent.click(screen.getByRole('button', { name: '✓ Done' }));
 
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });

@@ -87,6 +87,7 @@ class GameSettings(models.Model):
         max_digits=5, decimal_places=4, default="1.0000"
     )
     activity_search_includes_tasks = models.BooleanField(default=False)
+    trial_period_days = models.IntegerField(default=14)
 
     class Meta:
         verbose_name = "Game settings"
@@ -119,6 +120,8 @@ class GameSettings(models.Model):
             errors["premium_activity_xp_multiplier"] = "Must be > 0."
         if self.default_activity_xp_per_second <= 0:
             errors["default_activity_xp_per_second"] = "Must be > 0."
+        if self.trial_period_days < 0:
+            errors["trial_period_days"] = "Must be non-negative."
         if errors:
             raise ValidationError(errors)
 

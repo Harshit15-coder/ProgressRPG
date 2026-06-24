@@ -70,6 +70,18 @@
   word-break: break-word;
 }
 
+.premiumBadge {
+  display: inline-block;
+  background: c.$color-character;
+  color: c.$color-text-heading;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  padding: 0.2rem 0.65rem;
+  border-radius: 2rem;
+}
+
 .nameItem {
   grid-column: 1 / -1;
 }

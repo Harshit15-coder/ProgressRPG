@@ -80,7 +80,7 @@ cron-descriptor==1.4.5
     # via
     #   -r requirements.in
     #   django-celery-beat
-cryptography==48.0.0
+cryptography==48.0.1
     # via
     #   -r requirements.in
     #   autobahn
@@ -103,6 +103,7 @@ django==5.2.14
     #   channels
     #   dj-database-url
     #   dj-rest-auth
+    #   django-admin-sortable2
     #   django-allauth
     #   django-celery-beat
     #   django-cf-turnstile
@@ -155,7 +156,7 @@ hyperlink==21.0.0
     # via
     #   autobahn
     #   twisted
-idna==3.13
+idna==3.18
     # via
     #   hyperlink
     #   requests
@@ -176,7 +177,7 @@ kombu==5.6.2
     #   celery
 markupsafe==3.0.3
     # via werkzeug
-msgpack==1.1.2
+msgpack==1.2.1
     # via
     #   -r requirements.in
     #   autobahn
@@ -205,7 +206,7 @@ pyasn1-modules==0.4.2
     # via service-identity
 pycparser==3.0
     # via cffi
-pyjwt==2.12.1
+pyjwt==2.13.0
     # via
     #   -r requirements.in
     #   djangorestframework-simplejwt
@@ -238,7 +239,7 @@ referencing==0.37.0
     # via
     #   jsonschema
     #   jsonschema-specifications
-requests==2.33.1
+requests==2.34.2
     # via
     #   -r requirements.in
     #   stripe
@@ -248,7 +249,7 @@ rpds-py==0.30.0
     #   referencing
 sendgrid==6.12.5
     # via -r requirements.in
-sentry-sdk==2.59.0
+sentry-sdk==2.61.1
     # via -r requirements.in
 service-identity==24.2.0
     # via twisted
@@ -260,7 +261,7 @@ sqlparse==0.5.5
     #   django
 stripe==15.1.0
     # via -r requirements.in
-twisted[tls]==25.5.0
+twisted[tls]==26.4.0
     # via
     #   -r requirements.in
     #   daphne
@@ -280,7 +281,7 @@ tzdata==2026.2
     #   kombu
 tzlocal==5.3.1
     # via celery
-ujson==5.12.1
+ujson==5.13.0
     # via autobahn
 uritemplate==4.2.0
     # via

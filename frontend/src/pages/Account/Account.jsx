@@ -10,10 +10,13 @@ import {
   getPlayerNameErrorMessage,
   getPlayerNameValidation,
 } from "../../utils/playerNameValidation";
+import { useAppConfig } from "../../hooks/useAppConfig";
 import styles from "./Account.module.scss";
 
 export default function Account() {
   const { player, loading, fetchPlayerAndCharacter } = useGame();
+  const { data: appConfig } = useAppConfig();
+  const billingPortalUrl = appConfig?.stripe_billing_portal_url;
   const navigate = useNavigate();
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState("");
@@ -197,7 +200,11 @@ export default function Account() {
           <div className={styles.billingRow}>
             <div className={styles.infoItem}>
               <span className={styles.label}>Account type</span>
-              <span className={styles.value}>{accountType}</span>
+              {player?.is_premium ? (
+                <span className={styles.premiumBadge}>Premium</span>
+              ) : (
+                <span className={styles.value}>Free</span>
+              )}
             </div>
             <div className={styles.billingAction}>
               {player?.is_premium ? (
@@ -207,10 +214,11 @@ export default function Account() {
                   </p>
                   <Button
                     as="a"
-                    href="https://billing.stripe.com/p/login/test_fZucN7dm23whgwNf3N4ow00"
+                    href={billingPortalUrl}
                     target="_blank"
                     rel="noopener noreferrer"
                     variant="secondary"
+                    disabled={!billingPortalUrl}
                   >
                     Open billing portal
                   </Button>

@@ -12,6 +12,8 @@ const mockUpdatePlayer = vi.fn();
 const mockDownloadUserData = vi.fn();
 const mockDeleteAccount = vi.fn();
 
+const TEST_BILLING_PORTAL_URL = "https://billing.stripe.com/p/login/test_portal";
+
 vi.mock("../../context/GameContext", () => ({
   useGame: () => mockUseGame(),
 }));
@@ -20,6 +22,10 @@ vi.mock("../../api/player", () => ({
   updatePlayer: (...args) => mockUpdatePlayer(...args),
   downloadUserData: (...args) => mockDownloadUserData(...args),
   deleteAccount: (...args) => mockDeleteAccount(...args),
+}));
+
+vi.mock("../../hooks/useAppConfig", () => ({
+  useAppConfig: () => ({ data: { stripe_billing_portal_url: TEST_BILLING_PORTAL_URL } }),
 }));
 
 const tierOneAchievements = [
@@ -314,10 +320,7 @@ describe("Account", () => {
     ).toBeInTheDocument();
     expect(
       screen.getByRole("link", { name: "Open billing portal" })
-    ).toHaveAttribute(
-      "href",
-      "https://billing.stripe.com/p/login/test_fZucN7dm23whgwNf3N4ow00"
-    );
+    ).toHaveAttribute("href", TEST_BILLING_PORTAL_URL);
     expect(screen.queryByRole("link", { name: "Upgrade" })).not.toBeInTheDocument();
   });
 });
