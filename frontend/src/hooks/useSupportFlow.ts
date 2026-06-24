@@ -57,8 +57,9 @@ interface SupportFlowOptions {
  */
 export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
   const [flowState, flowDispatch] = useReducer(
-    // The reducer is a .js file; cast to the typed signature.
-    supportFlowReducer as (state: FlowState, action: FlowAction) => FlowState,
+    // The reducer uses loose internal types; cast via unknown to the typed signature.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    supportFlowReducer as unknown as (state: FlowState, action: FlowAction) => FlowState,
     { isOpen: false } as FlowState
   );
 
