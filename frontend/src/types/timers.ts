@@ -1,0 +1,177 @@
+/**
+ * Timer-related types — activity timer state, WebSocket message shapes,
+ * and the return type of useActivityTimer.
+ */
+
+import type { TimerStatus, WebSocketMessageType, ServerWebSocketAction, ClientWebSocketAction } from "./enums";
+import type { PlayerActivity } from "./domain";
+
+// ---------------------------------------------------------------------------
+// Activity timer API shape (ActivityTimerSerializer)
+// ---------------------------------------------------------------------------
+
+/** Raw shape returned from /activity_timers/ endpoints */
+export interface ActivityTimerApiData {
+  id: number;
+  status: TimerStatus;
+  elapsed_time: number;
+  created_at: string;
+  last_updated: string;
+  activity: PlayerActivity | null;
+  player: number;
+}
+
+/** Response from POST /activity_timers/complete/ */
+export interface ActivityCompleteResponse {
+  duration_seconds: number;
+  base_xp: number;
+  xp_multiplier: number;
+  xp_gained: number;
+  level_ups: LevelUpEvent[];
+}
+
+/** Single level-up event returned in completion rewards */
+export interface LevelUpEvent {
+  entity: "player" | "character";
+  new_level: number;
+  old_level?: number;
+}
+
+// ---------------------------------------------------------------------------
+// Quest timer API shape (QuestTimerSerializer)
+// ---------------------------------------------------------------------------
+
+export interface QuestTimerApiData {
+  id: number;
+  status: TimerStatus;
+  elapsed_time: number;
+  created_at: string;
+  last_updated: string;
+  quest: import("./domain").Quest | null;
+  duration: number;
+  remaining_time: number;
+  character: number;
+}
+
+// ---------------------------------------------------------------------------
+// useActivityTimer hook state and return value
+// ---------------------------------------------------------------------------
+
+/**
+ * The current activity as held in local hook state.
+ * This may be the full server PlayerActivity or a lightweight optimistic object.
+ */
+export interface CurrentActivity {
+  /** Display name (from server activity.name or optimistic text) */
+  name?: string;
+  /** Optimistic text before server confirmation */
+  text?: string;
+  /** Optional task ID the activity is logged against */
+  taskId?: number | null;
+  /** Server-assigned id once confirmed */
+  id?: number;
+}
+
+/**
+ * Payload passed to startActivity when starting a new timer.
+ * A plain string is also accepted (treated as `{ text: string }`).
+ */
+export interface StartActivityInput {
+  text: string;
+  taskId?: number | null;
+  /** Optional hard cap in seconds — timer auto-stops when reached */
+  limitSeconds?: number | null;
+  /** Human-readable reason for the limit (shown in auto-stop notification) */
+  limitReason?: string | null;
+}
+
+/**
+ * Payload set when the timer auto-stops due to hitting limitSeconds.
+ * Stored in autoStopCompletion state until cleared.
+ */
+export interface AutoStopCompletion {
+  xpGained: number | null;
+  baseXp: number | null;
+  xpMultiplier: number | null;
+  levelUps: LevelUpEvent[];
+  activityName: string | null;
+  elapsedSeconds: number;
+  stopReason?: string;
+}
+
+/** Full return shape of useActivityTimer */
+export interface ActivityTimerReturn {
+  status: TimerStatus;
+  elapsed: number;
+  duration: number;
+  limitSeconds: number | null;
+  limitReached: boolean;
+  autoStopCompletion: AutoStopCompletion | null;
+  currentActivity: CurrentActivity | null;
+  startActivity: (newActivity: StartActivityInput | string) => Promise<unknown>;
+  stop: (opts?: {
+    activityName?: string;
+    elapsedSeconds?: number;
+    source?: "manual" | "auto";
+    stopReason?: string | null;
+  }) => Promise<ActivityCompleteResponse | null>;
+  loadFromServer: (
+    serverData: ActivityTimerApiData | null,
+    opts?: { limitSeconds?: number | null }
+  ) => void;
+  clearAutoStopCompletion: () => void;
+}
+
+// ---------------------------------------------------------------------------
+// WebSocket message shapes
+// ---------------------------------------------------------------------------
+
+/** Base shape for all WebSocket messages */
+export interface WebSocketMessageBase {
+  type: WebSocketMessageType;
+  action: ServerWebSocketAction;
+  message?: string;
+}
+
+/** console.log / pong messages */
+export interface WebSocketConsoleMessage extends WebSocketMessageBase {
+  type: "console.log";
+  action: "console.log";
+  message: string;
+}
+
+export interface WebSocketPongMessage extends WebSocketMessageBase {
+  type: "pong";
+  action: "pong";
+  message: "pong";
+}
+
+/** Notification message (quest complete, activity submitted, etc.) */
+export interface WebSocketNotificationMessage extends WebSocketMessageBase {
+  type: "notification";
+  action: "notification";
+  data?: Record<string, unknown>;
+  created_at?: string;
+}
+
+/** Error message sent by server */
+export interface WebSocketErrorMessage extends WebSocketMessageBase {
+  type: "error";
+  action: ServerWebSocketAction;
+  message: string;
+}
+
+/** Union of all known incoming WebSocket message shapes */
+export type IncomingWebSocketMessage =
+  | WebSocketConsoleMessage
+  | WebSocketPongMessage
+  | WebSocketNotificationMessage
+  | WebSocketErrorMessage
+  | WebSocketMessageBase;
+
+/** Client-to-server message shape */
+export interface OutgoingWebSocketMessage {
+  type: "client_request" | "ping";
+  action?: ClientWebSocketAction;
+  [key: string]: unknown;
+}

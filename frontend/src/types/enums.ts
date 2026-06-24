@@ -1,0 +1,90 @@
+/**
+ * Shared enums and literal union types.
+ */
+
+// ---------------------------------------------------------------------------
+// Feature flags
+// ---------------------------------------------------------------------------
+
+/** Possible values for any feature flag */
+export type FeatureFlagValue = "no" | "all" | "premium";
+
+/** Known feature flag keys (from src/featureFlags.js) */
+export type FeatureFlagKey =
+  | "activityList"
+  | "tasksPage"
+  | "categoriesPage"
+  | "skillsPage"
+  | "projectsPage";
+
+// ---------------------------------------------------------------------------
+// Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)
+// ---------------------------------------------------------------------------
+
+export type TimerStatus = "active" | "paused" | "waiting" | "completed" | "empty";
+
+// ---------------------------------------------------------------------------
+// Character activity status (CharacterActivitySerializer.get_status)
+// ---------------------------------------------------------------------------
+
+export type CharacterActivityStatus = "past" | "current" | "future" | "unknown";
+
+// ---------------------------------------------------------------------------
+// Login / session state
+// ---------------------------------------------------------------------------
+
+/** Login state returned by /fetch_info/ */
+export type LoginState = "none" | "new_login" | "returning" | string;
+
+// ---------------------------------------------------------------------------
+// WebSocket message types (gameplay/consumers.py + ServerMessage.type)
+// ---------------------------------------------------------------------------
+
+export type WebSocketMessageType =
+  | "console.log"
+  | "server_message"
+  | "notification"
+  | "event"
+  | "action"
+  | "response"
+  | "error"
+  | "pong";
+
+// WebSocket action strings sent from client (handle_client_request)
+export type ClientWebSocketAction =
+  | "start_timers"
+  | "pause_timers"
+  | "create_activity"
+  | "choose_quest"
+  | "complete_quest"
+  | "submit_activity";
+
+// WebSocket action strings sent by server
+export type ServerWebSocketAction =
+  | "console.log"
+  | "pong"
+  | "no_active_character"
+  | "notification"
+  | "quest_complete"
+  | "reward"
+  | "message"
+  | string;
+
+// ---------------------------------------------------------------------------
+// XP modifier scope (XpModifier.Scope)
+// ---------------------------------------------------------------------------
+
+export type XpModifierScope = "PLAYER" | "CHARACTER";
+
+// ---------------------------------------------------------------------------
+// Quest category / frequency
+// ---------------------------------------------------------------------------
+
+export type QuestCategory = "NONE" | "TRADE" | "RECUR" | "EVENT";
+export type QuestFrequency = "NONE" | "DAY" | "WEEK" | "MONTH";
+
+// ---------------------------------------------------------------------------
+// Subscription plan
+// ---------------------------------------------------------------------------
+
+export type SubscriptionPlan = "monthly" | "annual";

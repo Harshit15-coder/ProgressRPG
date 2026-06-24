@@ -13,9 +13,7 @@ from .utils import (
 )
 import sys
 
-
 ROOT_URLCONF = "progress_rpg.urls"
-
 
 LOGGING = {
     "version": 1,

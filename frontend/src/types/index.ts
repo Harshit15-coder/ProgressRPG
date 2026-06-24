@@ -1,0 +1,75 @@
+/**
+ * Barrel export for all shared TypeScript types.
+ *
+ * Import from here in consuming files:
+ *   import type { Player, Character, TimerStatus } from "../types";
+ */
+
+// Generic API response shapes
+export type {
+  PaginatedResponse,
+  ApiErrorResponse,
+  TokenPair,
+  AccessTokenResponse,
+  CheckoutSessionResponse,
+  AppConfig,
+  GameSettings,
+  FetchInfoResponse,
+} from "./api";
+
+// Enums and literal union types
+export type {
+  FeatureFlagValue,
+  FeatureFlagKey,
+  TimerStatus,
+  CharacterActivityStatus,
+  LoginState,
+  WebSocketMessageType,
+  ClientWebSocketAction,
+  ServerWebSocketAction,
+  XpModifierScope,
+  QuestCategory,
+  QuestFrequency,
+  SubscriptionPlan,
+} from "./enums";
+
+// Domain interfaces
+export type {
+  User,
+  Player,
+  AchievementGoal,
+  Character,
+  GeoJSONPoint,
+  PlayerSkill,
+  Category,
+  PlayerActivity,
+  CharacterActivity,
+  Project,
+  Task,
+  Quest,
+  QuestResults,
+  CharacterQuest,
+  XpModifier,
+  PopulationCentre,
+  Building,
+  TutorialStep,
+} from "./domain";
+
+// Timer types
+export type {
+  ActivityTimerApiData,
+  ActivityCompleteResponse,
+  LevelUpEvent,
+  QuestTimerApiData,
+  CurrentActivity,
+  StartActivityInput,
+  AutoStopCompletion,
+  ActivityTimerReturn,
+  WebSocketMessageBase,
+  WebSocketConsoleMessage,
+  WebSocketPongMessage,
+  WebSocketNotificationMessage,
+  WebSocketErrorMessage,
+  IncomingWebSocketMessage,
+  OutgoingWebSocketMessage,
+} from "./timers";
