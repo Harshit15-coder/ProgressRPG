@@ -1,4 +1,4 @@
-// hooks/useSupportFlow.js
+// hooks/useSupportFlow.ts
 // Hook that manages SupportFlow modal state and exposes a clean API to callers.
 //
 // Usage:
@@ -8,25 +8,66 @@
 // Then render <SupportFlowModal state={flowState} dispatch={flowDispatch} onConfirmActivity={handleConfirmActivity} />
 
 import { useReducer, useCallback, useRef, useEffect } from "react";
+import type { Dispatch } from "react";
 import { supportFlowReducer } from "../components/SupportFlow/supportFlowReducer";
 
+// ---------------------------------------------------------------------------
+// Types — the reducer lives in a .js file; we describe its state shape here.
+// ---------------------------------------------------------------------------
+
+interface FlowCtx {
+  activityText: string;
+  durationSeconds: number | null;
+  [key: string]: unknown;
+}
+
+type FlowState =
+  | { isOpen: false }
+  | { isOpen: true; screen: string; ctx: FlowCtx };
+
+/** Loose action type — the reducer handles all narrowing internally. */
+type FlowAction = { type: string; [key: string]: unknown };
+
+interface OpenActivityRewardOptions {
+  xpGained?: number | null;
+  activityName?: string | null;
+  elapsedSeconds?: number | null;
+  baseXp?: number | null;
+  xpMultiplier?: number | null;
+  levelUps?: number[];
+  isAutoStopped?: boolean;
+  showUpgradePrompt?: boolean;
+}
+
+interface OpenWelcomeMessageOptions {
+  loginState?: string;
+  loginStreak?: number;
+  loginRewardXp?: number;
+}
+
+interface SupportFlowOptions {
+  /** Invoked when the user confirms an activity in the modal. */
+  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null }) => void;
+}
+
 /**
- * @param {object} options
- * @param {(payload: { activityText: string, durationSeconds: number|null }) => void} options.onStartActivity
+ * @param options.onStartActivity
  *   Callback invoked when the user confirms an activity in the modal.
  *   The parent should wire this to startActivity({ text, limitSeconds }).
  */
-export function useSupportFlow({ onStartActivity } = {}) {
-  const [flowState, flowDispatch] = useReducer(supportFlowReducer, {
-    isOpen: false,
-  });
+export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
+  const [flowState, flowDispatch] = useReducer(
+    // The reducer is a .js file; cast to the typed signature.
+    supportFlowReducer as (state: FlowState, action: FlowAction) => FlowState,
+    { isOpen: false } as FlowState
+  );
 
   // Keep a ref to the latest flowState so handleConfirmActivity doesn't
   // get recreated on every keystroke in the activity text input.
-  const flowStateRef = useRef(flowState);
+  const flowStateRef = useRef<FlowState>(flowState);
   useEffect(() => { flowStateRef.current = flowState; }, [flowState]);
 
-  const openWelcomeMessage = useCallback(({ loginState = "none", loginStreak = 0, loginRewardXp = 0 } = {}) => {
+  const openWelcomeMessage = useCallback(({ loginState = "none", loginStreak = 0, loginRewardXp = 0 }: OpenWelcomeMessageOptions = {}): void => {
     flowDispatch({ type: "OPEN_WELCOME_MESSAGE", loginState, loginStreak, loginRewardXp });
   }, []);
 
@@ -40,7 +81,7 @@ export function useSupportFlow({ onStartActivity } = {}) {
       levelUps = [],
       isAutoStopped = false,
       showUpgradePrompt = false,
-    } = {}) => {
+    }: OpenActivityRewardOptions = {}): void => {
       flowDispatch({
         type: "OPEN_ACTIVITY_REWARD",
         xpGained,
@@ -56,11 +97,11 @@ export function useSupportFlow({ onStartActivity } = {}) {
     []
   );
 
-  const openSupportMode = useCallback(() => {
+  const openSupportMode = useCallback((): void => {
     flowDispatch({ type: "OPEN_SUPPORT_MODE" });
   }, []);
 
-  const handleConfirmActivity = useCallback((activityTextOverride = null) => {
+  const handleConfirmActivity = useCallback((activityTextOverride: string | null = null): void => {
     const state = flowStateRef.current;
     if (!state.isOpen) return;
     const { activityText, durationSeconds } = state.ctx;
@@ -77,7 +118,7 @@ export function useSupportFlow({ onStartActivity } = {}) {
     openActivityReward,
     openSupportMode,
     flowState,
-    flowDispatch,
+    flowDispatch: flowDispatch as Dispatch<FlowAction>,
     handleConfirmActivity,
   };
 }

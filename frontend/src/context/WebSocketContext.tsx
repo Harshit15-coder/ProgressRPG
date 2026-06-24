@@ -33,11 +33,7 @@ export const WebSocketProvider = ({ children }: ProviderProps): ReactElement => 
 
   const onMessage = useCallback((data: IncomingWebSocketMessage) => {
     //console.log("[WS Provider] showToast:", showToast);
-    // handleGlobalWebSocketEvent is a .js file whose TS inference marks setMaintenance
-    // as required; the refetch path handles the case without it (uses optional chaining).
-    // Cast opts to any to avoid a spurious error until that file is migrated.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    handleGlobalWebSocketEvent(data, { showToast, maintenanceRefetch } as any);
+    handleGlobalWebSocketEvent(data, { showToast, maintenanceRefetch });
     eventHandlersRef.current.forEach((handler) => handler(data));
   }, [showToast, maintenanceRefetch]);
 

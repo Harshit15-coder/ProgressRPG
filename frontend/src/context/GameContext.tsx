@@ -124,8 +124,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
   const [characterCurrentActivity, setCharacterCurrentActivity] = useState<CharacterActivity | null>(null);
   const [populationCentre, setPopulationCentre] = useState<PopulationCentre | null>(populationCentreInfo);
 
-  // useActivityTimer is still a .js file — its return type matches ActivityTimerReturn
-  const activityTimer = useActivityTimer() as ActivityTimerReturn;
+  const activityTimer = useActivityTimer();
   const { loadFromServer } = activityTimer;
 
 

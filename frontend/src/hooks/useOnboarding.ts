@@ -1,4 +1,5 @@
-// src/hooks/useOnboarding.js
+// src/hooks/useOnboarding.ts
+
 import { useMemo, useState, useCallback } from 'react';
 import { apiFetch } from "../utils/api";
 import { useGame } from '../context/GameContext';
@@ -9,14 +10,14 @@ export default function useOnboarding() {
     loading,
     fetchPlayerAndCharacter,
   } = useGame();
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string>("");
 
-  const completed = useMemo(() => {
+  const completed = useMemo((): boolean | undefined => {
     if (!player) return undefined;
     return Boolean(player.onboarding_completed);
   }, [player]);
 
-  const completeOnboarding = useCallback(async () => {
+  const completeOnboarding = useCallback(async (): Promise<boolean> => {
     try {
       await apiFetch("/me/complete_onboarding/", {
         method: "POST",
@@ -27,7 +28,8 @@ export default function useOnboarding() {
       return true;
     } catch (err) {
       console.error("[Onboarding] Complete error:", err);
-      setError(err?.message || "Failed to complete onboarding.");
+      const error = err as Error | null;
+      setError(error?.message || "Failed to complete onboarding.");
       return false;
     }
   }, [fetchPlayerAndCharacter]);

@@ -1,7 +1,8 @@
-// src/hooks/useTasks.js
+// src/hooks/useTasks.ts
 
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { updateTask, deleteTask, fetchTasks, createTask } from "../api/tasks";
+import type { Task } from "../types";
 
 
 export function useTasks() {
@@ -28,7 +29,7 @@ export function useUpdateTask() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => updateTask(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Task> }) => updateTask(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["tasks"] });
     },
@@ -40,19 +41,19 @@ export function useDeleteTask() {
 
   return useMutation({
     mutationFn: deleteTask,
-    onMutate: async (taskId) => {
+    onMutate: async (taskId: number) => {
       await queryClient.cancelQueries({ queryKey: ["tasks"] });
 
-      const previousTasks = queryClient.getQueryData(["tasks"]);
+      const previousTasks = queryClient.getQueryData<Task[]>(["tasks"]);
 
-      queryClient.setQueryData(["tasks"], (old) =>
+      queryClient.setQueryData<Task[]>(["tasks"], (old = []) =>
         old.filter((task) => task.id !== taskId)
       );
       return { previousTasks };
     },
 
     // Rollback on error
-    onError: (err, taskId, context) => {
+    onError: (_err: unknown, _taskId: number, context: { previousTasks?: Task[] } | undefined) => {
       if (context?.previousTasks) {
         queryClient.setQueryData(["tasks"], context.previousTasks);
       }

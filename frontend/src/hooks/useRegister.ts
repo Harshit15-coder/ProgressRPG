@@ -1,15 +1,36 @@
-// hooks/useRegister.js
+// hooks/useRegister.ts
 import { useCallback, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { API_BASE_URL } from '../config';
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
+interface RegistrationApiResponse {
+  characters_available?: boolean;
+  non_field_errors?: string[];
+  detail?: string;
+  accessToken?: string;
+  refreshToken?: string;
+  [key: string]: unknown;
+}
+
+type RegisterResult =
+  | { success: true; confirmationRequired?: boolean; message?: string; availableCharacters?: boolean }
+  | { success: false; errors: RegistrationApiResponse | null; errorMessage: string };
+
 export default function useRegister() {
   const { login } = useAuth();
-  const [characterAvailable, setCharacterAvailable] = useState(false);
+  const [characterAvailable, setCharacterAvailable] = useState<boolean>(false);
 
-  const register = useCallback(async (email, password1, password2, inviteCode, agreeToTerms, turnstileToken, timezone) => {
+  const register = useCallback(async (
+    email: string,
+    password1: string,
+    password2: string,
+    inviteCode: string,
+    agreeToTerms: boolean,
+    turnstileToken: string,
+    timezone: string,
+  ): Promise<RegisterResult> => {
     try {
       const response = await fetch(`${API_URL}/auth/registration/`, {
         method: 'POST',
@@ -27,7 +48,7 @@ export default function useRegister() {
         }),
       });
 
-      const data = await response.json();
+      const data: RegistrationApiResponse = await response.json();
 
       // Update character availability state here
       if (typeof data.characters_available === 'boolean') {

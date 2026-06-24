@@ -1,14 +1,22 @@
-// hooks/useMaintenanceStatus.js
-import { useMaintenanceContext } from '../context/MaintenanceContext';
+// hooks/useMaintenanceStatus.ts
+import { useMaintenanceContext, type MaintenanceState } from '../context/MaintenanceContext';
 import { useCallback } from 'react';
 import { apiFetch } from "../utils/api";
+
+interface MaintenanceStatusApiResponse {
+  maintenance_active: boolean;
+  name?: string;
+  description?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+}
 
 export function useMaintenanceStatus() {
   const { maintenance, setMaintenance } = useMaintenanceContext();
 
-  const fetchMaintenance = useCallback(async () => {
+  const fetchMaintenance = useCallback(async (): Promise<MaintenanceState> => {
     try {
-      const data = await apiFetch('/maintenance_status/');
+      const data = await apiFetch<MaintenanceStatusApiResponse>('/maintenance_status/');
       if (data.maintenance_active) {
         const payload = {
           active: true,

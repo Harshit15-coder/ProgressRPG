@@ -1,24 +1,34 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from "../utils/api";
 import { useAuth } from '../context/AuthContext';
+import type {
+  Player,
+  Character,
+  ActivityTimerApiData,
+  PopulationCentre,
+  XpModifier,
+  LoginState,
+  FetchInfoResponse,
+  GameSettings,
+} from '../types';
 
 export function useBootstrapGameData() {
   const { isAuthenticated, loading: authLoading } = useAuth();
 
-  const [player, setPlayer] = useState(null);
-  const [character, setCharacter] = useState(null);
-  const [activityTimerInfo, setActivityTimerInfo] = useState(null);
-  const [populationCentreInfo, setPopulationCentreInfo] = useState(null);
-  const [xpMods, setXpMods] = useState([]);
-  const [loginState, setLoginState] = useState("none");
-  const [loginStreak, setLoginStreak] = useState(0);
-  const [loginEventAt, setLoginEventAt] = useState(null);
-  const [loginRewardXp, setLoginRewardXp] = useState(0);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [buildNumber, setBuildNumber] = useState(true);
-  const [freeTimerLimitSeconds, setFreeTimerLimitSeconds] = useState(1800);
-  const [gameSettings, setGameSettings] = useState(null);
+  const [player, setPlayer] = useState<Player | null>(null);
+  const [character, setCharacter] = useState<Character | null>(null);
+  const [activityTimerInfo, setActivityTimerInfo] = useState<ActivityTimerApiData | null>(null);
+  const [populationCentreInfo, setPopulationCentreInfo] = useState<PopulationCentre | null>(null);
+  const [xpMods, setXpMods] = useState<XpModifier[]>([]);
+  const [loginState, setLoginState] = useState<LoginState>("none");
+  const [loginStreak, setLoginStreak] = useState<number>(0);
+  const [loginEventAt, setLoginEventAt] = useState<string | null>(null);
+  const [loginRewardXp, setLoginRewardXp] = useState<number>(0);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [buildNumber, setBuildNumber] = useState<string | boolean>(true);
+  const [freeTimerLimitSeconds, setFreeTimerLimitSeconds] = useState<number>(1800);
+  const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
 
   useEffect(() => {
     if (authLoading) return;
@@ -36,7 +46,7 @@ export function useBootstrapGameData() {
       try {
         setLoading(true);
 
-        const info = await apiFetch('/fetch_info/');
+        const info = await apiFetch<FetchInfoResponse>('/fetch_info/');
         // console.log("bootstrap info:", info);
         setPlayer(info.player);
         setCharacter(info.character);

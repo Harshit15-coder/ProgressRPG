@@ -1,7 +1,9 @@
 /* eslint-disable react-hooks/set-state-in-effect */
+// hooks/useWebSocketConnection.ts
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { API_BASE_URL } from '../config';
 import { getValidAccessToken } from "../utils/api";
+import type { IncomingWebSocketMessage, OutgoingWebSocketMessage } from "../types";
 
 // WebSocket connection constants
 const RECONNECT_DELAY_MS = 3000;
@@ -9,14 +11,21 @@ const RETRY_DELAY_MS = 5000;
 const NORMAL_CLOSURE = 1000;
 const GOING_AWAY = 1001;
 
-export function useWebSocketConnection(playerId, onMessage, onError, onClose, onOpen, shouldConnect = true) {
-  const socketRef = useRef(null);
-  const reconnectTimeoutRef = useRef(null);
-  const [isConnected, setIsConnected] = useState(false);
-  const intentionalCloseRef = useRef(false);
-  const connectRef = useRef(null);
+export function useWebSocketConnection(
+  playerId: number | undefined,
+  onMessage?: (data: IncomingWebSocketMessage) => void,
+  onError?: (err: Event) => void,
+  onClose?: (event: CloseEvent) => void,
+  onOpen?: () => void,
+  shouldConnect = true,
+) {
+  const socketRef = useRef<WebSocket | null>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [isConnected, setIsConnected] = useState<boolean>(false);
+  const intentionalCloseRef = useRef<boolean>(false);
+  const connectRef = useRef<(() => Promise<void>) | null>(null);
 
-  const connect = useCallback(async () => {
+  const connect = useCallback(async (): Promise<void> => {
     if (!shouldConnect) {
       return;
     }
@@ -51,9 +60,9 @@ export function useWebSocketConnection(playerId, onMessage, onError, onClose, on
         onOpen?.();
       };
 
-      socket.onmessage = (event) => {
+      socket.onmessage = (event: MessageEvent<string>): void => {
         try {
-          const data = JSON.parse(event.data);
+          const data = JSON.parse(event.data) as IncomingWebSocketMessage;
           onMessage?.(data);
         } catch (err) {
           console.error('[WS] Parse error:', err);
@@ -89,7 +98,7 @@ export function useWebSocketConnection(playerId, onMessage, onError, onClose, on
       if (!shouldConnect) {
         return;
       }
-      if ((err?.message || '').toLowerCase().includes('unauthorized')) {
+      if (((err as Error)?.message || '').toLowerCase().includes('unauthorized')) {
         return;
       }
 
@@ -123,7 +132,7 @@ export function useWebSocketConnection(playerId, onMessage, onError, onClose, on
     };
   }, [connect, shouldConnect]);
 
-  const send = useCallback((data) => {
+  const send = useCallback((data: OutgoingWebSocketMessage): void => {
     if (socketRef.current?.readyState === WebSocket.OPEN) {
       socketRef.current.send(JSON.stringify(data));
     } else {
@@ -131,7 +140,7 @@ export function useWebSocketConnection(playerId, onMessage, onError, onClose, on
     }
   }, []);
 
-  const disconnect = useCallback((code = NORMAL_CLOSURE, reason = 'logout') => {
+  const disconnect = useCallback((code: number = NORMAL_CLOSURE, reason: string = 'logout'): void => {
     intentionalCloseRef.current = true;
 
     if (reconnectTimeoutRef.current) {

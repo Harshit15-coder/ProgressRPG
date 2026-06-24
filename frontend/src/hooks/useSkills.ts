@@ -1,7 +1,8 @@
-// src/hooks/useSkills.js
+// src/hooks/useSkills.ts
 
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { updateSkill, deleteSkill, fetchSkills, createSkill } from "../api/skills";
+import type { PlayerSkill } from "../types";
 
 
 export function useSkills() {
@@ -28,7 +29,7 @@ export function useUpdateSkill() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => updateSkill(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<PlayerSkill> }) => updateSkill(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["skills"] });
     },
@@ -40,19 +41,19 @@ export function useDeleteSkill() {
 
   return useMutation({
     mutationFn: deleteSkill,
-    onMutate: async (skillId) => {
+    onMutate: async (skillId: number) => {
       await queryClient.cancelQueries({ queryKey: ["skills"] });
 
-      const previousSkills = queryClient.getQueryData(["skills"]);
+      const previousSkills = queryClient.getQueryData<PlayerSkill[]>(["skills"]);
 
-      queryClient.setQueryData(["skills"], (old) =>
+      queryClient.setQueryData<PlayerSkill[]>(["skills"], (old = []) =>
         old.filter((skill) => skill.id !== skillId)
       );
 
       return { previousSkills };
     },
     // Rollback on error
-    onError: (err, skillId, context) => {
+    onError: (_err: unknown, _skillId: number, context: { previousSkills?: PlayerSkill[] } | undefined) => {
       if (context?.previousSkills) {
         queryClient.setQueryData(["skills"], context.previousSkills);
       }

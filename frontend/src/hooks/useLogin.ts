@@ -1,11 +1,15 @@
-// hooks/useLogin.js
+// hooks/useLogin.ts
 import { useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
+type LoginResult =
+  | { success: true; tokens: { access_token: string; refresh_token: string } }
+  | { success: false; error: string };
+
 export default function useLogin() {
-  const login = useCallback(async (email, password) => {
+  const login = useCallback(async (email: string, password: string): Promise<LoginResult> => {
     try {
       const response = await fetch(`${API_URL}/auth/jwt/create/`, {
         method: 'POST',

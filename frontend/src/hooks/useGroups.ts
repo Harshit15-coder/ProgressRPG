@@ -1,4 +1,4 @@
-// src/hooks/useSkillGroups.js
+// src/hooks/useGroups.ts
 import { useQuery } from "@tanstack/react-query";
 import { fetchGroups } from "../api/skills";
 

@@ -1,45 +1,54 @@
-// hooks/useActivityTimer.js
+// hooks/useActivityTimer.ts
 import { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch } from "../utils/api.js";
 import { playActivityStartedSound, primeAudio } from "../utils/sounds.js";
+import type {
+  TimerStatus,
+  CurrentActivity,
+  StartActivityInput,
+  ActivityTimerApiData,
+  ActivityCompleteResponse,
+  AutoStopCompletion,
+  ActivityTimerReturn,
+} from "../types";
 //import { useGame } from "../context/GameContext.jsx";
 
 
-export default function useActivityTimer() {
-  const [_id, setId] = useState(0);
-  const [status, setStatus] = useState("empty"); // "empty", "active", "waiting", "completed"
-  const [duration, setDuration] = useState(0); // total seconds for timer base
-  const [elapsed, setElapsed] = useState(0);
-  const [currentActivity, setCurrentActivity] = useState(null);
-  const [limitSeconds, setLimitSeconds] = useState(null); // optional time limit
-  const [limitReached, setLimitReached] = useState(false); // true after auto-stop fires; cleared on next startActivity or stop
-  const [autoStopCompletion, setAutoStopCompletion] = useState(null);
+export default function useActivityTimer(): ActivityTimerReturn {
+  const [_id, setId] = useState<number>(0);
+  const [status, setStatus] = useState<TimerStatus>("empty"); // "empty", "active", "waiting", "completed"
+  const [duration, setDuration] = useState<number>(0); // total seconds for timer base
+  const [elapsed, setElapsed] = useState<number>(0);
+  const [currentActivity, setCurrentActivity] = useState<CurrentActivity | null>(null);
+  const [limitSeconds, setLimitSeconds] = useState<number | null>(null); // optional time limit
+  const [limitReached, setLimitReached] = useState<boolean>(false); // true after auto-stop fires; cleared on next startActivity or stop
+  const [autoStopCompletion, setAutoStopCompletion] = useState<AutoStopCompletion | null>(null);
 
-  const timerRef = useRef(null);
-  const startTimeRef = useRef(null);
-  const pausedTimeRef = useRef(0);
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const startTimeRef = useRef<number | null>(null);
+  const pausedTimeRef = useRef<number>(0);
 
-  const elapsedRef = useRef(elapsed);
+  const elapsedRef = useRef<number>(elapsed);
   useEffect(() => { elapsedRef.current = elapsed; }, [elapsed]);
 
-  const statusRef = useRef(status);
+  const statusRef = useRef<TimerStatus>(status);
   useEffect(() => { statusRef.current = status; }, [status]);
 
-  const currentActivityRef = useRef(currentActivity);
+  const currentActivityRef = useRef<CurrentActivity | null>(currentActivity);
   useEffect(() => { currentActivityRef.current = currentActivity; }, [currentActivity]);
 
   // Mirror limitSeconds into a ref so tickMain can read it without stale closure issues
-  const limitRef = useRef(limitSeconds);
+  const limitRef = useRef<number | null>(limitSeconds);
   useEffect(() => { limitRef.current = limitSeconds; }, [limitSeconds]);
 
   // Guard: ensures auto-submit fires at most once per activity
-  const didAutoStopRef = useRef(false);
-  const autoStopReasonRef = useRef(null);
+  const didAutoStopRef = useRef<boolean>(false);
+  const autoStopReasonRef = useRef<string | null>(null);
 
   // Stable ref to stop so tickMain can call it without becoming stale
-  const stopRef = useRef(null);
+  const stopRef = useRef<ActivityTimerReturn["stop"] | null>(null);
 
-  const normalizeLimitSeconds = useCallback((rawLimit) => {
+  const normalizeLimitSeconds = useCallback((rawLimit: unknown): number | null => {
     const parsedLimit = Number(rawLimit);
     return Number.isFinite(parsedLimit) && parsedLimit > 0 ? parsedLimit : null;
   }, []);
@@ -49,7 +58,7 @@ export default function useActivityTimer() {
   // Tick the activity timer
   // ----------------------------
 
-  const tickMain = useCallback(() => {
+  const tickMain = useCallback((): void => {
     if (statusRef.current !== "active") return;
     if (!startTimeRef.current) return;
 
@@ -88,7 +97,7 @@ export default function useActivityTimer() {
   // ----------------------------
 
 
-  const startActivity = useCallback(async (newActivity) => {
+  const startActivity = useCallback(async (newActivity: StartActivityInput | string): Promise<unknown> => {
     const { text, taskId, limitSeconds: newLimit, limitReason = null } =
       typeof newActivity === "string"
         ? { text: newActivity, taskId: null, limitSeconds: null, limitReason: null }
@@ -123,7 +132,7 @@ export default function useActivityTimer() {
 
     try {
       // 1) Tell server what the activity is
-      const setData = await apiFetch(`/activity_timers/set_activity/`, {
+      const setData = await apiFetch<{ activity_timer?: { activity?: CurrentActivity } }>(`/activity_timers/set_activity/`, {
         method: "POST",
         body: JSON.stringify({
           activityName: text.trim(),
@@ -180,12 +189,17 @@ export default function useActivityTimer() {
 
 
   const stop = useCallback(
-    async ({ activityName, elapsedSeconds, source = "manual", stopReason = null } = {}) => {
+    async ({ activityName, elapsedSeconds, source = "manual", stopReason = null }: {
+      activityName?: string;
+      elapsedSeconds?: number;
+      source?: "manual" | "auto";
+      stopReason?: string | null;
+    } = {}): Promise<ActivityCompleteResponse | null> => {
     //console.log(`[useActivityTimer] Stop and submit timer`);
     //console.log("COMPLETE called", { status, duration, elapsed, currentActivity });
     //console.trace();
 
-    if (status === "empty") return;
+    if (status === "empty") return null;
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -194,7 +208,7 @@ export default function useActivityTimer() {
     startTimeRef.current = null;
 
     try {
-      let result = null;
+      let result: ActivityCompleteResponse | null = null;
       const completedActivityName = (
         activityName ||
         currentActivityRef.current?.name ||
@@ -205,7 +219,7 @@ export default function useActivityTimer() {
         ? Number(elapsedSeconds)
         : elapsedRef.current;
 
-      result = await apiFetch(`/activity_timers/complete/`, {
+      result = await apiFetch<ActivityCompleteResponse>(`/activity_timers/complete/`, {
         method: "POST",
         body: JSON.stringify({
           activityName,
@@ -275,7 +289,7 @@ export default function useActivityTimer() {
   // Block tab close / refresh / external navigation while timer is active
   useEffect(() => {
     if (status !== 'active') return;
-    const handler = (e) => { e.preventDefault(); e.returnValue = ''; };
+    const handler = (e: BeforeUnloadEvent): void => { e.preventDefault(); e.returnValue = ''; };
     window.addEventListener('beforeunload', handler);
     return () => window.removeEventListener('beforeunload', handler);
   }, [status]);
@@ -293,13 +307,19 @@ export default function useActivityTimer() {
   }, []);
 
 
-  const loadFromServer = useCallback((serverData, { limitSeconds: incomingLimit } = {}) => {
+  const loadFromServer = useCallback((
+    serverData: ActivityTimerApiData | null,
+    { limitSeconds: incomingLimit }: { limitSeconds?: number | null } = {}
+  ): void => {
     if (!serverData) return;
     //console.log("timer from server:", serverData);
-    const { id, status, elapsed_time, duration, activity } = serverData;
+    const { id, status, elapsed_time, activity } = serverData;
+    // ActivityTimerApiData doesn't declare duration but the server may return it;
+    // cast to access it safely and fall back to 0.
+    const duration = (serverData as ActivityTimerApiData & { duration?: number }).duration ?? 0;
     const resolvedLimit = normalizeLimitSeconds(incomingLimit);
     const nextElapsed = elapsed_time || 0;
-    const nextStatus = status || 'empty';
+    const nextStatus: TimerStatus = status || 'empty';
 
     if (timerRef.current) {
       clearInterval(timerRef.current);
@@ -335,7 +355,7 @@ export default function useActivityTimer() {
     }
   }, [normalizeLimitSeconds, tickMain]);
 
-  const clearAutoStopCompletion = useCallback(() => {
+  const clearAutoStopCompletion = useCallback((): void => {
     setAutoStopCompletion(null);
   }, []);
 

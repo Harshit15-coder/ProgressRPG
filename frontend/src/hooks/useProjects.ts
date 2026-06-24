@@ -1,4 +1,4 @@
-// src/hooks/useProjects.js
+// src/hooks/useProjects.ts
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createProject,
@@ -6,6 +6,7 @@ import {
   fetchProjects,
   updateProject,
 } from "../api/projects";
+import type { Project } from "../types";
 
 export function useProjects() {
   return useQuery({
@@ -29,7 +30,7 @@ export function useUpdateProject() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => updateProject(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Project> }) => updateProject(id, data),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["projects"] });
     },
@@ -41,18 +42,18 @@ export function useDeleteProject() {
 
   return useMutation({
     mutationFn: deleteProject,
-    onMutate: async (projectId) => {
+    onMutate: async (projectId: number) => {
       await queryClient.cancelQueries({ queryKey: ["projects"] });
 
-      const previousProjects = queryClient.getQueryData(["projects"]);
+      const previousProjects = queryClient.getQueryData<Project[]>(["projects"]);
 
-      queryClient.setQueryData(["projects"], (old) =>
+      queryClient.setQueryData<Project[]>(["projects"], (old = []) =>
         old.filter((project) => project.id !== projectId),
       );
 
       return { previousProjects };
     },
-    onError: (err, projectId, context) => {
+    onError: (_err: unknown, _projectId: number, context: { previousProjects?: Project[] } | undefined) => {
       if (context?.previousProjects) {
         queryClient.setQueryData(["projects"], context.previousProjects);
       }

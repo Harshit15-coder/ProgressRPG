@@ -1,7 +1,8 @@
-// src/hooks/useCategories.js
+// src/hooks/useCategories.ts
 
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { updateCategory, deleteCategory, fetchCategories, createCategory } from "../api/categories";
+import type { Category } from "../types";
 
 
 export function useCategories() {
@@ -28,7 +29,7 @@ export function useUpdateCategory() {
   const qc = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }) => updateCategory(id, data),
+    mutationFn: ({ id, data }: { id: number; data: Partial<Category> }) => updateCategory(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["categories"] });
     },
@@ -40,19 +41,19 @@ export function useDeleteCategory() {
 
   return useMutation({
     mutationFn: deleteCategory,
-    onMutate: async (categoryId) => {
+    onMutate: async (categoryId: number) => {
       await queryClient.cancelQueries({ queryKey: ["categories"] });
 
-      const previousCategories = queryClient.getQueryData(["categories"]);
+      const previousCategories = queryClient.getQueryData<Category[]>(["categories"]);
 
-      queryClient.setQueryData(["categories"], (old) =>
+      queryClient.setQueryData<Category[]>(["categories"], (old = []) =>
         old.filter((category) => category.id !== categoryId)
       );
 
       return { previousCategories };
     },
     // Rollback on error
-    onError: (err, categoryId, context) => {
+    onError: (_err: unknown, _categoryId: number, context: { previousCategories?: Category[] } | undefined) => {
       if (context?.previousCategories) {
         queryClient.setQueryData(["categories"], context.previousCategories);
       }

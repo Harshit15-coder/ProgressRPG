@@ -1,24 +1,35 @@
+// hooks/usePasswordReset.ts
 import { useCallback } from 'react';
 import { API_BASE_URL } from '../config';
 
 const API_URL = `${API_BASE_URL}/api/v1/auth`;
 
-async function readResponseJson(response) {
+type ApiData = Record<string, unknown> | null;
+
+type RequestResetResult =
+  | { success: true; message: string }
+  | { success: false; errors: ApiData; errorMessage: string };
+
+type ConfirmResetResult =
+  | { success: true; message: string }
+  | { success: false; errors: ApiData; errorMessage: string };
+
+async function readResponseJson(response: Response): Promise<ApiData> {
   try {
-    return await response.json();
+    return await response.json() as ApiData;
   } catch {
     return null;
   }
 }
 
-function getErrorMessage(data, fallback) {
+function getErrorMessage(data: ApiData, fallback: string): string {
   if (!data || typeof data !== 'object') {
     return fallback;
   }
 
   const firstEntry = Object.values(data)[0];
   if (Array.isArray(firstEntry) && firstEntry[0]) {
-    return firstEntry[0];
+    return String(firstEntry[0]);
   }
 
   if (typeof data.detail === 'string' && data.detail) {
@@ -29,7 +40,7 @@ function getErrorMessage(data, fallback) {
 }
 
 export default function usePasswordReset() {
-  const requestPasswordReset = useCallback(async (email) => {
+  const requestPasswordReset = useCallback(async (email: string): Promise<RequestResetResult> => {
     try {
       const response = await fetch(`${API_URL}/password/reset/`, {
         method: 'POST',
@@ -52,7 +63,7 @@ export default function usePasswordReset() {
       return {
         success: true,
         message:
-          data?.detail ||
+          (typeof data?.detail === 'string' ? data.detail : null) ||
           'If an account exists for that email, a password reset link has been sent.',
       };
     } catch (error) {
@@ -65,7 +76,7 @@ export default function usePasswordReset() {
     }
   }, []);
 
-  const confirmPasswordReset = useCallback(async ({ uid, token, password1, password2 }) => {
+  const confirmPasswordReset = useCallback(async ({ uid, token, password1, password2 }: { uid: string; token: string; password1: string; password2: string }): Promise<ConfirmResetResult> => {
     try {
       const response = await fetch(`${API_URL}/password/reset/confirm/`, {
         method: 'POST',
@@ -92,7 +103,7 @@ export default function usePasswordReset() {
 
       return {
         success: true,
-        message: data?.detail || 'Your password has been reset successfully.',
+        message: (typeof data?.detail === 'string' ? data.detail : null) || 'Your password has been reset successfully.',
       };
     } catch (error) {
       console.error('[usePasswordReset] Unexpected confirm error:', error);
