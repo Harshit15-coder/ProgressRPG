@@ -2,16 +2,17 @@ import { act, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import useActivityTimer from './useActivityTimer';
+import type { ActivityTimerApiData } from '../types';
 
 const mockApiFetch = vi.fn();
 const mockPlayActivityStartedSound = vi.fn();
 
 vi.mock("../utils/api.js", () => ({
-  apiFetch: (...args) => mockApiFetch(...args),
+  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
 }));
 
 vi.mock("../utils/sounds.js", () => ({
-  playActivityStartedSound: (...args) => mockPlayActivityStartedSound(...args),
+  playActivityStartedSound: (...args: unknown[]) => mockPlayActivityStartedSound(...args),
   primeAudio: vi.fn(),
 }));
 
@@ -30,7 +31,7 @@ describe('useActivityTimer', () => {
   });
 
   it('auto-stops when a new timer reaches its configured limit', async () => {
-    mockApiFetch.mockImplementation((url) => {
+    mockApiFetch.mockImplementation((url: string) => {
       if (url === '/activity_timers/set_activity/') {
         return Promise.resolve({
           activity_timer: {
@@ -90,7 +91,7 @@ describe('useActivityTimer', () => {
           elapsed_time: 14,
           duration: 0,
           activity: { id: 1, name: 'Restored activity' },
-        },
+        } as unknown as ActivityTimerApiData,
         { limitSeconds: 15 }
       );
     });
@@ -116,7 +117,7 @@ describe('useActivityTimer', () => {
   });
 
   it('plays the start chime when an activity starts successfully', async () => {
-    mockApiFetch.mockImplementation((url) => {
+    mockApiFetch.mockImplementation((url: string) => {
       if (url === '/activity_timers/set_activity/') {
         return Promise.resolve({
           activity_timer: {

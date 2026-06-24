@@ -4,16 +4,25 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { useWebSocketConnection } from './useWebSocketConnection';
 
 const mockGetValidAccessToken = vi.fn();
-const sockets = [];
+const sockets: MockWebSocket[] = [];
 
 vi.mock('../utils/api', () => ({
-  getValidAccessToken: (...args) => mockGetValidAccessToken(...args),
+  getValidAccessToken: (...args: unknown[]) => mockGetValidAccessToken(...args),
 }));
 
 class MockWebSocket {
   static OPEN = 1;
 
-  constructor(url) {
+  url: string;
+  readyState: number;
+  send: ReturnType<typeof vi.fn>;
+  onopen: (() => void) | null;
+  onmessage: ((event: { data: string }) => void) | null;
+  onerror: ((event: Event) => void) | null;
+  onclose: ((event: { code: number }) => void) | null;
+  close: ReturnType<typeof vi.fn>;
+
+  constructor(url: string) {
     this.url = url;
     this.readyState = 0;
     this.send = vi.fn();
@@ -71,7 +80,7 @@ describe('useWebSocketConnection', () => {
 
     act(() => {
       sockets[0].readyState = MockWebSocket.OPEN;
-      sockets[0].onopen();
+      sockets[0].onopen!();
     });
 
     expect(result.current.isConnected).toBe(true);
@@ -104,12 +113,12 @@ describe('useWebSocketConnection', () => {
 
     act(() => {
       sockets[0].readyState = MockWebSocket.OPEN;
-      sockets[0].onopen();
+      sockets[0].onopen!();
     });
     expect(result.current.isConnected).toBe(true);
 
     act(() => {
-      sockets[0].onerror(new Event('error'));
+      sockets[0].onerror!(new Event('error'));
     });
 
     expect(result.current.isConnected).toBe(false);
@@ -128,11 +137,11 @@ describe('useWebSocketConnection', () => {
 
     act(() => {
       sockets[0].readyState = MockWebSocket.OPEN;
-      sockets[0].onopen();
+      sockets[0].onopen!();
     });
 
     act(() => {
-      sockets[0].onclose({ code: 1006 });
+      sockets[0].onclose!({ code: 1006 });
     });
 
     expect(result.current.isConnected).toBe(false);
@@ -153,7 +162,7 @@ describe('useWebSocketConnection', () => {
 
     mockGetValidAccessToken.mockResolvedValue('token-v2');
 
-    act(() => { sockets[0].onclose({ code: 1006 }); });
+    act(() => { sockets[0].onclose!({ code: 1006 }); });
 
     // Advance past RECONNECT_DELAY_MS (3000ms), then flush the async connect()
     act(() => { vi.advanceTimersByTime(3000); });
@@ -174,7 +183,7 @@ describe('useWebSocketConnection', () => {
 
     await act(async () => {});
 
-    act(() => { sockets[0].onclose({ code: 1000 }); });
+    act(() => { sockets[0].onclose!({ code: 1000 }); });
     act(() => { vi.advanceTimersByTime(5000); });
     await act(async () => {});
 
@@ -192,7 +201,7 @@ describe('useWebSocketConnection', () => {
 
     await act(async () => {});
 
-    act(() => { sockets[0].onclose({ code: 1001 }); });
+    act(() => { sockets[0].onclose!({ code: 1001 }); });
     act(() => { vi.advanceTimersByTime(5000); });
     await act(async () => {});
 
@@ -231,7 +240,7 @@ describe('useWebSocketConnection', () => {
     await act(async () => {});
 
     // Trigger a reconnect countdown via unexpected close
-    act(() => { sockets[0].onclose({ code: 1006 }); });
+    act(() => { sockets[0].onclose!({ code: 1006 }); });
 
     // Disconnect before the 3s timer fires
     act(() => { result.current.disconnect(); });
@@ -272,7 +281,7 @@ describe('useWebSocketConnection', () => {
     await waitFor(() => expect(sockets).toHaveLength(1));
 
     act(() => {
-      sockets[0].onmessage({ data: JSON.stringify({ type: 'xp_update', amount: 50 }) });
+      sockets[0].onmessage!({ data: JSON.stringify({ type: 'xp_update', amount: 50 }) });
     });
 
     expect(onMessage).toHaveBeenCalledWith({ type: 'xp_update', amount: 50 });
@@ -291,7 +300,7 @@ describe('useWebSocketConnection', () => {
     expect(sockets).toHaveLength(1);
 
     // Start a reconnect countdown
-    act(() => { sockets[0].onclose({ code: 1006 }); });
+    act(() => { sockets[0].onclose!({ code: 1006 }); });
 
     unmount();
 
