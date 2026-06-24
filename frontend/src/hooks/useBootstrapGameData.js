@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { apiFetch } from "../utils/api";
-import { useAuth } from '../context/AuthContext.jsx';
+import { useAuth } from '../context/AuthContext';
 
 export function useBootstrapGameData() {
   const { isAuthenticated, loading: authLoading } = useAuth();

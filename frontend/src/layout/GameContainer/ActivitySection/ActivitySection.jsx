@@ -2,7 +2,7 @@ import React from 'react';
 import GameSection from '../GameSection';
 import ActivityPanel from './ActivityPanel';
 import { ActivityTimer } from '../../../components/Timer/ActivityTimer';
-import { useGame } from '../../../context/GameContext.jsx';
+import { useGame } from '../../../context/GameContext';
 
 export default function ActivitySection() {
   const { onboardingStage } = useGame();

@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import QuestList from './QuestList/QuestList.jsx';
 import QuestDetail from './QuestDetail/QuestDetail.jsx';
-import { useGame } from '../../../context/GameContext.jsx';
+import { useGame } from '../../../context/GameContext';
 import Button from '../../../components/Button/Button.jsx';
 import Modal from '../../../components/Modal/Modal.jsx';
 
