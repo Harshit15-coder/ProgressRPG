@@ -1,12 +1,19 @@
-// src/utils/api.js
+// src/utils/api.ts
 import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL } from "../config";
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
-function isTokenExpiringSoon(token, bufferSeconds = 60) {
+type ResponseType = "json" | "blob" | "text" | "raw";
+
+interface ApiFetchOptions extends Omit<RequestInit, "headers"> {
+  responseType?: ResponseType;
+  headers?: Record<string, string>;
+}
+
+function isTokenExpiringSoon(token: string, bufferSeconds = 60): boolean {
   try {
-    const { exp } = jwtDecode(token);
+    const { exp } = jwtDecode<{ exp: number }>(token);
     const now = Date.now() / 1000;
     return exp - now < bufferSeconds;
   } catch {
@@ -14,7 +21,7 @@ function isTokenExpiringSoon(token, bufferSeconds = 60) {
   }
 }
 
-function clearAuthAndRedirect() {
+function clearAuthAndRedirect(): void {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
 
@@ -27,7 +34,7 @@ function clearAuthAndRedirect() {
   }, 500);
 }
 
-async function refreshAccessToken(refreshToken) {
+async function refreshAccessToken(refreshToken: string): Promise<string | false> {
   try {
     const response = await fetch(`${API_URL}/auth/jwt/refresh/`, {
       method: "POST",
@@ -37,7 +44,7 @@ async function refreshAccessToken(refreshToken) {
 
     if (!response.ok) throw new Error("Failed to refresh access token");
 
-    const data = await response.json();
+    const data: { access_token?: string } = await response.json();
 
     if (data.access_token) {
       localStorage.setItem("accessToken", data.access_token);
@@ -49,7 +56,7 @@ async function refreshAccessToken(refreshToken) {
   }
 }
 
-export async function getValidAccessToken() {
+export async function getValidAccessToken(): Promise<string> {
   const accessToken = localStorage.getItem("accessToken");
   const refreshToken = localStorage.getItem("refreshToken");
   if (!accessToken || !refreshToken) throw new Error("Missing tokens");
@@ -63,7 +70,17 @@ export async function getValidAccessToken() {
   return accessToken;
 }
 
-export async function apiFetch(path, options = {}, explicitAccessToken = null) {
+// Overloads for different responseType values
+export async function apiFetch(path: string, options: ApiFetchOptions & { responseType: "blob" }, explicitAccessToken?: string | null): Promise<Blob>;
+export async function apiFetch(path: string, options: ApiFetchOptions & { responseType: "text" }, explicitAccessToken?: string | null): Promise<string>;
+export async function apiFetch(path: string, options: ApiFetchOptions & { responseType: "raw" }, explicitAccessToken?: string | null): Promise<Response>;
+export async function apiFetch<T = unknown>(path: string, options?: ApiFetchOptions, explicitAccessToken?: string | null): Promise<T>;
+
+export async function apiFetch<T = unknown>(
+  path: string,
+  options: ApiFetchOptions = {},
+  explicitAccessToken: string | null = null
+): Promise<T | Blob | string | Response> {
   try {
     const { responseType = "json", ...fetchOptions } = options;
     const accessToken = explicitAccessToken || (await getValidAccessToken());
@@ -72,7 +89,7 @@ export async function apiFetch(path, options = {}, explicitAccessToken = null) {
       throw new Error("No access token available for request");
     }
 
-    const headers = {
+    const headers: Record<string, string> = {
       ...(fetchOptions.headers || {}),
       Authorization: `Bearer ${accessToken}`,
       "Content-Type": "application/json",
@@ -90,7 +107,7 @@ export async function apiFetch(path, options = {}, explicitAccessToken = null) {
 
     if (response.status === 503) {
       // optionally parse JSON if included
-      const data = await response.json().catch(() => ({}));
+      const data: { detail?: string } = await response.json().catch(() => ({}));
       // redirect or show toast
       window.location.href = "/maintenance";
       return Promise.reject(new Error(data.detail || "Maintenance mode"));
@@ -110,7 +127,7 @@ export async function apiFetch(path, options = {}, explicitAccessToken = null) {
         return response;
       case "json":
       default:
-        return response.json();
+        return response.json() as Promise<T>;
     }
   } catch (err) {
     if (err instanceof TypeError) {

@@ -1,13 +1,23 @@
-// utils/sounds.js
+// utils/sounds.ts
 // Programmatic sound effects using the Web Audio API.
 // No audio assets required – tones are synthesised on demand.
 
 // Singleton context — created once and kept alive so Firefox's autoplay policy
 // doesn't block sounds that fire after async operations or timer callbacks.
-let _ctx = null;
+let _ctx: AudioContext | null = null;
 
-function getContext() {
-  const AC = window.AudioContext || window.webkitAudioContext;
+interface Note {
+  frequency: number;
+  offset: number;
+  duration: number;
+}
+
+function getContext(): AudioContext | null {
+  // webkitAudioContext exists on older Safari — not in the standard lib types,
+  // so we access it via the window object with a type assertion.
+  const AC =
+    window.AudioContext ||
+    (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
   if (!AC) return null;
   if (!_ctx || _ctx.state === "closed") {
     _ctx = new AC();
@@ -18,7 +28,7 @@ function getContext() {
 // Call this synchronously inside a user-gesture handler (e.g. button click)
 // before any awaits. This unlocks the AudioContext in Firefox so that sounds
 // triggered later (after API calls or timer callbacks) play correctly.
-export function primeAudio() {
+export function primeAudio(): void {
   try {
     const ctx = getContext();
     if (ctx && ctx.state === "suspended") ctx.resume();
@@ -27,14 +37,14 @@ export function primeAudio() {
   }
 }
 
-function playChime(noteSequence) {
+function playChime(noteSequence: Note[]): void {
   try {
     const ctx = getContext();
     if (!ctx) return;
 
     if (ctx.state === "suspended") ctx.resume();
 
-    const nodes = []; // hold refs so Firefox doesn't GC nodes before playback ends
+    const nodes: (OscillatorNode | GainNode)[] = []; // hold refs so Firefox doesn't GC nodes before playback ends
     const t = ctx.currentTime;
 
     noteSequence.forEach(({ frequency, offset, duration }) => {
@@ -63,7 +73,7 @@ function playChime(noteSequence) {
   }
 }
 
-export function playActivityStartedSound() {
+export function playActivityStartedSound(): void {
   playChime([
     { frequency: 523, offset: 0, duration: 0.22 }, // C5
     { frequency: 784, offset: 0.16, duration: 0.22 }, // G5
@@ -71,7 +81,7 @@ export function playActivityStartedSound() {
   ]);
 }
 
-export function playLimitReachedSound() {
+export function playLimitReachedSound(): void {
   playChime([
     { frequency: 523, offset: 0, duration: 0.18 }, // C5
     { frequency: 659, offset: 0.12, duration: 0.18 }, // E5

@@ -1,15 +1,16 @@
-// src/api/player.js
+// src/api/player.ts
+import type { Player } from "../types";
 import { apiFetch } from "../utils/api";
 
-export const updatePlayer = async (data) => {
-  const response = await apiFetch("/me/player/", {
+export const updatePlayer = async (data: Partial<Player>): Promise<Player> => {
+  const response = await apiFetch<Player>("/me/player/", {
     method: "PATCH",
     body: JSON.stringify(data),
   });
   return response;
 };
 
-export const downloadUserData = async () => {
+export const downloadUserData = async (): Promise<{ success: true }> => {
   const response = await apiFetch("/download_user_data/", {
     method: 'GET',
     responseType: 'raw',
@@ -27,13 +28,13 @@ export const downloadUserData = async () => {
   link.setAttribute('download', filename);
   document.body.appendChild(link);
   link.click();
-  link.parentNode.removeChild(link);
+  link.parentNode!.removeChild(link);
   window.URL.revokeObjectURL(url);
 
   return { success: true };
 };
 
-export const deleteAccount = async () => {
+export const deleteAccount = async (): Promise<unknown> => {
   const response = await apiFetch("/delete_account/", {
     method: "DELETE",
   });

@@ -1,5 +1,7 @@
-// src/featureFlags.js
-const featureFlags = {
+// src/featureFlags.ts
+import type { FeatureFlagKey, FeatureFlagValue } from "./types";
+
+const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   // Access levels:
   // - 'no': disabled for everyone
   // - 'all': enabled for all users

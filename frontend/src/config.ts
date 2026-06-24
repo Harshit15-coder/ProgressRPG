@@ -1,6 +1,6 @@
-// src/config.js
-let API_BASE_URL;
-const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL;
+// src/config.ts
+let API_BASE_URL: string;
+const envApiBaseUrl = import.meta.env.VITE_API_BASE_URL as string | undefined;
 
 if (envApiBaseUrl) {
   API_BASE_URL = envApiBaseUrl;

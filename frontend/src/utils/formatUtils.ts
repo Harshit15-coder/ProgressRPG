@@ -1,4 +1,4 @@
-export function formatDuration(duration) {
+export function formatDuration(duration: number): string {
   const hours = Math.floor(duration / 3600);
   const mins = Math.floor((duration % 3600) / 60);
   const secs = duration % 60;
@@ -11,7 +11,7 @@ export function formatDuration(duration) {
     : `${paddedMins}:${paddedSecs}`;
 }
 
-export function formatRewardDuration(durationSeconds) {
+export function formatRewardDuration(durationSeconds: number): string {
   const totalSeconds = Math.max(0, Math.floor(durationSeconds));
   const hours = Math.floor(totalSeconds / 3600);
   const minutes = Math.floor((totalSeconds % 3600) / 60);

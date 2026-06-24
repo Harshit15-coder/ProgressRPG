@@ -5,14 +5,26 @@ const allowedCharactersPattern = /^[A-Za-z0-9 _.'-]+$/;
 const playerNamePattern = /^(?:[._'-])?[A-Za-z0-9]+(?:[ _.'-][A-Za-z0-9]+)*(?:[._'-])?$/;
 const alphanumericPattern = /[A-Za-z0-9]/;
 
-export function normalizePlayerName(value) {
+export interface ValidationRule {
+  id: string;
+  label: string;
+  valid: boolean;
+}
+
+export interface PlayerNameValidationResult {
+  normalized: string;
+  rules: ValidationRule[];
+  isValid: boolean;
+}
+
+export function normalizePlayerName(value: string): string {
   return value.trim();
 }
 
-export function getPlayerNameValidation(value) {
+export function getPlayerNameValidation(value: string): PlayerNameValidationResult {
   const normalized = normalizePlayerName(value);
 
-  const rules = [
+  const rules: ValidationRule[] = [
     {
       id: "length",
       label: `Use ${PLAYER_NAME_MIN_LENGTH}-${PLAYER_NAME_MAX_LENGTH} characters.`,
@@ -45,13 +57,13 @@ export function getPlayerNameValidation(value) {
   };
 }
 
-export function getPlayerNameErrorMessage(error) {
+export function getPlayerNameErrorMessage(error: { message?: string } | null | undefined): string {
   if (!error?.message) {
     return "Failed to update name.";
   }
 
   try {
-    const parsedError = JSON.parse(error.message);
+    const parsedError = JSON.parse(error.message) as { name?: string[]; detail?: string };
     if (Array.isArray(parsedError.name) && parsedError.name.length > 0) {
       return parsedError.name[0];
     }
