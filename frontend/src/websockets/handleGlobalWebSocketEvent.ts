@@ -8,31 +8,16 @@ interface HandleGlobalWebSocketEventOptions {
   setMaintenance?: (state: MaintenanceState) => void;
 }
 
-/** Extended WS message shape for 'action' type messages from the server. */
-interface ActionWebSocketMessage extends Record<string, unknown> {
-  type: string;
-  action?: string;
-  message?: string;
-  maintenance_active?: boolean;
-  name?: string;
-  description?: string;
-  start_time?: string | null;
-  end_time?: string | null;
-}
-
 export async function handleGlobalWebSocketEvent(
   data: IncomingWebSocketMessage,
   { showToast, maintenanceRefetch, setMaintenance }: HandleGlobalWebSocketEventOptions,
 ): Promise<void> {
-  // Cast to a looser type for the switch — individual cases narrow as needed.
-  const msg = data as ActionWebSocketMessage;
-
-  switch (msg.type) {
+  switch (data.type) {
     case 'notification':
-      showToast?.(msg.message ?? '');
+      showToast?.(data.message ?? '');
       break;
     case 'console.log':
-      console.log('[WS]', msg.message);
+      console.log('[WS]', data.message);
       break;
     case 'pong':
       console.log('[WS] Pong!');
@@ -41,18 +26,17 @@ export async function handleGlobalWebSocketEvent(
       break;
 
     case 'action':
-      switch (msg.action) {
-
+      switch (data.action) {
         case 'refresh':
-          if (msg.maintenance_active !== undefined) {
-            if (msg.maintenance_active) {
+          if (data.maintenance_active !== undefined) {
+            if (data.maintenance_active) {
               setMaintenance?.({
                 active: true,
                 details: {
-                  name: msg.name,
-                  description: msg.description,
-                  startTime: msg.start_time,
-                  endTime: msg.end_time,
+                  name: data.name,
+                  description: data.description,
+                  startTime: data.start_time,
+                  endTime: data.end_time,
                 },
               });
             } else {
@@ -61,7 +45,6 @@ export async function handleGlobalWebSocketEvent(
             return;
           }
 
-          // Fallback: refetch from API and act on the returned value
           if (maintenanceRefetch) {
             try {
               const result = await maintenanceRefetch();
@@ -76,7 +59,7 @@ export async function handleGlobalWebSocketEvent(
           } else {
             console.warn('[WS] maintenanceRefetch not provided, cannot refresh.');
           }
-          return;
+          break;
         case 'load-game':
           console.log("[WS] Django consumer 'load-game' message not currently in use.");
           break;

@@ -142,16 +142,12 @@ export default function ActivityInput() {
       playLimitReachedSound();
 
       const isFreeLimitAutoStop = completion.stopReason === "free_limit";
-      // AutoStopCompletion.levelUps is LevelUpEvent[] per the type definition, but
-      // existing code and mocks treat it as number[]. Cast to preserve runtime behavior
-      // until the type is corrected across the stack.
-      const levelUpsAsNumbers = completion.levelUps as unknown as number[];
 
       openActivityReward({
         xpGained: completion.xpGained,
         baseXp: completion.baseXp,
         xpMultiplier: completion.xpMultiplier,
-        levelUps: levelUpsAsNumbers,
+        levelUps: completion.levelUps,
         isAutoStopped: true,
         showUpgradePrompt: !isPremium && isFreeLimitAutoStop,
         activityName: completion.activityName,

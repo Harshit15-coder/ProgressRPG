@@ -28,11 +28,15 @@ export interface User {
 // ---------------------------------------------------------------------------
 
 export interface AchievementGoal {
-  key: string;
+  type: string;
   label: string;
-  target: number;
-  current: number;
-  completed: boolean;
+  symbol?: string;
+  tier: number;
+  complete: boolean;
+  color?: string;
+  value: number;
+  threshold: number;
+  next_threshold?: number | null;
 }
 
 export interface Player {

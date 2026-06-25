@@ -7,6 +7,7 @@ import { useAuth } from './AuthContext';
 import { useWebSocketConnection } from '../hooks/useWebSocketConnection';
 import { handleGlobalWebSocketEvent } from '../websockets/handleGlobalWebSocketEvent';
 import { useMaintenanceStatus } from '../hooks/useMaintenanceStatus';
+import { useMaintenanceContext } from './MaintenanceContext';
 import { WebSocketContext } from './webSocketContext';
 import type { IncomingWebSocketMessage, OutgoingWebSocketMessage } from '../types';
 
@@ -27,15 +28,16 @@ export const WebSocketProvider = ({ children }: ProviderProps): ReactElement => 
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { refetch: maintenanceRefetch } = useMaintenanceStatus();
+  const { setMaintenance } = useMaintenanceContext();
   // Set stores message handler callbacks registered by child components
   const eventHandlersRef = useRef<Set<(data: IncomingWebSocketMessage) => void>>(new Set());
   const wsEnabled = Boolean(!authLoading && isAuthenticated && player?.id);
 
   const onMessage = useCallback((data: IncomingWebSocketMessage) => {
     //console.log("[WS Provider] showToast:", showToast);
-    handleGlobalWebSocketEvent(data, { showToast, maintenanceRefetch });
+    handleGlobalWebSocketEvent(data, { showToast, maintenanceRefetch, setMaintenance });
     eventHandlersRef.current.forEach((handler) => handler(data));
-  }, [showToast, maintenanceRefetch]);
+  }, [showToast, maintenanceRefetch, setMaintenance]);
 
   const onError = useCallback(() => {
     console.error('WebSocket connection error');

@@ -79,9 +79,8 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
 
     // Fetch user info after login
     try {
-      const data = await apiFetch<{ user: User }>('/me/');
-      //console.log("[AUTH PROVIDER] data:", data);
-      setUser(data.user);
+      const data = await apiFetch<User>('/me/');
+      setUser(data);
       setIsAuthenticated(true);
       return data;
     } catch {

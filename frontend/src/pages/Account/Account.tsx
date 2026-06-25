@@ -193,8 +193,7 @@ export default function Account(): React.ReactElement {
           </div>
         </section>
 
-        {/* achievements runtime shape differs from AchievementGoal — cast until domain type is updated */}
-        <Achievements achievements={achievements as unknown as Parameters<typeof Achievements>[0]['achievements']} />
+        <Achievements achievements={achievements} />
 
         <section className={styles.section}>
           <h2>Billing</h2>

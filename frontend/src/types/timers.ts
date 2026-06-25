@@ -27,14 +27,7 @@ export interface ActivityCompleteResponse {
   base_xp: number;
   xp_multiplier: number;
   xp_gained: number;
-  level_ups: LevelUpEvent[];
-}
-
-/** Single level-up event returned in completion rewards */
-export interface LevelUpEvent {
-  entity: "player" | "character";
-  new_level: number;
-  old_level?: number;
+  level_ups: number[];
 }
 
 // ---------------------------------------------------------------------------
@@ -93,7 +86,7 @@ export interface AutoStopCompletion {
   xpGained: number | null;
   baseXp: number | null;
   xpMultiplier: number | null;
-  levelUps: LevelUpEvent[];
+  levelUps: number[];
   activityName: string | null;
   elapsedSeconds: number;
   stopReason?: string;
@@ -161,13 +154,33 @@ export interface WebSocketErrorMessage extends WebSocketMessageBase {
   message: string;
 }
 
+/** Server-initiated action message (maintenance refresh, game events) */
+export interface WebSocketActionMessage {
+  type: "action";
+  action: "refresh" | "load-game";
+  message?: string;
+  maintenance_active?: boolean;
+  name?: string;
+  description?: string;
+  start_time?: string | null;
+  end_time?: string | null;
+}
+
+/** Generic server message (currently unused payload) */
+export interface WebSocketServerMessage {
+  type: "server_message";
+  action?: string;
+  message?: string;
+}
+
 /** Union of all known incoming WebSocket message shapes */
 export type IncomingWebSocketMessage =
   | WebSocketConsoleMessage
   | WebSocketPongMessage
   | WebSocketNotificationMessage
   | WebSocketErrorMessage
-  | WebSocketMessageBase;
+  | WebSocketActionMessage
+  | WebSocketServerMessage;
 
 /** Client-to-server message shape */
 export interface OutgoingWebSocketMessage {

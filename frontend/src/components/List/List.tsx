@@ -2,6 +2,7 @@ import React from 'react';
 import classNames from 'classnames';
 import styles from './List.module.scss';
 import Li from './Li';
+import type { PaginatedResponse } from '../../types';
 
 // List is generic over item shape — it doesn't need to know the item type
 // as long as it has optional id/player/character/isHidden properties.
@@ -16,13 +17,8 @@ interface ListItem {
   [key: string]: unknown;
 }
 
-interface PaginatedItems<T> {
-  results: T[];
-  [key: string]: unknown;
-}
-
 interface ListProps<T extends ListItem> {
-  items?: T[] | PaginatedItems<T>;
+  items?: T[] | PaginatedResponse<T>;
   renderItem?: (item: T, index: number) => React.ReactNode;
   getKey?: (item: T, index: number) => string | number;
   onSelect?: (item: T) => void;
@@ -60,8 +56,8 @@ export default function List<T extends ListItem>({
 
   let normalizedItems: T[];
   if (!Array.isArray(items)) {
-    normalizedItems = Array.isArray((items as PaginatedItems<T>).results)
-      ? (items as PaginatedItems<T>).results
+    normalizedItems = Array.isArray((items as PaginatedResponse<T>).results)
+      ? (items as PaginatedResponse<T>).results
       : [];
   } else {
     normalizedItems = items;

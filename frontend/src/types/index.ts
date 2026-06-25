@@ -59,7 +59,6 @@ export type {
 export type {
   ActivityTimerApiData,
   ActivityCompleteResponse,
-  LevelUpEvent,
   QuestTimerApiData,
   CurrentActivity,
   StartActivityInput,
@@ -70,6 +69,8 @@ export type {
   WebSocketPongMessage,
   WebSocketNotificationMessage,
   WebSocketErrorMessage,
+  WebSocketActionMessage,
+  WebSocketServerMessage,
   IncomingWebSocketMessage,
   OutgoingWebSocketMessage,
 } from "./timers";

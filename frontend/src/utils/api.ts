@@ -44,11 +44,11 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
 
     if (!response.ok) throw new Error("Failed to refresh access token");
 
-    const data: { access_token?: string } = await response.json();
+    const data: { access?: string } = await response.json();
 
-    if (data.access_token) {
-      localStorage.setItem("accessToken", data.access_token);
-      return data.access_token;
+    if (data.access) {
+      localStorage.setItem("accessToken", data.access);
+      return data.access;
     }
     throw new Error("No access token returned from refresh");
   } catch {
