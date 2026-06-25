@@ -25,5 +25,12 @@ user_data.json
 *.dump
 *.sql
 playwright-report/
-/playwright/.auth/
+playwright/.auth/
 media/
+# design-sync (converter scripts + generated output — durable set in .design-sync/ IS committed)
+.ds-sync/
+ds-bundle/
+.design-sync/.cache/
+.design-sync/learnings/
+.design-sync/node_modules
+frontend/dist-ds/
