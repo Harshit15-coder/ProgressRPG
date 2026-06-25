@@ -1,4 +1,11 @@
-import ReactGA from 'react-ga4';
+import ReactGADefault from 'react-ga4';
+
+// Rollup's CJS interop wraps the module exports as the synthetic default
+// (forceDefault=1), so the GA4 singleton ends up at .default.default in prod
+// builds. Unwrap one layer defensively.
+const ReactGA = (
+  (ReactGADefault as unknown as { default: typeof ReactGADefault }).default ?? ReactGADefault
+);
 
 const GA_TRACKING_ID = import.meta.env.VITE_GA_TRACKING_ID as string | undefined;
 const GA_TEST_MODE = import.meta.env.VITE_GA_TEST_MODE === 'true';
