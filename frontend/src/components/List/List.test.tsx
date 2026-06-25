@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import List from './List';
+import type { PaginatedResponse } from '../../types';
 
 // Test helper – wraps a primitive value in the ListItem shape List expects
 type AnyListItem = { id?: string | number; name?: string; isHidden?: boolean; [key: string]: unknown };
@@ -164,7 +165,7 @@ describe('List', () => {
   it('handles items with results property', () => {
     const itemsWithResults = {
       results: asItems(['Apple', 'Banana', 'Cherry']),
-    };
+    } as unknown as PaginatedResponse<AnyListItem>;
 
     render(<List items={itemsWithResults} />);
 
