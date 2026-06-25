@@ -87,7 +87,7 @@ cryptography==48.0.1
     #   pyopenssl
     #   sendgrid
     #   service-identity
-daphne==4.2.1
+daphne==4.2.2
     # via -r requirements.in
 defusedxml==0.7.1
     # via
@@ -249,7 +249,7 @@ rpds-py==0.30.0
     #   referencing
 sendgrid==6.12.5
     # via -r requirements.in
-sentry-sdk==2.61.1
+sentry-sdk==2.62.0
     # via -r requirements.in
 service-identity==24.2.0
     # via twisted

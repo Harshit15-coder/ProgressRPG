@@ -12,19 +12,19 @@ on:
 jobs:
   mypy:
     runs-on: ubuntu-latest
-    
+
     env:
       DJANGO_SETTINGS_MODULE: progress_rpg.settings.dev
       SECRET_KEY: type-checking-secret-key
-    
+
     steps:
     - uses: actions/checkout@v4
-    
+
     - name: Set up Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.11'
-        
+
     - name: Cache pip packages
       uses: actions/cache@v3
       with:
@@ -32,17 +32,17 @@ jobs:
         key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
         restore-keys: |
           ${{ runner.os }}-pip-
-    
+
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
-        
+
     - name: Run mypy
       run: |
         mypy . --config-file=mypy.ini || true
       continue-on-error: true
-      
+
     - name: Type check character app (strict)
       run: |
         mypy character/ --config-file=mypy.ini
@@ -51,3 +51,28 @@ jobs:
     - name: Report status
       run: |
         echo "Type checking completed. Review output above for errors."
+
+  typescript:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Cache npm packages
+      uses: actions/cache@v3
+      with:
+        path: ~/.npm
+        key: ${{ runner.os }}-npm-${{ hashFiles('frontend/package-lock.json') }}
+        restore-keys: |
+          ${{ runner.os }}-npm-
+
+    - name: Install dependencies
+      run: cd frontend && npm ci
+
+    - name: Run TypeScript type check
+      run: cd frontend && npx tsc --noEmit
