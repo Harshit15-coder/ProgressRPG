@@ -1,6 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.admin import SimpleListFilter
+from django.db.models import Max
 from adminsortable2.admin import SortableAdminMixin
 
 from .models import (
@@ -156,6 +157,10 @@ class CustomUserAdmin(UserAdmin):
     search_fields = ["email"]
     ordering = ("-created_at",)
 
+    def get_queryset(self, request):
+        queryset = super().get_queryset(request)
+        return queryset.annotate(last_recorded_login_sort=Max("logins__timestamp"))
+
     def save_model(self, request, obj, form, change):
         if not change:
             obj.is_confirmed = True
@@ -171,7 +176,7 @@ class CustomUserAdmin(UserAdmin):
     ]
     inlines = [PlayerInline, UserLoginInline, UserSubscriptionInline]
 
-    @admin.display(description="Recorded login")
+    @admin.display(description="Recorded login", ordering="last_recorded_login_sort")
     def last_recorded_login(self, obj):
         return obj.last_recorded_login
 
