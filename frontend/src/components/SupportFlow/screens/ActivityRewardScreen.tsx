@@ -3,6 +3,7 @@ import React, { useEffect, useRef, useState } from "react";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { formatDuration, formatRewardDuration } from "../../../utils/formatUtils";
+import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
 import styles from "../SupportFlowModal.module.scss";
 
 const SUPPORT_COUNTDOWN_MS = 3000;
@@ -16,6 +17,7 @@ interface ActivityRewardScreenProps {
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
   elapsedSeconds?: number | null;
+  taskId?: number | null;
   enableAutoSupportCountdown?: boolean;
   onContinue?: () => void;
   onSupport?: () => void;
@@ -30,6 +32,7 @@ export default function ActivityRewardScreen({
   isAutoStopped = false,
   showUpgradePrompt = false,
   elapsedSeconds,
+  taskId = null,
   enableAutoSupportCountdown = true,
   onContinue,
   onSupport,
@@ -38,6 +41,26 @@ export default function ActivityRewardScreen({
   const [remainingMs, setRemainingMs] = useState(SUPPORT_COUNTDOWN_MS);
   const [isCountdownPaused, setIsCountdownPaused] = useState(false);
   const hasAutoContinuedRef = useRef(false);
+
+  const { data: tasks = [] } = useTasks();
+  const updateTask = useUpdateTask();
+  const linkedTask = taskId != null ? tasks.find((t) => t.id === taskId) ?? null : null;
+  const [isTaskComplete, setIsTaskComplete] = useState<boolean>(linkedTask?.is_complete ?? false);
+  // Sync initial value once linkedTask loads (it may arrive after first render)
+  const hasInitialisedTaskComplete = useRef(false);
+  useEffect(() => {
+    if (linkedTask && !hasInitialisedTaskComplete.current) {
+      setIsTaskComplete(linkedTask.is_complete);
+      hasInitialisedTaskComplete.current = true;
+    }
+  }, [linkedTask]);
+
+  function handleToggleTaskComplete() {
+    if (!linkedTask) return;
+    const next = !isTaskComplete;
+    setIsTaskComplete(next);
+    updateTask.mutate({ id: linkedTask.id, data: { is_complete: next } });
+  }
 
   useEffect(() => {
     if (!shouldEnableCountdown || isCountdownPaused || hasAutoContinuedRef.current) {
@@ -150,6 +173,25 @@ export default function ActivityRewardScreen({
         <p key={level}>Level up! You reached level {level}.</p>
       ))}
       {!hasActivityName && hasXp && <p>You gained {parsedXp} XP!</p>}
+
+      {linkedTask && (
+        <div className={styles.taskCompletionPanel}>
+          <p className={styles.taskCompletionTitle}>Task: {linkedTask.name}</p>
+          <div className={styles.taskCompletionRow}>
+            <span className={styles.taskCompletionTime}>
+              Total time: {formatRewardDuration(linkedTask.total_time)}
+            </span>
+            <label className={styles.taskCompletionCheck}>
+              Completed task?
+              <input
+                type="checkbox"
+                checked={isTaskComplete}
+                onChange={handleToggleTaskComplete}
+              />
+            </label>
+          </div>
+        </div>
+      )}
 
       <div className={styles.actionRow}>
         <div

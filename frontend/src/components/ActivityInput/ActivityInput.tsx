@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGame } from "../../context/GameContext";
 import Button from "../Button/Button";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
@@ -45,6 +46,7 @@ export default function ActivityInput() {
   } = activityTimer;
 
   const isPremium = Boolean(player?.is_premium);
+  const queryClient = useQueryClient();
   const { addEntityToCache } = useEntitySearchCache("activity");
 
   const [name, setName] = useState("");
@@ -175,6 +177,7 @@ export default function ActivityInput() {
     primeAudio(); // unlock AudioContext while still in user-gesture context
     if (isActive) {
       const completedActivityName = (name || currentActivity?.name || "").trim();
+      const completedTaskId = currentActivity?.taskId ?? null;
       const completion = await stop({ activityName: completedActivityName });
       // completion comes back as ActivityCompleteResponse or null — fields use snake_case from API
       const completionRaw = completion as Record<string, unknown> | null;
@@ -190,6 +193,7 @@ export default function ActivityInput() {
         fetchPlayerAndCharacter(),
         fetchCharacterCurrent(),
         fetchActivities(),
+        completedTaskId ? queryClient.invalidateQueries({ queryKey: ["tasks"] }) : Promise.resolve(),
       ]);
       playLimitReachedSound();
       openActivityReward({
@@ -201,6 +205,7 @@ export default function ActivityInput() {
         showUpgradePrompt: !isPremium,
         activityName: completedActivityName || null,
         elapsedSeconds,
+        taskId: completedTaskId,
       });
       return;
     }

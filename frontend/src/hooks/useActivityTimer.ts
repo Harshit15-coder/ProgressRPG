@@ -145,7 +145,7 @@ export default function useActivityTimer(): ActivityTimerReturn {
       // If server returns canonical activity object, store it
       // But don't update status yet - keep optimistic "active" state
       const serverActivity = setData?.activity_timer?.activity;
-      if (serverActivity) setCurrentActivity(serverActivity);
+      if (serverActivity) setCurrentActivity({ taskId, ...serverActivity });
 
       // 2) Tell server to start timing
       const startData = await apiFetch(`/activity_timers/start/`, {

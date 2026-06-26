@@ -37,6 +37,7 @@ interface OpenActivityRewardOptions {
   levelUps?: number[];
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
+  taskId?: number | null;
 }
 
 interface OpenWelcomeMessageOptions {
@@ -82,6 +83,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       levelUps = [],
       isAutoStopped = false,
       showUpgradePrompt = false,
+      taskId = null,
     }: OpenActivityRewardOptions = {}): void => {
       flowDispatch({
         type: "OPEN_ACTIVITY_REWARD",
@@ -93,6 +95,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
         levelUps,
         isAutoStopped,
         showUpgradePrompt,
+        taskId,
       });
     },
     []

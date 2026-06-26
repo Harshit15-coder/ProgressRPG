@@ -82,6 +82,7 @@ const initialCtx = (entrypoint: string | null = null) => ({
   rewardShowUpgradePrompt: false,
   completedActivityName: null,
   completedActivityElapsedSeconds: null,
+  completedActivityTaskId: null,
   supportActionId: null,
   activityPresetId: null,
   activityText: "",
@@ -177,6 +178,10 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
               ? event.activityName.trim()
               : null,
           completedActivityElapsedSeconds: normalizedElapsedSeconds,
+          completedActivityTaskId:
+            typeof event.taskId === "number" && Number.isInteger(event.taskId) && event.taskId > 0
+              ? event.taskId
+              : null,
         },
       };
       }
