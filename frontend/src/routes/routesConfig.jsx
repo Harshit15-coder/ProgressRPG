@@ -158,7 +158,7 @@ export const routes = [
     path: "/tasks",
     element: (
       <PrivateRoute>
-        <FeatureToggle flag="tasksPage">
+        <FeatureToggle flag="tasksFeature">
           <TasksPage />
         </FeatureToggle>
       </PrivateRoute>

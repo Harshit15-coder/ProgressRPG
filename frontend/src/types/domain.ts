@@ -50,6 +50,7 @@ export interface Player {
   total_activities: number;
   achievements: AchievementGoal[];
   is_premium: boolean;
+  is_tester: boolean;
   has_previous_subscription: boolean;
   onboarding_step: number;
   onboarding_completed: boolean;

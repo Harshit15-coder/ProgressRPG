@@ -6,13 +6,16 @@
 // Feature flags
 // ---------------------------------------------------------------------------
 
-/** Possible values for any feature flag */
-export type FeatureFlagValue = "no" | "all" | "premium";
+/** Groups that can be granted access to a feature */
+export type AccessGroup = "all" | "premium" | "testers";
+
+/** Feature flag value: array of groups that have access (empty = no one) */
+export type FeatureFlagValue = AccessGroup[];
 
 /** Known feature flag keys (from src/featureFlags.js) */
 export type FeatureFlagKey =
   | "activityList"
-  | "tasksPage"
+  | "tasksFeature"
   | "categoriesPage"
   | "skillsPage"
   | "projectsPage";
