@@ -244,16 +244,13 @@ class AppConfigViewTests(APITestCase):
         self.assertIn("stripe_live_mode", response.data)
         self.assertEqual(response.data["feature_flags"], {})
 
-    def test_returns_feature_flag_access_levels(self):
+    def test_returns_feature_flag_access_groups(self):
+        FeatureFlag.objects.create(key="activityList", access_groups=["all"])
+        FeatureFlag.objects.create(key="premiumOnlyFeature", access_groups=["premium"])
         FeatureFlag.objects.create(
-            key="activityList", access_level=FeatureFlag.AccessLevel.ALL
+            key="testersAndPremium", access_groups=["premium", "testers"]
         )
-        FeatureFlag.objects.create(
-            key="premiumOnlyFeature", access_level=FeatureFlag.AccessLevel.PREMIUM
-        )
-        FeatureFlag.objects.create(
-            key="disabledFeature", access_level=FeatureFlag.AccessLevel.NO
-        )
+        FeatureFlag.objects.create(key="disabledFeature", access_groups=[])
 
         response = self.client.get(self.url)
 
@@ -261,9 +258,10 @@ class AppConfigViewTests(APITestCase):
         self.assertEqual(
             response.data["feature_flags"],
             {
-                "activityList": "all",
-                "disabledFeature": "no",
-                "premiumOnlyFeature": "premium",
+                "activityList": ["all"],
+                "disabledFeature": [],
+                "premiumOnlyFeature": ["premium"],
+                "testersAndPremium": ["premium", "testers"],
             },
         )
 
