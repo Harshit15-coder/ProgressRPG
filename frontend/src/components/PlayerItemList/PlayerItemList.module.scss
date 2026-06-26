@@ -6,6 +6,41 @@
   width: 100%;
 }
 
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: v.$spacing-sm;
+  margin-bottom: v.$spacing-sm;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  flex-wrap: wrap;
+}
+
+.controlLabel {
+  font-size: 0.85em;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.sortSelect {
+  padding: v.$spacing-xs v.$spacing-sm;
+  border: 1px solid rgba(c.$color-border-primary, 0.35);
+  border-radius: v.$border-radius;
+  background: transparent;
+  font-size: 0.875em;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: c.$color-border-primary;
+  }
+}
+
 .list {
   gap: v.$spacing-sm;
   overflow: visible;

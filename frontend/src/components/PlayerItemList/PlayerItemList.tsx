@@ -6,6 +6,18 @@ import List from "../List/List";
 import Modal from "../Modal/Modal";
 import styles from "./PlayerItemList.module.scss";
 
+export interface SortOption<T> {
+  key: string;
+  label: string;
+  compareFn: (a: T, b: T) => number;
+}
+
+export interface FilterOption<T> {
+  key: string;
+  label: string;
+  predicate: (item: T) => boolean;
+}
+
 interface PlayerItemListProps<T extends { id?: string | number; name?: string; [key: string]: unknown }> {
   items?: T[];
   itemLabel?: string;
@@ -20,6 +32,9 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string; [
   onDelete?: (item: T) => void;
   listClassName?: string;
   sectionClassName?: string;
+  sortOptions?: SortOption<T>[];
+  filterOptions?: FilterOption<T>[];
+  controls?: React.ReactNode;
 }
 
 export default function PlayerItemList<T extends { id?: string | number; name?: string; [key: string]: unknown }>({
@@ -36,8 +51,17 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   onDelete,
   listClassName,
   sectionClassName,
+  sortOptions,
+  filterOptions,
+  controls,
 }: PlayerItemListProps<T>) {
   const [activeItem, setActiveItem] = useState<T | null>(null);
+  const [activeFilterKey, setActiveFilterKey] = useState<string | null>(
+    () => filterOptions?.[0]?.key ?? null,
+  );
+  const [activeSortKey, setActiveSortKey] = useState<string | null>(
+    () => sortOptions?.[0]?.key ?? null,
+  );
   const [editingName, setEditingName] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -96,10 +120,58 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
     [itemLabelLower],
   );
 
+  const displayItems = useMemo(() => {
+    let result = items;
+    const activeFilter = filterOptions?.find((o) => o.key === activeFilterKey);
+    if (activeFilter) result = result.filter(activeFilter.predicate);
+    const activeSort = sortOptions?.find((o) => o.key === activeSortKey);
+    if (activeSort) result = [...result].sort(activeSort.compareFn);
+    return result;
+  }, [items, filterOptions, activeFilterKey, sortOptions, activeSortKey]);
+
+  const hasControls = Boolean(filterOptions?.length || sortOptions?.length || controls);
+
   return (
     <>
+      {hasControls ? (
+        <div className={styles.controls}>
+          {controls ?? null}
+          {filterOptions?.length ? (
+            <div className={styles.controlGroup} role="group" aria-label={`Filter ${itemLabelLower}s`}>
+              {filterOptions.map((opt) => (
+                <Button
+                  key={opt.key}
+                  variant={activeFilterKey === opt.key ? "primary" : "secondary"}
+                  onClick={() => setActiveFilterKey(opt.key)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {sortOptions?.length ? (
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel} htmlFor={`${modalIdPrefix}-sort`}>
+                Sort:
+              </label>
+              <select
+                id={`${modalIdPrefix}-sort`}
+                className={styles.sortSelect}
+                value={activeSortKey ?? ""}
+                onChange={(e) => setActiveSortKey(e.target.value)}
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
       <List
-        items={items}
+        items={displayItems}
         ariaLabel={ariaLabel}
         canHover
         className={classNames(styles.list, listClassName)}

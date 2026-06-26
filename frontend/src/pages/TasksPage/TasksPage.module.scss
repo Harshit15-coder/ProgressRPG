@@ -95,6 +95,13 @@
   @include lp.list-page-empty-state;
 }
 
+.filterToggle {
+  align-self: flex-start;
+  font-size: 0.875em;
+  padding: v.$spacing-xs v.$spacing-sm;
+  min-width: 9rem;
+}
+
 .addButtonIcon {
   display: none;
 }
