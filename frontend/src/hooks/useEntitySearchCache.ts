@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchActivities } from "../api/activities";
 import { fetchTasks } from "../api/tasks";
-import { useGame } from "../context/GameContext";
+import { useFeatureFlag } from "./useFeatureFlag";
 import type { PlayerActivity, Task } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -74,6 +74,7 @@ function normalizeActivityEntity(activity: Partial<PlayerActivity> & { isOptimis
 function normalizeTaskEntity(task: Partial<Task> | null | undefined): SearchEntity | null {
   const name = normalizeEntityName(task?.name);
   if (!name) return null;
+  if (task?.is_complete || task?.completed_at) return null;
 
   return {
     id: task?.id ?? `task-${name.toLowerCase()}`,
@@ -117,8 +118,7 @@ export function useEntitySearchCache(type: EntityType) {
     throw new Error(`Unsupported entity search type: ${type}`);
   }
 
-  const { gameSettings } = useGame();
-  const includesTasks = gameSettings?.activity_search_includes_tasks ?? false;
+  const includesTasks = useFeatureFlag("tasksFeature");
 
   const query = useQuery<SearchEntity[]>({
     queryKey: config.queryKey,
