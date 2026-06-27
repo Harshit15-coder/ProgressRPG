@@ -85,7 +85,7 @@ DB_PORT = os.environ.get("DB_PORT")
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = "Progress RPG <noreply@progressrpg.com>"
+DEFAULT_FROM_EMAIL = "Progress RPG <noreply@mail.progressrpg.com>"
 SERVER_EMAIL = "Progress RPG <noreply@progressrpg.com>"
 
 EMAIL_HOST = "smtp.resend.com"
