@@ -117,8 +117,6 @@
   gap: v.$spacing-xs;
   max-height: 220px;
   overflow-y: auto;
-  padding-right: v.$spacing-xs;
-  scrollbar-gutter: stable;
 
   &::-webkit-scrollbar {
     width: 6px;
