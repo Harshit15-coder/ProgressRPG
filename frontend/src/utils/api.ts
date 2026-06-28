@@ -59,11 +59,17 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
 export async function getValidAccessToken(): Promise<string> {
   const accessToken = localStorage.getItem("accessToken");
   const refreshToken = localStorage.getItem("refreshToken");
-  if (!accessToken || !refreshToken) throw new Error("Missing tokens");
+  if (!accessToken || !refreshToken) {
+    clearAuthAndRedirect();
+    throw new Error("Missing tokens");
+  }
 
   if (isTokenExpiringSoon(accessToken)) {
     const newAccess = await refreshAccessToken(refreshToken);
-    if (!newAccess) throw new Error("Token refresh failed");
+    if (!newAccess) {
+      clearAuthAndRedirect();
+      throw new Error("Token refresh failed");
+    }
     return newAccess;
   }
 

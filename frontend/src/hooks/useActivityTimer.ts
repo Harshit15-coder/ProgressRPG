@@ -268,8 +268,18 @@ export default function useActivityTimer(): ActivityTimerReturn {
       return result;
     } catch (err) {
       console.error("Failed to stop timer:", err);
-      // You might want to restore interval here if status was active,
-      // but for MVP it's okay to leave it stopped and let user retry.
+      // Reset local state so the user isn't left stuck in "active" with a
+      // dead interval — they can retry or start a new activity.
+      setStatus("empty");
+      setElapsed(0);
+      setDuration(0);
+      setCurrentActivity(null);
+      setLimitSeconds(null);
+      limitRef.current = null;
+      autoStopReasonRef.current = null;
+      didAutoStopRef.current = false;
+      setLimitReached(false);
+      pausedTimeRef.current = 0;
       throw err;
     }
     },
