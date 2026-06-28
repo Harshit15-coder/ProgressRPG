@@ -150,7 +150,7 @@ export default function ActivityInputScreen({
 
           {(!showTabs || activeTab === "memory") && (
             <div className={styles.priorityThreeContainer}>
-              <p className={styles.readableText}>Write down the first three tasks that come into your head.</p>
+              <p className={styles.readableText}>Write down the first three things that come into your head.</p>
               {hint && <p className={`${styles.hint} ${styles.readableText}`}>{hint}</p>}
               {[0, 1, 2].map((index) => {
                 const taskValue = candidateTasks[index];
