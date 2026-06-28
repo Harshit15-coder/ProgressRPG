@@ -136,7 +136,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   const hasControls = Boolean(filterOptions?.length || sortOptions?.length || controls);
 
   return (
-    <>
+    <div className={styles.wrapper}>
       {hasControls ? (
         <div className={styles.controls}>
           {controls ?? null}
@@ -174,6 +174,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           ) : null}
         </div>
       ) : null}
+      <div className={styles.listScroll}>
       <List
         items={displayItems}
         ariaLabel={ariaLabel}
@@ -239,6 +240,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           </>
         )}
       />
+      </div>
 
       {activeItem ? (
         <Modal
@@ -305,6 +307,6 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           )}
         </Modal>
       ) : null}
-    </>
+    </div>
   );
 }

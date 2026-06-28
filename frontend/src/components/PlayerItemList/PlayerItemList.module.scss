@@ -6,6 +6,38 @@
   width: 100%;
 }
 
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.listScroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: v.$spacing-sm;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(c.$color-border-primary, 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(c.$color-border-primary, 0.6);
+    }
+  }
+}
+
 .controls {
   display: flex;
   flex-wrap: wrap;

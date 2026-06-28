@@ -154,7 +154,7 @@ export function useEntitySearchCache(type: EntityType) {
     queryKey: TASK_LIST_CACHE_KEY,
     queryFn: async () => {
       const tasks = await fetchTasks();
-      return Array.isArray(tasks) ? tasks.map(normalizeTaskEntity).filter((e): e is SearchEntity => e !== null) : [];
+      return Array.isArray(tasks) ? tasks.map((t) => normalizeTaskEntity(t)).filter((e): e is SearchEntity => e !== null) : [];
     },
     enabled: type === "activity" && includesTasks,
     staleTime: Number.POSITIVE_INFINITY,
