@@ -34,6 +34,7 @@ interface OpenActivityRewardOptions {
   elapsedSeconds?: number | null;
   baseXp?: number | null;
   xpMultiplier?: number | null;
+  taskXpMultiplier?: number | null;
   levelUps?: number[];
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
@@ -80,6 +81,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       elapsedSeconds = null,
       baseXp = null,
       xpMultiplier = null,
+      taskXpMultiplier = null,
       levelUps = [],
       isAutoStopped = false,
       showUpgradePrompt = false,
@@ -92,6 +94,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
         elapsedSeconds,
         baseXp,
         xpMultiplier,
+        taskXpMultiplier,
         levelUps,
         isAutoStopped,
         showUpgradePrompt,
