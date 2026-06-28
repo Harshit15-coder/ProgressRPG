@@ -86,6 +86,10 @@ class GameSettings(models.Model):
     default_activity_xp_per_second = models.DecimalField(
         max_digits=5, decimal_places=4, default="1.0000"
     )
+    task_activity_xp_multiplier = models.DecimalField(
+        max_digits=5, decimal_places=2, default="1.25"
+    )
+    task_completion_xp = models.IntegerField(default=100)
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
 
@@ -120,6 +124,10 @@ class GameSettings(models.Model):
             errors["premium_activity_xp_multiplier"] = "Must be > 0."
         if self.default_activity_xp_per_second <= 0:
             errors["default_activity_xp_per_second"] = "Must be > 0."
+        if self.task_activity_xp_multiplier <= 0:
+            errors["task_activity_xp_multiplier"] = "Must be > 0."
+        if self.task_completion_xp < 0:
+            errors["task_completion_xp"] = "Must be non-negative."
         if self.trial_period_days < 0:
             errors["trial_period_days"] = "Must be non-negative."
         if errors:
