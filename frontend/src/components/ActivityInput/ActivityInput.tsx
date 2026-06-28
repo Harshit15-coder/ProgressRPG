@@ -175,7 +175,16 @@ export default function ActivityInput() {
     primeAudio(); // unlock AudioContext while still in user-gesture context
     if (isActive) {
       const completedActivityName = (name || currentActivity?.name || "").trim();
-      const completion = await stop({ activityName: completedActivityName });
+      const localElapsed = elapsed; // capture before async operations clear it
+
+      let completion: Awaited<ReturnType<typeof stop>> = null;
+      try {
+        completion = await stop({ activityName: completedActivityName });
+      } catch (err) {
+        console.error("[ActivityInput] Failed to stop timer:", err);
+        // Continue — play sound and show popup with local data so the user isn't left hanging
+      }
+
       // completion comes back as ActivityCompleteResponse or null — fields use snake_case from API
       const completionRaw = completion as Record<string, unknown> | null;
       const xpGained = completionRaw?.xp_gained != null ? Number(completionRaw.xp_gained) : null;
@@ -184,13 +193,19 @@ export default function ActivityInput() {
       const levelUps = Array.isArray(completionRaw?.level_ups) ? completionRaw.level_ups as number[] : [];
       const elapsedSeconds = completionRaw?.duration_seconds != null
         ? Number(completionRaw.duration_seconds)
-        : elapsed;
+        : localElapsed;
       setName("");
-      await Promise.all([
-        fetchPlayerAndCharacter(),
-        fetchCharacterCurrent(),
-        fetchActivities(),
-      ]);
+
+      try {
+        await Promise.all([
+          fetchPlayerAndCharacter(),
+          fetchCharacterCurrent(),
+          fetchActivities(),
+        ]);
+      } catch (err) {
+        console.error("[ActivityInput] Failed to refresh after stop:", err);
+      }
+
       playLimitReachedSound();
       openActivityReward({
         xpGained,

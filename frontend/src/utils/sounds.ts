@@ -37,37 +37,45 @@ export function primeAudio(): void {
   }
 }
 
+function scheduleNotes(ctx: AudioContext, noteSequence: Note[]): void {
+  const nodes: (OscillatorNode | GainNode)[] = []; // hold refs so Firefox doesn't GC nodes before playback ends
+  const t = ctx.currentTime;
+
+  noteSequence.forEach(({ frequency, offset, duration }) => {
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    osc.type = "sine";
+    osc.frequency.value = frequency;
+    gain.gain.setValueAtTime(0.25, t + offset);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + offset + duration);
+    osc.start(t + offset);
+    osc.stop(t + offset + duration);
+    nodes.push(osc, gain);
+  });
+
+  const finalNoteEnd =
+    noteSequence.reduce(
+      (latestEnd, note) => Math.max(latestEnd, note.offset + note.duration),
+      0,
+    ) * 1000;
+
+  setTimeout(() => { nodes.length = 0; }, finalNoteEnd + 400);
+}
+
 function playChime(noteSequence: Note[]): void {
   try {
     const ctx = getContext();
     if (!ctx) return;
 
-    if (ctx.state === "suspended") ctx.resume();
-
-    const nodes: (OscillatorNode | GainNode)[] = []; // hold refs so Firefox doesn't GC nodes before playback ends
-    const t = ctx.currentTime;
-
-    noteSequence.forEach(({ frequency, offset, duration }) => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain);
-      gain.connect(ctx.destination);
-      osc.type = "sine";
-      osc.frequency.value = frequency;
-      gain.gain.setValueAtTime(0.25, t + offset);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + offset + duration);
-      osc.start(t + offset);
-      osc.stop(t + offset + duration);
-      nodes.push(osc, gain);
-    });
-
-    const finalNoteEnd =
-      noteSequence.reduce(
-        (latestEnd, note) => Math.max(latestEnd, note.offset + note.duration),
-        0,
-      ) * 1000;
-
-    setTimeout(() => { nodes.length = 0; }, finalNoteEnd + 400);
+    // If suspended, wait for resume to complete before scheduling notes so
+    // that notes aren't silently dropped while the context is still unlocking.
+    if (ctx.state === "suspended") {
+      ctx.resume().then(() => scheduleNotes(ctx, noteSequence)).catch(() => {});
+    } else {
+      scheduleNotes(ctx, noteSequence);
+    }
   } catch {
     // Silently ignore errors (e.g. browser blocks AudioContext creation).
   }

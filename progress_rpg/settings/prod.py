@@ -85,15 +85,15 @@ DB_PORT = os.environ.get("DB_PORT")
 
 
 EMAIL_BACKEND = "django.core.mail.backends.smtp.EmailBackend"
-DEFAULT_FROM_EMAIL = "Progress RPG <noreply@progressrpg.com>"
-SERVER_EMAIL = "Progress RPG <noreply@progressrpg.com>"
+DEFAULT_FROM_EMAIL = "Progress RPG <noreply@mail.progressrpg.com>"
+SERVER_EMAIL = "Progress RPG <noreply@mail.progressrpg.com>"
 
-EMAIL_HOST = "smtp.sendgrid.net"
+EMAIL_HOST = "smtp.resend.com"
 EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
-EMAIL_HOST_USER = "apikey"  # SendGrid SMTP requires this literal string as the username
-EMAIL_HOST_PASSWORD = os.environ.get("SENDGRID_API_KEY", "")
+EMAIL_HOST_USER = "resend"  # Resend SMTP requires this literal string as the username
+EMAIL_HOST_PASSWORD = os.environ.get("RESEND_API_KEY", "")
 
 print("DEBUG:", DEBUG, file=sys.stderr)
 
