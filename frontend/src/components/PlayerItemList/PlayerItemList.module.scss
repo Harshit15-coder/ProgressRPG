@@ -191,6 +191,16 @@
   gap: v.$spacing-xs;
 }
 
+.itemDetailsButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
 .itemName {
   font-weight: 500;
   @include t.apply-text-style(t.$text-body);
@@ -249,6 +259,9 @@
 }
 
 .editConfirmMeta {
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-xs;
   margin: 0;
   color: rgba(0, 0, 0, 0.65);
   @include t.apply-text-style(t.$text-caption);

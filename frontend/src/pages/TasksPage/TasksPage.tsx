@@ -38,6 +38,19 @@ const taskSortOptions: SortOption<ItemRecord>[] = [
   },
 ];
 
+function formatTimestamp(timestamp: string | null | undefined): string {
+  if (!timestamp) return "—";
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return "—";
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 function formatLastWorkedOn(task: Task): string {
   const timestamp = task?.last_worked_on;
   if (!timestamp) return "No time recorded";
@@ -170,11 +183,20 @@ export default function TasksPage(): React.ReactElement | null {
               )}
             </>
           )}
-          renderEditSummary={(task) => (
-            <>
-              {isTaskComplete(task as Task) ? "Complete" : "Incomplete"} • Total time: {formatRewardDuration((task as Task).total_time)}
-            </>
-          )}
+          renderEditSummary={(taskItem) => {
+            const task = taskItem as Task;
+            const complete = isTaskComplete(task);
+            return (
+              <>
+                <div>
+                  {complete ? "Complete" : "Incomplete"} • Total time: {formatRewardDuration(task.total_time)}
+                </div>
+                <div>Created: {formatTimestamp(task.created_at)}</div>
+                <div>Modified: {formatTimestamp(task.last_updated)}</div>
+                {complete && <div>Completed: {formatTimestamp(task.completed_at)}</div>}
+              </>
+            );
+          }}
           hoverEdit
           renderRowActions={(task) => (
             <button

@@ -202,12 +202,26 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
             ) : null}
             {hoverEdit ? (
               <div className={styles.itemContent}>
-                <div className={styles.itemDetails}>
-                  <div className={styles.itemName}>{getItemName(item)}</div>
-                  {renderItemMeta ? (
-                    <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                  ) : null}
-                </div>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className={classNames(styles.itemDetails, styles.itemDetailsButton)}
+                    aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+                    onClick={() => handleOpenItem(item)}
+                  >
+                    <div className={styles.itemName}>{getItemName(item)}</div>
+                    {renderItemMeta ? (
+                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                    ) : null}
+                  </button>
+                ) : (
+                  <div className={styles.itemDetails}>
+                    <div className={styles.itemName}>{getItemName(item)}</div>
+                    {renderItemMeta ? (
+                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                    ) : null}
+                  </div>
+                )}
                 <div className={styles.rowActions}>
                   {renderRowActions?.(item)}
                   {canEdit ? (
@@ -286,7 +300,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
                 />
               ) : null}
               {modalSummary ? (
-                <p className={styles.editConfirmMeta}>{modalSummary}</p>
+                <div className={styles.editConfirmMeta}>{modalSummary}</div>
               ) : null}
               <div className={styles.editConfirmActions}>
                 {canEdit ? (
