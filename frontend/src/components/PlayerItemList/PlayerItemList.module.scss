@@ -211,7 +211,15 @@
   @include t.apply-text-style(t.$text-caption);
 }
 
+.editTitleRow {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-sm;
+}
+
 .editInput {
+  flex: 1;
+  min-width: 0;
   padding: v.$spacing-xs v.$spacing-sm;
   border: 2px solid rgba(c.$color-status-success, 0.45);
   border-radius: v.$border-radius;
@@ -228,6 +236,7 @@
 .editConfirmContent {
   display: grid;
   gap: v.$spacing-md;
+  width: 100%;
 
   p {
     margin: 0;

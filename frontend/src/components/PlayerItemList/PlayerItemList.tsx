@@ -74,11 +74,6 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   const canEdit = typeof onEdit === "function";
   const canDelete = typeof onDelete === "function";
 
-  const activeItemName = activeItem ? getItemName(activeItem) : "";
-  const modalSummary = activeItem
-    ? (renderEditSummary?.(activeItem) ?? renderItemMeta?.(activeItem) ?? null)
-    : null;
-
   const handleOpenItem = useCallback(
     (item: T) => {
       setActiveItem(item);
@@ -132,6 +127,20 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
     if (activeSort) result = [...result].sort(activeSort.compareFn);
     return result;
   }, [items, filterOptions, activeFilterKey, sortOptions, activeSortKey]);
+
+  // Keep dialog state in sync with the live items array so toggling complete
+  // inside the dialog reflects immediately without closing and reopening it.
+  const liveActiveItem = useMemo(
+    () => activeItem
+      ? (items.find((item) => item.id !== undefined && item.id === activeItem.id) ?? activeItem)
+      : null,
+    [activeItem, items],
+  );
+
+  const activeItemName = liveActiveItem ? getItemName(liveActiveItem) : "";
+  const modalSummary = liveActiveItem
+    ? (renderEditSummary?.(liveActiveItem) ?? renderItemMeta?.(liveActiveItem) ?? null)
+    : null;
 
   const hasControls = Boolean(filterOptions?.length || sortOptions?.length || controls);
 
@@ -285,19 +294,34 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
             </div>
           ) : (
             <div className={styles.editConfirmContent}>
-              {canEdit ? (
-                <input
-                  type="text"
-                  className={styles.editInput}
-                  aria-label={`${itemLabel} name`}
-                  value={editingName}
-                  onChange={(event) => setEditingName(event.target.value)}
-                  autoFocus
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleEditSave();
-                    if (event.key === "Escape") handleModalClose();
-                  }}
-                />
+              {(canToggleComplete || canEdit) ? (
+                <div className={styles.editTitleRow}>
+                  {canToggleComplete && liveActiveItem ? (
+                    <label className={styles.completeCheckboxLabel}>
+                      <input
+                        className={styles.completeCheckbox}
+                        type="checkbox"
+                        checked={Boolean(isItemComplete?.(liveActiveItem))}
+                        onChange={() => onToggleComplete!(liveActiveItem)}
+                        aria-label={`Mark ${activeItemName || itemLabelLower} as complete`}
+                      />
+                    </label>
+                  ) : null}
+                  {canEdit ? (
+                    <input
+                      type="text"
+                      className={styles.editInput}
+                      aria-label={`${itemLabel} name`}
+                      value={editingName}
+                      onChange={(event) => setEditingName(event.target.value)}
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleEditSave();
+                        if (event.key === "Escape") handleModalClose();
+                      }}
+                    />
+                  ) : null}
+                </div>
               ) : null}
               {modalSummary ? (
                 <div className={styles.editConfirmMeta}>{modalSummary}</div>
