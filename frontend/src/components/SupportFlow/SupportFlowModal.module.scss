@@ -142,6 +142,8 @@
   border: 1px solid rgba(c.$color-border-primary, 0.15);
   border-radius: v.$border-radius;
   background: rgba(c.$color-bg, 0.4);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .taskPickName {
@@ -165,12 +167,14 @@
   display: flex;
   flex-direction: column;
   gap: v.$spacing-sm;
+  width: 100%;
 }
 
 .priorityRow {
   display: flex;
   align-items: center;
   gap: v.$spacing-sm;
+  width: 100%;
 }
 
 .priorityInput {
