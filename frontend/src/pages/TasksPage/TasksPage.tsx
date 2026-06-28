@@ -1,8 +1,10 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
+import { useGame } from "../../context/GameContext";
 import type { Task } from "../../types";
-import Input from "../../components/Input/Input";
+import EntitySearchInput from "../../components/EntitySearchInput/EntitySearchInput";
 import Button from "../../components/Button/Button";
 import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
 import type { SortOption } from "../../components/PlayerItemList/PlayerItemList";
@@ -57,23 +59,38 @@ function formatLastWorkedOn(task: Task): string {
 }
 
 export default function TasksPage(): React.ReactElement | null {
+  const navigate = useNavigate();
+  const { fetchPlayerAndCharacter, activityTimer, freeTimerLimitSeconds, player } = useGame();
+  const isPremium = Boolean(player?.is_premium);
   const { data: tasks, isLoading } = useTasks();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
 
   const [newName, setNewName] = useState("");
+  const [completionReward, setCompletionReward] = useState<{ taskId: number; xp: number } | null>(null);
+
+  useEffect(() => {
+    if (!completionReward) return;
+    const timer = setTimeout(() => setCompletionReward(null), 4000);
+    return () => clearTimeout(timer);
+  }, [completionReward]);
   const [hideCompleted, setHideCompleted] = useState(
     () => localStorage.getItem("tasks.hideCompleted") !== "false",
   );
   const safeTasks = Array.isArray(tasks) ? tasks : [];
   const visibleTasks = hideCompleted ? safeTasks.filter((t) => !isTaskComplete(t)) : safeTasks;
 
-  const handleCreateTask = (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    if (!newName.trim()) return;
-    createTask.mutate({ name: newName.trim() });
+  const handleCreateTask = useCallback((name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    createTask.mutate({ name: trimmed });
     setNewName("");
+  }, [createTask]);
+
+  const handleSubmitForm = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    handleCreateTask(newName);
   };
 
   const handleEdit = useCallback(
@@ -92,29 +109,43 @@ export default function TasksPage(): React.ReactElement | null {
 
   const handleToggleComplete = useCallback(
     (task: ItemRecord) => {
-      updateTask.mutate({
-        id: task.id,
-        data: {
-          completed_at: isTaskComplete(task) ? null : new Date().toISOString(),
+      const completing = !isTaskComplete(task);
+      updateTask.mutate(
+        {
+          id: task.id,
+          data: {
+            is_complete: completing,
+            completed_at: completing ? new Date().toISOString() : null,
+          },
         },
-      });
+        {
+          onSuccess: (data) => {
+            if (data.completion_xp_gained > 0) {
+              setCompletionReward({ taskId: task.id, xp: data.completion_xp_gained });
+              fetchPlayerAndCharacter();
+            }
+          },
+        }
+      );
     },
-    [updateTask],
+    [updateTask, fetchPlayerAndCharacter],
   );
 
   if (isLoading) return <p>Loading tasks...</p>;
 
   return (
     <div className={styles.page}>
+      <div className={styles.content}>
       <div className={styles.header}>
         <h1>Tasks</h1>
       </div>
 
-      <form className={styles.addTaskForm} onSubmit={handleCreateTask}>
-        <Input
-          id="new-task-name"
+      <form className={styles.addTaskForm} onSubmit={handleSubmitForm}>
+        <EntitySearchInput
+          type="task"
           value={newName}
-          onChange={(v) => setNewName(v as string)}
+          onChange={(v) => setNewName(v)}
+          onCreate={handleCreateTask}
           placeholder="New task name"
           className={styles.addTaskInput}
         />
@@ -124,42 +155,71 @@ export default function TasksPage(): React.ReactElement | null {
         </Button>
       </form>
 
-      {visibleTasks.length > 0 ? (
-        <div className={styles.tasksList}>
-          <PlayerItemList<ItemRecord>
-            items={visibleTasks as ItemRecord[]}
-            itemLabel="task"
-            ariaLabel="Tasks"
-            isItemComplete={isTaskComplete as (item: ItemRecord) => boolean}
-            onToggleComplete={handleToggleComplete}
-            renderItemMeta={(task) => formatLastWorkedOn(task as Task)}
-            renderEditSummary={(task) => (
-              <>
-                {isTaskComplete(task as Task) ? "Complete" : "Incomplete"} • Total time: {formatRewardDuration((task as Task).total_time)}
-              </>
-            )}
-            onEdit={handleEdit}
-            onDelete={handleDelete}
-            sortOptions={taskSortOptions}
-            controls={
-              <Button
-                variant={hideCompleted ? "primary" : "secondary"}
-                onClick={() => setHideCompleted((v) => {
-          localStorage.setItem("tasks.hideCompleted", String(!v));
-          return !v;
-        })}
-                className={styles.filterToggle}
-              >
-                {hideCompleted ? "Show complete" : "Hide complete"}
-              </Button>
-            }
-          />
-        </div>
-      ) : (
-        <div className={styles.emptyState}>
-          <p>{hideCompleted ? "No incomplete tasks." : "No tasks yet."}</p>
-        </div>
-      )}
+      <div className={styles.tasksList}>
+        <PlayerItemList<ItemRecord>
+          items={visibleTasks as ItemRecord[]}
+          itemLabel="task"
+          ariaLabel="Tasks"
+          isItemComplete={isTaskComplete as (item: ItemRecord) => boolean}
+          onToggleComplete={handleToggleComplete}
+          renderItemMeta={(task) => (
+            <>
+              {formatLastWorkedOn(task as Task)}
+              {completionReward?.taskId === (task as Task).id && (
+                <> • +{completionReward.xp} XP</>
+              )}
+            </>
+          )}
+          renderEditSummary={(task) => (
+            <>
+              {isTaskComplete(task as Task) ? "Complete" : "Incomplete"} • Total time: {formatRewardDuration((task as Task).total_time)}
+            </>
+          )}
+          hoverEdit
+          renderRowActions={(task) => (
+            <button
+              type="button"
+              className={styles.taskPlayButton}
+              aria-label={`Start working on ${(task as Task).name}`}
+              title="Start working on this task"
+              onClick={async (event) => {
+                event.currentTarget.blur();
+                const name = (task as Task).name;
+                if (!name || activityTimer?.status === "active") return;
+                await activityTimer?.startActivity({
+                  text: name,
+                  taskId: (task as Task).id,
+                  limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                });
+                navigate("/timer");
+              }}
+            >
+              ▷
+            </button>
+          )}
+          onEdit={handleEdit}
+          onDelete={handleDelete}
+          sortOptions={taskSortOptions}
+          controls={
+            <Button
+              variant={hideCompleted ? "primary" : "secondary"}
+              onClick={() => setHideCompleted((v) => {
+                localStorage.setItem("tasks.hideCompleted", String(!v));
+                return !v;
+              })}
+              className={styles.filterToggle}
+            >
+              {hideCompleted ? "Show complete" : "Hide complete"}
+            </Button>
+          }
+        />
+        {visibleTasks.length === 0 && (
+          <div className={styles.emptyState}>
+            <p>{hideCompleted ? "No incomplete tasks." : "No tasks yet."}</p>
+          </div>
+        )}
+      </div>
+      </div>
     </div>
   );
 }
