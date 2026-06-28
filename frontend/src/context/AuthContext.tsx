@@ -48,6 +48,14 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   };
 
   useEffect(() => {
+    const handleAuthExpired = () => logout();
+    window.addEventListener("auth:expired", handleAuthExpired);
+    return () => window.removeEventListener("auth:expired", handleAuthExpired);
+  // logout is defined in the same render scope and only uses stable state setters
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
     async function verifyUser(): Promise<void> {
       if (!accessToken || !refreshToken) {
         setLoading(false);

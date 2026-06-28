@@ -24,14 +24,7 @@ function isTokenExpiringSoon(token: string, bufferSeconds = 60): boolean {
 function clearAuthAndRedirect(): void {
   localStorage.removeItem("accessToken");
   localStorage.removeItem("refreshToken");
-
-  // Give user feedback before redirect
-  console.warn("[Auth] Session expired, redirecting to login...");
-
-  // Small delay to allow any error messages to display
-  setTimeout(() => {
-    window.location.href = "/login";
-  }, 500);
+  window.dispatchEvent(new CustomEvent("auth:expired"));
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<string | false> {
