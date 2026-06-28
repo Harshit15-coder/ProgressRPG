@@ -81,6 +81,49 @@
   cursor: pointer;
 }
 
+.itemContent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: v.$spacing-sm;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.item:hover .rowActions,
+.item:focus-within .rowActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editHoverButton {
+  border: none;
+  background: transparent;
+  color: c.$color-border-primary;
+  border-radius: v.$border-radius;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(c.$color-border-primary, 0.1);
+  }
+}
+
 .itemCompleted {
   background: rgba(c.$color-border-primary, 0.03);
   border-color: rgba(c.$color-border-primary, 0.3);

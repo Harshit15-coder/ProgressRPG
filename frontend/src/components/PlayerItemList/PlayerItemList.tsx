@@ -30,6 +30,8 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string; [
   renderEditSummary?: (item: T) => React.ReactNode;
   onEdit?: (item: T, name: string) => void;
   onDelete?: (item: T) => void;
+  hoverEdit?: boolean;
+  renderRowActions?: (item: T) => React.ReactNode;
   listClassName?: string;
   sectionClassName?: string;
   sortOptions?: SortOption<T>[];
@@ -49,6 +51,8 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   renderEditSummary,
   onEdit,
   onDelete,
+  hoverEdit = false,
+  renderRowActions,
   listClassName,
   sectionClassName,
   sortOptions,
@@ -195,19 +199,43 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
                 />
               </label>
             ) : null}
-            <button
-              type="button"
-              className={styles.itemButton}
-              aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
-              onClick={() => handleOpenItem(item)}
-            >
-              <div className={styles.itemDetails}>
-                <div className={styles.itemName}>{getItemName(item)}</div>
-                {renderItemMeta ? (
-                  <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                ) : null}
+            {hoverEdit ? (
+              <div className={styles.itemContent}>
+                <div className={styles.itemDetails}>
+                  <div className={styles.itemName}>{getItemName(item)}</div>
+                  {renderItemMeta ? (
+                    <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                  ) : null}
+                </div>
+                <div className={styles.rowActions}>
+                  {renderRowActions?.(item)}
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className={styles.editHoverButton}
+                      aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+                      onClick={() => handleOpenItem(item)}
+                    >
+                      📝
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.itemButton}
+                aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
+                onClick={() => handleOpenItem(item)}
+              >
+                <div className={styles.itemDetails}>
+                  <div className={styles.itemName}>{getItemName(item)}</div>
+                  {renderItemMeta ? (
+                    <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                  ) : null}
+                </div>
+              </button>
+            )}
           </>
         )}
       />
@@ -218,7 +246,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           title={
             confirmingDelete
               ? `Delete ${itemLabelLower}?`
-              : activeItemName || `Edit ${itemLabelLower}`
+              : `Edit ${itemLabelLower}`
           }
           onClose={handleModalClose}
           onBack={confirmingDelete ? () => setConfirmingDelete(false) : undefined}
