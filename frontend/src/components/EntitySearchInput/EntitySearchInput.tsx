@@ -20,7 +20,7 @@ interface SearchEntity {
 }
 
 interface EntitySearchInputProps {
-  type: "activity";
+  type: "activity" | "task";
   value: string;
   onChange?: (value: string) => void;
   onSelect?: (entity: SearchEntity) => void;
