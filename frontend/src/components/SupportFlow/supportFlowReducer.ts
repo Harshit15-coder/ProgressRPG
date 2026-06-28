@@ -154,6 +154,11 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
           Number.isFinite(parsedXpMultiplier) && parsedXpMultiplier > 0
             ? parsedXpMultiplier
             : null;
+        const parsedTaskXpMultiplier = Number(event.taskXpMultiplier);
+        const normalizedTaskXpMultiplier =
+          Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1
+            ? parsedTaskXpMultiplier
+            : null;
         const normalizedLevelUps = Array.isArray(event.levelUps)
           ? event.levelUps
               .map((level) => Number(level))
@@ -170,6 +175,7 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
           xpGained: normalizedXp,
           rewardBaseXp: normalizedBaseXp,
           rewardXpMultiplier: normalizedXpMultiplier,
+          rewardTaskXpMultiplier: normalizedTaskXpMultiplier,
           rewardLevelUps: normalizedLevelUps,
           rewardIsAutoStopped: normalizedIsAutoStopped,
           rewardShowUpgradePrompt: normalizedShowUpgradePrompt,

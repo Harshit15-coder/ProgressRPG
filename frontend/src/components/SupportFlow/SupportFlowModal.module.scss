@@ -231,6 +231,13 @@
   }
 }
 
+.taskCompletionXp {
+  margin: v.$spacing-xs 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: c.$color-text-body;
+}
+
 .upgradePanel {
   width: 100%;
   margin-bottom: 0;

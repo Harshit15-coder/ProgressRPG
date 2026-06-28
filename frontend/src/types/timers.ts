@@ -26,6 +26,7 @@ export interface ActivityCompleteResponse {
   duration_seconds: number;
   base_xp: number;
   xp_multiplier: number;
+  task_xp_multiplier?: number;
   xp_gained: number;
   level_ups: number[];
 }
@@ -86,6 +87,7 @@ export interface AutoStopCompletion {
   xpGained: number | null;
   baseXp: number | null;
   xpMultiplier: number | null;
+  taskXpMultiplier: number | null;
   levelUps: number[];
   activityName: string | null;
   elapsedSeconds: number;

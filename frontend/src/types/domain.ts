@@ -200,6 +200,7 @@ export interface Task {
   last_updated: string;
   is_complete: boolean;
   completed_at: string | null;
+  first_completed_at: string | null;
   total_time: number;
   total_records: number;
   last_worked_on: string | null;

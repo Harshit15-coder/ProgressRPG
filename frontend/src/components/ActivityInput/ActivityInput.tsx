@@ -149,6 +149,7 @@ export default function ActivityInput() {
         xpGained: completion.xpGained,
         baseXp: completion.baseXp,
         xpMultiplier: completion.xpMultiplier,
+        taskXpMultiplier: completion.taskXpMultiplier,
         levelUps: completion.levelUps,
         isAutoStopped: true,
         showUpgradePrompt: !isPremium && isFreeLimitAutoStop,
@@ -194,6 +195,7 @@ export default function ActivityInput() {
       const xpGained = completionRaw?.xp_gained != null ? Number(completionRaw.xp_gained) : null;
       const baseXp = completionRaw?.base_xp != null ? Number(completionRaw.base_xp) : null;
       const xpMultiplier = completionRaw?.xp_multiplier != null ? Number(completionRaw.xp_multiplier) : null;
+      const taskXpMultiplier = completionRaw?.task_xp_multiplier != null ? Number(completionRaw.task_xp_multiplier) : null;
       const levelUps = Array.isArray(completionRaw?.level_ups) ? completionRaw.level_ups as number[] : [];
       const elapsedSeconds = completionRaw?.duration_seconds != null
         ? Number(completionRaw.duration_seconds)
@@ -217,6 +219,7 @@ export default function ActivityInput() {
         xpGained,
         baseXp,
         xpMultiplier,
+        taskXpMultiplier,
         levelUps,
         isAutoStopped: false,
         showUpgradePrompt: !isPremium,

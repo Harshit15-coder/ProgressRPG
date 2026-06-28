@@ -258,6 +258,7 @@ export default function useActivityTimer(): ActivityTimerReturn {
           xpGained: result?.xp_gained ?? null,
           baseXp: result?.base_xp ?? null,
           xpMultiplier: result?.xp_multiplier ?? null,
+          taskXpMultiplier: result?.task_xp_multiplier ?? null,
           levelUps: result?.level_ups ?? [],
           activityName: completedActivityName || null,
           elapsedSeconds: resolvedCompletionElapsedSeconds,

@@ -30,6 +30,7 @@ interface FlowCtx {
   xpGained?: number | null;
   rewardBaseXp?: number | null;
   rewardXpMultiplier?: number | null;
+  rewardTaskXpMultiplier?: number | null;
   rewardLevelUps?: number[];
   rewardIsAutoStopped?: boolean;
   rewardShowUpgradePrompt?: boolean;
@@ -103,6 +104,7 @@ export default function SupportFlowModal({ state, dispatch, onConfirmActivity }:
             xpGained={ctx.xpGained}
             baseXp={ctx.rewardBaseXp}
             xpMultiplier={ctx.rewardXpMultiplier}
+            taskXpMultiplier={ctx.rewardTaskXpMultiplier}
             levelUps={ctx.rewardLevelUps}
             isAutoStopped={ctx.rewardIsAutoStopped}
             showUpgradePrompt={ctx.rewardShowUpgradePrompt}

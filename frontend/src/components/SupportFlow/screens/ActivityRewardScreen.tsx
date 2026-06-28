@@ -4,6 +4,7 @@ import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { formatDuration, formatRewardDuration } from "../../../utils/formatUtils";
 import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
+import { useGame } from "../../../context/GameContext";
 import styles from "../SupportFlowModal.module.scss";
 
 const SUPPORT_COUNTDOWN_MS = 3000;
@@ -13,6 +14,7 @@ interface ActivityRewardScreenProps {
   xpGained?: number | null;
   baseXp?: number | null;
   xpMultiplier?: number | null;
+  taskXpMultiplier?: number | null;
   levelUps?: number[];
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
@@ -28,6 +30,7 @@ export default function ActivityRewardScreen({
   xpGained,
   baseXp,
   xpMultiplier,
+  taskXpMultiplier = null,
   levelUps = [],
   isAutoStopped = false,
   showUpgradePrompt = false,
@@ -42,6 +45,7 @@ export default function ActivityRewardScreen({
   const [isCountdownPaused, setIsCountdownPaused] = useState(false);
   const hasAutoContinuedRef = useRef(false);
 
+  const { fetchPlayerAndCharacter } = useGame();
   const { data: tasks = [] } = useTasks();
   const updateTask = useUpdateTask();
   const linkedTask = taskId != null ? tasks.find((t) => t.id === taskId) ?? null : null;
@@ -59,7 +63,14 @@ export default function ActivityRewardScreen({
     if (!linkedTask) return;
     const next = !isTaskComplete;
     setIsTaskComplete(next);
-    updateTask.mutate({ id: linkedTask.id, data: { is_complete: next } });
+    updateTask.mutate(
+      { id: linkedTask.id, data: { is_complete: next } },
+      {
+        onSuccess: (data) => {
+          if (data.completion_xp_gained > 0) fetchPlayerAndCharacter();
+        },
+      }
+    );
   }
 
   useEffect(() => {
@@ -107,17 +118,25 @@ export default function ActivityRewardScreen({
   const condensedElapsed = hasElapsedSeconds
     ? formatDuration(parsedElapsedSeconds)
     : null;
-  const formattedMultiplier = hasRewardBreakdown
-    ? Number.isInteger(parsedMultiplier)
-      ? String(parsedMultiplier)
-      : parsedMultiplier.toFixed(2).replace(/\.?0+$/, "")
-    : null;
+  const parsedTaskXpMultiplier = Number(taskXpMultiplier);
+  const hasTaskBonus =
+    Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1;
+  // Infer premium component: combined / task (or combined if no task bonus)
+  const premiumMultiplier =
+    hasRewardBreakdown && hasTaskBonus && parsedTaskXpMultiplier > 0
+      ? parsedMultiplier / parsedTaskXpMultiplier
+      : parsedMultiplier;
+
+  function fmtMult(m: number): string {
+    return Number.isInteger(m) ? String(m) : m.toFixed(2).replace(/\.?0+$/, "");
+  }
+
   const normalizedLevelUps = Array.isArray(levelUps)
     ? levelUps
         .map((level) => Number(level))
         .filter((level) => Number.isInteger(level) && level > 0)
     : [];
-  const isLikelyPremiumUser = parsedMultiplier === 2;
+  const isLikelyPremiumUser = premiumMultiplier >= 2;
   const shouldShowUpgradePrompt = Boolean(showUpgradePrompt) && !isLikelyPremiumUser;
   const upgradeMessage = shouldShowUpgradePrompt
     ? isAutoStopped
@@ -135,11 +154,12 @@ export default function ActivityRewardScreen({
     rewardSummaryLine = `Nice work ⚔️ You spent ${formattedElapsed} focused.`;
   }
 
-  if (hasRewardBreakdown && parsedMultiplier > 1) {
-    if (parsedMultiplier === 2) {
-      multiplierLines.push({ label: "Premium bonus", value: `x${formattedMultiplier}` });
-    } else {
-      multiplierLines.push({ label: "Activity XP", value: `x${formattedMultiplier}` });
+  if (hasRewardBreakdown) {
+    if (premiumMultiplier > 1) {
+      multiplierLines.push({ label: "Premium bonus", value: `x${fmtMult(premiumMultiplier)}` });
+    }
+    if (hasTaskBonus) {
+      multiplierLines.push({ label: "Task bonus", value: `x${fmtMult(parsedTaskXpMultiplier)}` });
     }
   }
 
@@ -190,6 +210,11 @@ export default function ActivityRewardScreen({
               />
             </label>
           </div>
+          {(updateTask.data?.completion_xp_gained ?? 0) > 0 && (
+            <p className={styles.taskCompletionXp}>
+              +{updateTask.data!.completion_xp_gained} XP for completing the task!
+            </p>
+          )}
         </div>
       )}
 
