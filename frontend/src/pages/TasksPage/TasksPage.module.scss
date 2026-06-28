@@ -97,6 +97,17 @@
   }
 }
 
+.taskTimestamps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: v.$spacing-sm;
+}
+
+.timestampLabel {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
 .emptyState {
   @include lp.list-page-empty-state;
 }

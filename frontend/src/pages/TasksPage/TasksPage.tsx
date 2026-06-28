@@ -186,14 +186,31 @@ export default function TasksPage(): React.ReactElement | null {
           renderEditSummary={(taskItem) => {
             const task = taskItem as Task;
             const complete = isTaskComplete(task);
+            const modifiedTs =
+              task.last_updated && task.created_at &&
+              Math.abs(new Date(task.last_updated).getTime() - new Date(task.created_at).getTime()) > 2000
+                ? formatTimestamp(task.last_updated)
+                : "—";
             return (
               <>
-                <div>
-                  {complete ? "Complete" : "Incomplete"} • Total time: {formatRewardDuration(task.total_time)}
+                <div className={styles.taskTimestamps}>
+                  <div>
+                    <div className={styles.timestampLabel}>Created</div>
+                    <div>{formatTimestamp(task.created_at)}</div>
+                  </div>
+                  <div>
+                    <div className={styles.timestampLabel}>Modified</div>
+                    <div>{modifiedTs}</div>
+                  </div>
+                  <div>
+                    <div className={styles.timestampLabel}>Completed</div>
+                    <div>{complete ? formatTimestamp(task.completed_at) : "—"}</div>
+                  </div>
                 </div>
-                <div>Created: {formatTimestamp(task.created_at)}</div>
-                <div>Modified: {formatTimestamp(task.last_updated)}</div>
-                {complete && <div>Completed: {formatTimestamp(task.completed_at)}</div>}
+                <hr></hr>
+                <div>
+                  Total time: {formatRewardDuration(task.total_time)}
+                </div>
               </>
             );
           }}
