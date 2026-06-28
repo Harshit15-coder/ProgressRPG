@@ -59,7 +59,7 @@ const SCREEN_TITLES: Record<string, string> = {
 interface SupportFlowModalProps {
   state: FlowState;
   dispatch: Dispatch<FlowAction>;
-  onConfirmActivity?: (text?: string) => void;
+  onConfirmActivity?: (text?: string, taskId?: number | null) => void;
 }
 
 export default function SupportFlowModal({ state, dispatch, onConfirmActivity }: SupportFlowModalProps) {
@@ -144,7 +144,7 @@ export default function SupportFlowModal({ state, dispatch, onConfirmActivity }:
               dispatch({ type: "SET_ACTIVITY_TEXT", text })
             }
             onConfirm={onConfirmActivity}
-            onConfirmWithText={(text) => onConfirmActivity?.(text)}
+            onConfirmWithText={(text, taskId) => onConfirmActivity?.(text, taskId)}
           />
         );
 

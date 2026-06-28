@@ -49,7 +49,7 @@ interface OpenWelcomeMessageOptions {
 
 interface SupportFlowOptions {
   /** Invoked when the user confirms an activity in the modal. */
-  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null }) => void;
+  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null; taskId?: number | null }) => void;
 }
 
 /**
@@ -108,7 +108,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
     flowDispatch({ type: "OPEN_SUPPORT_MODE" });
   }, []);
 
-  const handleConfirmActivity = useCallback((activityTextOverride: string | null = null): void => {
+  const handleConfirmActivity = useCallback((activityTextOverride: string | null = null, taskId?: number | null): void => {
     const state = flowStateRef.current;
     if (!state.isOpen) return;
     const { activityText, durationSeconds } = state.ctx;
@@ -116,7 +116,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       typeof activityTextOverride === "string"
         ? activityTextOverride
         : activityText;
-    onStartActivity?.({ activityText: finalActivityText, durationSeconds });
+    onStartActivity?.({ activityText: finalActivityText, durationSeconds, taskId });
     flowDispatch({ type: "CLOSE" });
   }, [onStartActivity]);
 

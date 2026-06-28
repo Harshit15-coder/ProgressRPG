@@ -65,7 +65,7 @@ export default function ActivityInput() {
     flowDispatch,
     handleConfirmActivity,
   } = useSupportFlow({
-    onStartActivity: ({ activityText, durationSeconds }) => {
+    onStartActivity: ({ activityText, durationSeconds, taskId }) => {
       const parsedDuration = Number(durationSeconds);
       const hasCustomDuration = Number.isFinite(parsedDuration) && parsedDuration > 0;
 
@@ -85,7 +85,7 @@ export default function ActivityInput() {
         limitReason = "preset_limit";
       }
 
-      startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason });
+      startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
     },
   });
 
