@@ -16,6 +16,7 @@ class MaintenanceWindow(models.Model):
     end_time = models.DateTimeField()
     description = models.TextField(blank=True)
     tasks_scheduled = models.BooleanField(default=False)
+    scheduled_task_ids = models.JSONField(default=list, blank=True)
     is_active = models.BooleanField(default=False)
 
     def __str__(self):
@@ -43,24 +44,29 @@ class MaintenanceWindow(models.Model):
 
         times_to_schedule = [t for t in warning_times if t <= minutes_to_start]
 
+        task_ids = []
+
         for minutes_until in times_to_schedule:
             message = f"Warning: maintenance is starting in {minutes_until} minute(s)!"
-            send_warning.apply_async(
+            result = send_warning.apply_async(
                 kwargs={"message": message},
                 eta=self.start_time - timezone.timedelta(minutes=minutes_until),
             )
+            task_ids.append(result.id)
         logger.debug(
             f"[SCHEDULE TASKS] Scheduled {len(times_to_schedule)} maintenance warnings"
         )
 
-        activate_maintenance.apply_async(
+        result = activate_maintenance.apply_async(
             kwargs={"window_id": self.id}, eta=self.start_time
         )
+        task_ids.append(result.id)
         logger.debug(
             f"[SCHEDULE TASKS] Scheduled maintenance window to start at {self.start_time}"
         )
 
         self.tasks_scheduled = True
+        self.scheduled_task_ids = task_ids
         self.save()
         return True
 
@@ -104,12 +110,24 @@ class MaintenanceWindow(models.Model):
 
         async_to_sync(send_group_message)("online_users", payload)
 
-    # def delete_scheduled_tasks(self):
-    #     """Deletes scheduled tasks if necessary."""
-    #     from celery.task.control import revoke
-    #     # Logic to track and revoke tasks (requires storing task IDs)
-    #     self.tasks_scheduled = False
-    #     self.save()
+    def delete_scheduled_tasks(self):
+        """Revokes scheduled Celery tasks for this maintenance window."""
+        if not self.tasks_scheduled or not self.scheduled_task_ids:
+            return False
+
+        from celery import current_app
+
+        for task_id in self.scheduled_task_ids:
+            current_app.control.revoke(task_id)
+            logger.debug(f"[DELETE TASKS] Revoked task {task_id}")
+
+        logger.info(
+            f"[DELETE TASKS] Revoked {len(self.scheduled_task_ids)} tasks for window '{self.name}'"
+        )
+        self.tasks_scheduled = False
+        self.scheduled_task_ids = []
+        self.save()
+        return True
 
 
 class FeatureFlag(models.Model):

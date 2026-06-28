@@ -74,6 +74,24 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
             f"/admin/server_management/maintenancewindow/{maintenancewindow_id}/change/"
         )
 
+    def delete_tasks(self, request, maintenancewindow_id):
+        logger.info(f"[ADMIN - DELETE TASKS]")
+        window = self.get_object(request, maintenancewindow_id)
+
+        success = window.delete_scheduled_tasks()
+
+        if success:
+            self.message_user(
+                request, f"Scheduled tasks deleted for window '{window.name}'."
+            )
+        else:
+            self.message_user(
+                request, f"No scheduled tasks to delete: no action taken."
+            )
+        return redirect(
+            f"/admin/server_management/maintenancewindow/{maintenancewindow_id}/change/"
+        )
+
     def activate_maintenance(self, request, maintenancewindow_id):
         window = self.get_object(request, maintenancewindow_id)
         if not window.is_active:
@@ -119,6 +137,11 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
         urls = super().get_urls()
         custom_urls = [
             path(
+                "<int:maintenancewindow_id>/delete-tasks/",
+                self.admin_site.admin_view(self.delete_tasks),
+                name="delete_tasks",
+            ),
+            path(
                 "<int:maintenancewindow_id>/schedule/",
                 self.admin_site.admin_view(self.schedule_tasks),
                 name="schedule_tasks",
@@ -138,6 +161,9 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
 
     def change_view(self, request, object_id, form_url="", extra_context=None):
         extra_context = extra_context or {}
+        extra_context["delete_url"] = (
+            f"/admin/server_management/maintenancewindow/{object_id}/delete-tasks/"
+        )
         extra_context["schedule_url"] = (
             f"/admin/server_management/maintenancewindow/{object_id}/schedule/"
         )

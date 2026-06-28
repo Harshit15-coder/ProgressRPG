@@ -12,8 +12,8 @@ interface ActivityInputScreenProps {
   activityPresetId?: string | null;
   activityText?: string;
   onChangeText?: (text: string) => void;
-  onConfirm?: () => void;
-  onConfirmWithText?: (text: string, taskId?: number | null) => void;
+  onConfirm?: () => void | Promise<void>;
+  onConfirmWithText?: (text: string, taskId?: number | null) => void | Promise<void>;
 }
 
 export default function ActivityInputScreen({

@@ -8,6 +8,7 @@ const mockUseGame = vi.fn();
 const mockUseSupportFlow = vi.fn();
 const mockUseEntitySearchCache = vi.fn();
 const openActivityReward = vi.fn();
+const openSupportMode = vi.fn();
 const fetchPlayerAndCharacter = vi.fn();
 const fetchCharacterCurrent = vi.fn();
 const fetchActivities = vi.fn();
@@ -43,7 +44,9 @@ vi.mock('../../utils/sounds', () => ({
 
 describe('ActivityInput', () => {
   beforeEach(() => {
+    mockUseSupportFlow.mockReset();
     openActivityReward.mockReset();
+    openSupportMode.mockReset();
     fetchPlayerAndCharacter.mockReset();
     fetchCharacterCurrent.mockReset();
     fetchActivities.mockReset();
@@ -60,7 +63,7 @@ describe('ActivityInput', () => {
     mockUseSupportFlow.mockReturnValue({
       openWelcomeMessage: vi.fn(),
       openActivityReward,
-      openSupportMode: vi.fn(),
+      openSupportMode,
       flowState: { isOpen: false },
       flowDispatch: vi.fn(),
       handleConfirmActivity: vi.fn(),
@@ -278,5 +281,85 @@ describe('ActivityInput', () => {
     expect(
       screen.queryByText('This timer will stop automatically when it reaches 0:30.')
     ).not.toBeInTheDocument();
+  });
+
+  it('does not submit the timer or open Task Support when the user cancels', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.fn(() => false);
+    Object.defineProperty(window, 'confirm', { value: confirmSpy, configurable: true });
+
+    mockUseGame.mockReturnValue({
+      activityTimer: {
+        currentActivity: { name: 'Write docs' },
+        status: 'active',
+        stop,
+        startActivity,
+        elapsed: 10,
+        limitSeconds: 30,
+        limitReached: false,
+        autoStopCompletion: null,
+        clearAutoStopCompletion,
+      },
+      fetchPlayerAndCharacter,
+      fetchCharacterCurrent,
+      fetchActivities,
+      loginState: 'none',
+      loginStreak: 0,
+      loginEventAt: null,
+      player: { is_premium: false },
+      freeTimerLimitSeconds: 30,
+    });
+
+    render(<ActivityInput />);
+
+    await user.click(screen.getByRole('button', { name: 'Open support mode' }));
+
+    expect(confirmSpy).toHaveBeenCalledWith(
+      'You already have a timer running. Submit it before opening Task Support?'
+    );
+    expect(stop).not.toHaveBeenCalled();
+    expect(openSupportMode).not.toHaveBeenCalled();
+  });
+
+  it('submits the active timer and opens Task Support when confirmed', async () => {
+    const user = userEvent.setup();
+    const confirmSpy = vi.fn(() => true);
+    Object.defineProperty(window, 'confirm', { value: confirmSpy, configurable: true });
+    stop.mockResolvedValue(null);
+
+    mockUseGame.mockReturnValue({
+      activityTimer: {
+        currentActivity: { name: 'Write docs' },
+        status: 'active',
+        stop,
+        startActivity,
+        elapsed: 10,
+        limitSeconds: 30,
+        limitReached: false,
+        autoStopCompletion: null,
+        clearAutoStopCompletion,
+      },
+      fetchPlayerAndCharacter,
+      fetchCharacterCurrent,
+      fetchActivities,
+      loginState: 'none',
+      loginStreak: 0,
+      loginEventAt: null,
+      player: { is_premium: false },
+      freeTimerLimitSeconds: 30,
+    });
+
+    render(<ActivityInput />);
+
+    await user.click(screen.getByRole('button', { name: 'Open support mode' }));
+
+    await waitFor(() => {
+      expect(confirmSpy).toHaveBeenCalledTimes(1);
+      expect(stop).toHaveBeenCalledWith({ activityName: 'Write docs' });
+      expect(fetchPlayerAndCharacter).toHaveBeenCalledTimes(1);
+      expect(fetchCharacterCurrent).toHaveBeenCalledTimes(1);
+      expect(fetchActivities).toHaveBeenCalledTimes(1);
+      expect(openSupportMode).toHaveBeenCalledTimes(1);
+    });
   });
 });

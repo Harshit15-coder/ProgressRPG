@@ -11,6 +11,8 @@ import SupportFlowModal from "../SupportFlow/SupportFlowModal";
 import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
 
 const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
+const SUBMIT_ACTIVE_ACTIVITY_MESSAGE =
+  "You already have a timer running. Submit it before opening Task Support?";
 
 // Shape of a selected entity from EntitySearchInput
 interface SelectedEntity {
@@ -65,7 +67,7 @@ export default function ActivityInput() {
     flowDispatch,
     handleConfirmActivity,
   } = useSupportFlow({
-    onStartActivity: ({ activityText, durationSeconds, taskId }) => {
+    onStartActivity: async ({ activityText, durationSeconds, taskId }) => {
       const parsedDuration = Number(durationSeconds);
       const hasCustomDuration = Number.isFinite(parsedDuration) && parsedDuration > 0;
 
@@ -85,7 +87,7 @@ export default function ActivityInput() {
         limitReason = "preset_limit";
       }
 
-      startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
+      await startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
     },
   });
 
@@ -343,7 +345,30 @@ export default function ActivityInput() {
 
         <div className={styles.supportButtonRow}>
           <Button
-            onClick={openSupportMode}
+            onClick={async () => {
+              if (isActive) {
+                const shouldSubmitCurrent = window.confirm(SUBMIT_ACTIVE_ACTIVITY_MESSAGE);
+                if (!shouldSubmitCurrent) return;
+                const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
+                try {
+                  await stop({ activityName: completedActivityName });
+                } catch (err) {
+                  console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
+                  return;
+                }
+                setName("");
+                try {
+                  await Promise.all([
+                    fetchPlayerAndCharacter(),
+                    fetchCharacterCurrent(),
+                    fetchActivities(),
+                  ]);
+                } catch (err) {
+                  console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
+                }
+              }
+              openSupportMode();
+            }}
             variant="secondary"
             className={styles.supportModeButton}
             ariaLabel="Open support mode"
