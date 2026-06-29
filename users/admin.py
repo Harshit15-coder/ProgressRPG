@@ -2,6 +2,7 @@ from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.admin import SimpleListFilter
 from django.db.models import Max
+from django.forms.models import BaseInlineFormSet
 from adminsortable2.admin import SortableAdminMixin
 
 from .models import (
@@ -65,8 +66,17 @@ class PlayerInline(admin.TabularInline):
     can_delete = False
 
 
+class UserLoginInlineFormSet(BaseInlineFormSet):
+    def get_queryset(self):
+        # Show only the most recent login events in the admin inline.
+        return super().get_queryset().order_by("-timestamp")[:5]
+
+
 class UserLoginInline(admin.TabularInline):
     model = UserLogin
+    verbose_name_plural = "Most recent logins"
+    classes = ("collapse",)
+    formset = UserLoginInlineFormSet
     extra = 0
     max_num = 5
     readonly_fields = ("timestamp", "is_first_login_of_day")
@@ -82,6 +92,7 @@ class PlayerCurrencyInline(admin.TabularInline):
 
 class UserSubscriptionInline(admin.TabularInline):
     model = UserSubscription
+    classes = ("collapse",)
     extra = 0
     max_num = 2
     fields = (

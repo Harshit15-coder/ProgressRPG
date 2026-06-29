@@ -57,7 +57,7 @@ const SCREEN_TITLES: Record<string, string> = {
 interface SupportFlowModalProps {
   state: FlowState;
   dispatch: Dispatch<FlowAction>;
-  onConfirmActivity?: (text?: string) => void;
+  onConfirmActivity?: (text?: string) => void | Promise<void>;
 }
 
 export default function SupportFlowModal({ state, dispatch, onConfirmActivity }: SupportFlowModalProps) {

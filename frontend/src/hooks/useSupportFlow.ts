@@ -47,7 +47,7 @@ interface OpenWelcomeMessageOptions {
 
 interface SupportFlowOptions {
   /** Invoked when the user confirms an activity in the modal. */
-  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null }) => void;
+  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null }) => boolean | void | Promise<boolean | void>;
 }
 
 /**
@@ -102,7 +102,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
     flowDispatch({ type: "OPEN_SUPPORT_MODE" });
   }, []);
 
-  const handleConfirmActivity = useCallback((activityTextOverride: string | null = null): void => {
+  const handleConfirmActivity = useCallback(async (activityTextOverride: string | null = null): Promise<void> => {
     const state = flowStateRef.current;
     if (!state.isOpen) return;
     const { activityText, durationSeconds } = state.ctx;
@@ -110,7 +110,8 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       typeof activityTextOverride === "string"
         ? activityTextOverride
         : activityText;
-    onStartActivity?.({ activityText: finalActivityText, durationSeconds });
+    const result = await onStartActivity?.({ activityText: finalActivityText, durationSeconds });
+    if (result === false) return;
     flowDispatch({ type: "CLOSE" });
   }, [onStartActivity]);
 
