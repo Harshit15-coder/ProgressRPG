@@ -67,7 +67,7 @@ describe('Modal', () => {
       </Modal>
     );
 
-    const backdrop = screen.getByRole('presentation');
+    const backdrop = screen.getByTestId('modal-overlay');
     await user.click(backdrop);
 
     expect(handleClose).toHaveBeenCalledTimes(1);

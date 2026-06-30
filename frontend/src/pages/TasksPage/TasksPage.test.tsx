@@ -2,7 +2,16 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { TooltipProvider } from "../../components/Tooltip/Tooltip";
 import TasksPage from "./TasksPage";
+
+function renderTasksPage() {
+  return render(
+    <TooltipProvider>
+      <TasksPage />
+    </TooltipProvider>
+  );
+}
 
 const mockUseTasks = vi.fn();
 const mockUseCreateTask = vi.fn();
@@ -105,7 +114,7 @@ describe("TasksPage", () => {
   });
 
   it("hides completed tasks by default", () => {
-    render(<TasksPage />);
+    renderTasksPage();
 
     expect(screen.getByText("Morning routine")).toBeInTheDocument();
     expect(screen.queryByText("Taxes")).not.toBeInTheDocument();
@@ -113,7 +122,7 @@ describe("TasksPage", () => {
 
   it("reveals completed tasks and persists the preference when toggled", async () => {
     const user = userEvent.setup();
-    render(<TasksPage />);
+    renderTasksPage();
 
     await user.click(screen.getByRole("button", { name: "Show complete" }));
 
@@ -125,14 +134,14 @@ describe("TasksPage", () => {
 
   it("respects a persisted 'show complete' preference on mount", () => {
     localStorage.setItem("tasks.hideCompleted", "false");
-    render(<TasksPage />);
+    renderTasksPage();
 
     expect(screen.getByText("Taxes")).toBeInTheDocument();
   });
 
   it("toggles task completion with the row checkbox", async () => {
     const user = userEvent.setup();
-    render(<TasksPage />);
+    renderTasksPage();
 
     await user.click(
       screen.getByRole("checkbox", { name: "Mark Morning routine as complete" }),
@@ -150,7 +159,7 @@ describe("TasksPage", () => {
     // The play button lives in a hover-revealed row (pointer-events:none until
     // hover), which jsdom can't simulate, so skip the pointer-events guard.
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    render(<TasksPage />);
+    renderTasksPage();
 
     await user.click(screen.getByRole("button", { name: "Start working on Morning routine" }));
 
@@ -167,7 +176,7 @@ describe("TasksPage", () => {
   it("does not start an activity when a timer is already running", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     gameValue.activityTimer = { status: "active", startActivity };
-    render(<TasksPage />);
+    renderTasksPage();
 
     await user.click(screen.getByRole("button", { name: "Start working on Morning routine" }));
 
@@ -177,7 +186,7 @@ describe("TasksPage", () => {
 
   it("edits a task name through the PlayerItemList dialog", async () => {
     const user = userEvent.setup();
-    render(<TasksPage />);
+    renderTasksPage();
 
     // hoverEdit renders the name and a 📝 button with the same label; either opens the dialog.
     await user.click(

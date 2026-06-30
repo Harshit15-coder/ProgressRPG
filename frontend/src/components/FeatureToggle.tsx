@@ -10,6 +10,13 @@ import type { AccessGroup, FeatureFlagKey } from '../types';
 const hasOwn = (obj: Record<string, unknown>, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(obj, key);
 
+function resolveGroups(value: unknown): AccessGroup[] {
+  if (Array.isArray(value)) return value as AccessGroup[];
+  if (value === true) return ['all'];
+  if (typeof value === 'string' && value !== 'no') return [value as AccessGroup];
+  return [];
+}
+
 interface FeatureToggleProps {
   flag: FeatureFlagKey;
   children: React.ReactNode;
@@ -20,8 +27,8 @@ export default function FeatureToggle({ flag, children, fallback }: FeatureToggl
   const { data: appConfig } = useAppConfig();
   const remoteFeatureFlags = appConfig?.feature_flags ?? {};
   const groups: AccessGroup[] = hasOwn(remoteFeatureFlags, flag)
-    ? (remoteFeatureFlags[flag] as unknown as AccessGroup[])
-    : featureFlags[flag];
+    ? resolveGroups(remoteFeatureFlags[flag])
+    : resolveGroups(featureFlags[flag]);
 
   const isEnabled = useFeatureFlag(flag);
 

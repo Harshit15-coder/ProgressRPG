@@ -1,0 +1,58 @@
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/colors' as c;
+
+.overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: v.$z-index-modal;
+}
+
+.content {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: v.$z-index-modal;
+
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-md;
+  background: c.$color-bg;
+  border-radius: v.$border-radius;
+  box-shadow: 0 v.$spacing-sm v.$spacing-md rgba(0, 0, 0, 0.2);
+  padding: v.$spacing-lg;
+  width: 90%;
+  max-width: min(95vw, 440px);
+
+  &:focus-visible {
+    outline: 2px solid c.$color-glowing-outline;
+    outline-offset: -1px;
+  }
+}
+
+.title {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: c.$color-text-heading;
+}
+
+.description {
+  margin: 0;
+  color: c.$color-text-body;
+  line-height: 1.5;
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: v.$spacing-sm;
+  margin-top: v.$spacing-sm;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
+}

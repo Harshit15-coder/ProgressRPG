@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import classNames from "classnames";
 import { useQueryClient } from "@tanstack/react-query";
 import { useGame } from "../../context/GameContext";
 import Button from "../Button/Button";
+import AlertDialog from "../AlertDialog/AlertDialog";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
 import { useEntitySearchCache } from "../../hooks/useEntitySearchCache";
 import styles from "./ActivityInput.module.scss";
@@ -11,8 +12,6 @@ import SupportFlowModal from "../SupportFlow/SupportFlowModal";
 import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
 
 const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
-const SUBMIT_ACTIVE_ACTIVITY_MESSAGE =
-  "You already have a timer running. Submit it before opening Task Support?";
 
 // Shape of a selected entity from EntitySearchInput
 interface SelectedEntity {
@@ -52,6 +51,7 @@ export default function ActivityInput() {
   const { addEntityToCache } = useEntitySearchCache("activity");
 
   const [name, setName] = useState("");
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const isActive = status === "active";
@@ -90,6 +90,28 @@ export default function ActivityInput() {
       await startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
     },
   });
+
+  const handleSubmitAndOpenSupport = useCallback(async () => {
+    setSubmitConfirmOpen(false);
+    const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
+    try {
+      await stop({ activityName: completedActivityName });
+    } catch (err) {
+      console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
+      return;
+    }
+    setName("");
+    try {
+      await Promise.all([
+        fetchPlayerAndCharacter(),
+        fetchCharacterCurrent(),
+        fetchActivities(),
+      ]);
+    } catch (err) {
+      console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
+    }
+    openSupportMode();
+  }, [name, currentActivity, stop, fetchPlayerAndCharacter, fetchCharacterCurrent, fetchActivities, openSupportMode]);
 
   useEffect(() => {
     if (loginState === "none" || !loginEventAt) return;
@@ -345,29 +367,12 @@ export default function ActivityInput() {
 
         <div className={styles.supportButtonRow}>
           <Button
-            onClick={async () => {
+            onClick={() => {
               if (isActive) {
-                const shouldSubmitCurrent = window.confirm(SUBMIT_ACTIVE_ACTIVITY_MESSAGE);
-                if (!shouldSubmitCurrent) return;
-                const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
-                try {
-                  await stop({ activityName: completedActivityName });
-                } catch (err) {
-                  console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
-                  return;
-                }
-                setName("");
-                try {
-                  await Promise.all([
-                    fetchPlayerAndCharacter(),
-                    fetchCharacterCurrent(),
-                    fetchActivities(),
-                  ]);
-                } catch (err) {
-                  console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
-                }
+                setSubmitConfirmOpen(true);
+              } else {
+                openSupportMode();
               }
-              openSupportMode();
             }}
             variant="secondary"
             className={styles.supportModeButton}
@@ -378,6 +383,16 @@ export default function ActivityInput() {
         </div>
 
       </div>
+
+      <AlertDialog
+        open={submitConfirmOpen}
+        title="Submit active timer?"
+        description="You already have a timer running. Submit it before opening Task Support?"
+        confirmLabel="Submit & continue"
+        cancelLabel="Cancel"
+        onCancel={() => setSubmitConfirmOpen(false)}
+        onConfirm={handleSubmitAndOpenSupport}
+      />
 
       <SupportFlowModal
         state={flowState}
