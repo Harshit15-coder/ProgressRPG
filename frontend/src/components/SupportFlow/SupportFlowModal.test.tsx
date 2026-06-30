@@ -8,6 +8,11 @@ import SupportFlowModal from "./SupportFlowModal";
 import type { FlowState } from "./SupportFlowModal";
 import { supportFlowReducer } from "./supportFlowReducer";
 
+vi.mock("../../hooks/useTasks", () => ({
+  useTasks: () => ({ data: [] }),
+  useUpdateTask: () => ({ mutate: vi.fn() }),
+}));
+
 type FlowAction = { type: string; [key: string]: unknown };
 
 // Helper: renders SupportFlowModal with reducer state

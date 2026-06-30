@@ -2,14 +2,10 @@
 import React from 'react';
 import Button from './Button/Button';
 import featureFlags from '../featureFlags';
-import { useGame } from '../context/GameContext';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import { useAppConfig } from '../hooks/useAppConfig';
 import styles from './FeatureToggle.module.scss';
-import type { FeatureFlagKey } from '../types';
-
-const ACCESS_NONE = 'no';
-const ACCESS_ALL = 'all';
-const ACCESS_PREMIUM = 'premium';
+import type { AccessGroup, FeatureFlagKey } from '../types';
 
 const hasOwn = (obj: Record<string, unknown>, key: string): boolean =>
   Object.prototype.hasOwnProperty.call(obj, key);
@@ -21,36 +17,16 @@ interface FeatureToggleProps {
 }
 
 export default function FeatureToggle({ flag, children, fallback }: FeatureToggleProps) {
-  const { player } = useGame() ?? {};
   const { data: appConfig } = useAppConfig();
-  const remoteFeatureFlags: Record<string, string> = appConfig?.feature_flags ?? {};
-  const accessLevel: string | boolean | undefined = hasOwn(remoteFeatureFlags, flag)
-    ? remoteFeatureFlags[flag]
+  const remoteFeatureFlags = appConfig?.feature_flags ?? {};
+  const groups: AccessGroup[] = hasOwn(remoteFeatureFlags, flag)
+    ? (remoteFeatureFlags[flag] as unknown as AccessGroup[])
     : featureFlags[flag];
-  const isPremiumUser = Boolean(player?.is_premium);
 
-  const isEnabled = (() => {
-    // Backward compatibility for existing boolean flags.
-    if (typeof accessLevel === 'boolean') {
-      return accessLevel;
-    }
+  const isEnabled = useFeatureFlag(flag);
 
-    if (accessLevel === ACCESS_ALL) {
-      return true;
-    }
-
-    if (accessLevel === ACCESS_PREMIUM) {
-      return isPremiumUser;
-    }
-
-    if (accessLevel === ACCESS_NONE || accessLevel === undefined) {
-      return false;
-    }
-
-    return false;
-  })();
-
-  const defaultFallback = accessLevel === ACCESS_PREMIUM ? (
+  const isPremiumGated = !groups.includes('all') && groups.includes('premium');
+  const defaultFallback = isPremiumGated ? (
     <div className={styles.fallbackPage}>
       <div className={styles.fallbackCard}>
         <p className={styles.fallbackTitle}>Premium feature</p>
