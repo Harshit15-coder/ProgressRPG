@@ -44,6 +44,7 @@ class PlayerActivityPremiumRewardTests(TestCase):
                 "duration_seconds": 60,
                 "base_xp": 60,
                 "xp_multiplier": 1,
+                "task_xp_multiplier": 1,
                 "xp_gained": 60,
             },
         )
@@ -65,6 +66,7 @@ class PlayerActivityPremiumRewardTests(TestCase):
                 "duration_seconds": 60,
                 "base_xp": 60,
                 "xp_multiplier": 2,
+                "task_xp_multiplier": 1,
                 "xp_gained": 120,
             },
         )

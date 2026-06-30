@@ -50,6 +50,7 @@ export interface Player {
   total_activities: number;
   achievements: AchievementGoal[];
   is_premium: boolean;
+  is_tester: boolean;
   has_previous_subscription: boolean;
   onboarding_step: number;
   onboarding_completed: boolean;
@@ -199,6 +200,7 @@ export interface Task {
   last_updated: string;
   is_complete: boolean;
   completed_at: string | null;
+  first_completed_at: string | null;
   total_time: number;
   total_records: number;
   last_worked_on: string | null;

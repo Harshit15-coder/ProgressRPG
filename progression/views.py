@@ -334,3 +334,35 @@ class TaskViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(player=self.request.user.player)
+
+    def partial_update(self, request, *args, **kwargs):
+        from core.models import GameSettings
+
+        instance = self.get_object()
+        is_newly_completing = (
+            request.data.get("is_complete") is True
+            and not instance.is_complete
+            and instance.first_completed_at is None
+        )
+
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        completion_xp_gained = 0
+        level_ups = []
+
+        if is_newly_completing:
+            bonus_xp = int(GameSettings.current().task_completion_xp)
+            serializer.save(first_completed_at=timezone.now())
+            level_ups = request.user.player.add_activity(xp=bonus_xp)
+            completion_xp_gained = bonus_xp
+        else:
+            serializer.save()
+
+        return Response(
+            {
+                **serializer.data,
+                "completion_xp_gained": completion_xp_gained,
+                "level_ups": level_ups,
+            }
+        )

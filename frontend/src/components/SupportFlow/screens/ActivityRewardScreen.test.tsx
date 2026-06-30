@@ -3,6 +3,11 @@ import { describe, expect, it, vi } from 'vitest';
 
 import ActivityRewardScreen from './ActivityRewardScreen';
 
+vi.mock('../../../hooks/useTasks', () => ({
+  useTasks: () => ({ data: [] }),
+  useUpdateTask: () => ({ mutate: vi.fn() }),
+}));
+
 describe('ActivityRewardScreen', () => {
   it('shows minutes and seconds in reward copy', () => {
     render(

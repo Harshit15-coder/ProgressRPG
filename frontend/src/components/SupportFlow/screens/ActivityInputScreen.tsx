@@ -3,14 +3,17 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { ACTIVITY_PRESETS } from "../supportFlowReducer";
+import { useFeatureFlag } from "../../../hooks/useFeatureFlag";
+import { useTasks } from "../../../hooks/useTasks";
 import styles from "../SupportFlowModal.module.scss";
+import type { Task } from "../../../types/domain";
 
 interface ActivityInputScreenProps {
   activityPresetId?: string | null;
   activityText?: string;
   onChangeText?: (text: string) => void;
   onConfirm?: () => void | Promise<void>;
-  onConfirmWithText?: (text: string) => void | Promise<void>;
+  onConfirmWithText?: (text: string, taskId?: number | null) => void | Promise<void>;
 }
 
 export default function ActivityInputScreen({
@@ -25,8 +28,17 @@ export default function ActivityInputScreen({
   const isExamplesOnlyPreset = activityPresetId === "tiniest_step";
   const isPriorityThreePreset = activityPresetId === "priority_three";
   const [candidateTasks, setCandidateTasks] = useState<string[]>(["", "", ""]);
+  const [activeTab, setActiveTab] = useState<"memory" | "tasks">("memory");
 
-  // Focus the text input when editable input is shown
+  const tasksFeatureEnabled = useFeatureFlag("tasksFeature");
+  const showTabs = isPriorityThreePreset && tasksFeatureEnabled;
+
+  const { data: allTasks } = useTasks({ enabled: showTabs });
+  const incompleteTasks: Task[] = useMemo(
+    () => (allTasks ?? []).filter((t) => !t.is_complete && !t.completed_at),
+    [allTasks]
+  );
+
   useEffect(() => {
     if (!isExamplesOnlyPreset && !isPriorityThreePreset) {
       inputRef.current?.focus();
@@ -37,7 +49,6 @@ export default function ActivityInputScreen({
   const hint = preset?.hint ?? null;
 
   function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    // Enter (without Shift) submits the current activity input.
     if (e.key === "Enter" && !e.shiftKey && activityText.trim()) {
       e.preventDefault();
       onConfirm?.();
@@ -69,15 +80,25 @@ export default function ActivityInputScreen({
     onConfirmWithText?.(filledCandidates[randomIndex]);
   }
 
+  function handleStartTask(task: Task) {
+    onConfirmWithText?.(task.name, task.id);
+  }
+
+  function handleRandomiseFromTasks() {
+    if (!incompleteTasks.length) return;
+    const task = incompleteTasks[Math.floor(Math.random() * incompleteTasks.length)];
+    onConfirmWithText?.(task.name, task.id);
+  }
+
   return (
     <div className={styles.activityInputScreen}>
-      <p className={styles.readableText}>
-        {isExamplesOnlyPreset
-          ? "Write down your next tiny action on paper or your phone."
-          : isPriorityThreePreset
-            ? "Write down the first three tasks that come into your head."
+      {!isPriorityThreePreset && (
+        <p className={styles.readableText}>
+          {isExamplesOnlyPreset
+            ? "Write down your next tiny action on paper or your phone."
             : "Describe what you'll do:"}
-      </p>
+        </p>
+      )}
 
       {isExamplesOnlyPreset && (
         <p className={`${styles.hint} ${styles.readableText}`}>
@@ -85,7 +106,9 @@ export default function ActivityInputScreen({
         </p>
       )}
 
-      {hint && <p className={`${styles.hint} ${styles.readableText}`}>{hint}</p>}
+      {hint && !isExamplesOnlyPreset && !isPriorityThreePreset && (
+        <p className={`${styles.hint} ${styles.readableText}`}>{hint}</p>
+      )}
 
       {!isExamplesOnlyPreset && !isPriorityThreePreset && (
         <textarea
@@ -101,33 +124,86 @@ export default function ActivityInputScreen({
       )}
 
       {isPriorityThreePreset && (
-        <div className={styles.priorityThreeContainer}>
-          {[0, 1, 2].map((index) => {
-            const taskValue = candidateTasks[index];
-            const taskNumber = index + 1;
-            return (
-              <div className={styles.priorityRow} key={`priority-task-${taskNumber}`}>
-                <input
-                  className={styles.priorityInput}
-                  type="text"
-                  value={taskValue}
-                  onChange={(e) => handleCandidateChange(index, e.target.value)}
-                  placeholder={`Task ${taskNumber}`}
-                  aria-label={`Task option ${taskNumber}`}
-                />
-                <Button
-                  onClick={() => handleStartCandidate(index)}
-                  disabled={!taskValue.trim()}
-                >
-                  Start this
-                </Button>
-              </div>
-            );
-          })}
-          <Button onClick={handleRandomizeStart} disabled={filledCandidates.length === 0}>
-            Randomise and start
-          </Button>
-        </div>
+        <>
+          {showTabs && (
+            <div className={styles.tabBar} role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "memory"}
+                className={`${styles.tab} ${activeTab === "memory" ? styles.tabActive : ""}`}
+                onClick={() => setActiveTab("memory")}
+              >
+                From memory
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={activeTab === "tasks"}
+                className={`${styles.tab} ${activeTab === "tasks" ? styles.tabActive : ""}`}
+                onClick={() => setActiveTab("tasks")}
+              >
+                My tasks
+              </button>
+            </div>
+          )}
+
+          {(!showTabs || activeTab === "memory") && (
+            <div className={styles.priorityThreeContainer}>
+              <p className={styles.readableText}>Write down the first three things that come into your head.</p>
+              {hint && <p className={`${styles.hint} ${styles.readableText}`}>{hint}</p>}
+              {[0, 1, 2].map((index) => {
+                const taskValue = candidateTasks[index];
+                const taskNumber = index + 1;
+                return (
+                  <div className={styles.priorityRow} key={`priority-task-${taskNumber}`}>
+                    <input
+                      className={styles.priorityInput}
+                      type="text"
+                      value={taskValue}
+                      onChange={(e) => handleCandidateChange(index, e.target.value)}
+                      placeholder={`Task ${taskNumber}`}
+                      aria-label={`Task option ${taskNumber}`}
+                    />
+                    <Button
+                      onClick={() => handleStartCandidate(index)}
+                      disabled={!taskValue.trim()}
+                    >
+                      Start this
+                    </Button>
+                  </div>
+                );
+              })}
+              <Button onClick={handleRandomizeStart} disabled={filledCandidates.length === 0}>
+                Randomise and start
+              </Button>
+            </div>
+          )}
+
+          {showTabs && activeTab === "tasks" && (
+            <div className={styles.priorityThreeContainer}>
+              {incompleteTasks.length === 0 ? (
+                <p className={styles.taskPickEmpty}>
+                  {allTasks === undefined ? "Loading tasks…" : "No incomplete tasks yet. Add some on the Tasks page."}
+                </p>
+              ) : (
+                <>
+                  <div className={styles.taskPickList}>
+                    {incompleteTasks.map((task) => (
+                      <div key={task.id} className={styles.taskPickRow}>
+                        <span className={styles.taskPickName}>{task.name}</span>
+                        <Button onClick={() => handleStartTask(task)}>Start this</Button>
+                      </div>
+                    ))}
+                  </div>
+                  <Button onClick={handleRandomiseFromTasks}>
+                    Randomise and start
+                  </Button>
+                </>
+              )}
+            </div>
+          )}
+        </>
       )}
 
       {!isPriorityThreePreset && (

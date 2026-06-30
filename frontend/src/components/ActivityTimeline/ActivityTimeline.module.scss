@@ -111,10 +111,57 @@
 }
 
 .activityLineItem:hover .playButton,
-.activityLineItem:focus-within .playButton {
+.activityLineItem:focus-within .playButton,
+.activityLineItem:hover .warningButton,
+.activityLineItem:focus-within .warningButton {
   opacity: 1;
   pointer-events: auto;
   transform: translateX(0);
+}
+
+.warningButton {
+  border: none;
+  background: transparent;
+  color: c.$color-warning;
+  border-radius: v.$border-radius;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  position: relative;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, background 0.15s ease;
+
+  &:hover {
+    background: rgba(c.$color-warning, 0.12);
+  }
+
+  // CSS-only tooltip — appears instantly (no transition delay)
+  &::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    top: calc(100% + 4px);
+    right: 0;
+    background: rgba(30, 30, 30, 0.92);
+    color: #fff;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    z-index: v.$z-index-tooltip;
+  }
+
+  &:hover::after,
+  &:focus-visible::after {
+    opacity: 1;
+  }
 }
 
 .header {

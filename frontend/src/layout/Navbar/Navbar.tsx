@@ -3,6 +3,7 @@ import { useLocation, Link } from "react-router-dom";
 import styles from "./Navbar.module.scss";
 import Button from "../../components/Button/Button";
 import { useAuth } from "../../context/AuthContext";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -15,9 +16,12 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const [accountOpenMobile, setAccountOpenMobile] = useState(false);
   const accountMobileRef = useRef<HTMLDivElement>(null);
 
+  const isTasksEnabled = useFeatureFlag("tasksFeature");
+
   const isTimerPage = location.pathname === "/timer";
   const isHomePage = location.pathname === "/";
   const isActivitiesPage = location.pathname === "/activities";
+  const isTasksPage = location.pathname === "/tasks";
   const isAccountPage = location.pathname === "/account";
 
   useEffect(() => {
@@ -68,6 +72,16 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   <span aria-hidden="true">📋 </span>Activities
                 </Button>
               </Link>
+              {isTasksEnabled && (
+                <Link to="/tasks" aria-label="Go to tasks">
+                  <Button
+                    variant={isTasksPage ? "primary" : "secondary"}
+                    className={styles.navLink}
+                  >
+                    <span aria-hidden="true">✅ </span>Tasks
+                  </Button>
+                </Link>
+              )}
             </>
           )}
         </div>

@@ -131,16 +131,12 @@ class MaintenanceWindow(models.Model):
 
 
 class FeatureFlag(models.Model):
-    class AccessLevel(models.TextChoices):
-        NO = "no", "No users"
-        ALL = "all", "All users"
-        PREMIUM = "premium", "Premium users"
+    ACCESS_GROUPS = ["all", "premium", "testers"]
 
     key = models.CharField(max_length=100, unique=True)
-    access_level = models.CharField(
-        max_length=16,
-        choices=AccessLevel.choices,
-        default=AccessLevel.NO,
+    access_groups = models.JSONField(
+        default=list,
+        help_text="List of groups that can access this feature: 'all', 'premium', 'testers'.",
     )
     description = models.TextField(blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
@@ -150,8 +146,9 @@ class FeatureFlag(models.Model):
         ordering = ("key",)
 
     def __str__(self):
-        return f"{self.key} ({self.access_level})"
+        groups = ", ".join(self.access_groups) if self.access_groups else "no one"
+        return f"{self.key} ({groups})"
 
     @classmethod
     def as_dict(cls):
-        return dict(cls.objects.values_list("key", "access_level"))
+        return {flag.key: flag.access_groups for flag in cls.objects.all()}

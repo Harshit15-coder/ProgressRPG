@@ -3,6 +3,8 @@ import React, { useEffect, useRef, useState } from "react";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { formatDuration, formatRewardDuration } from "../../../utils/formatUtils";
+import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
+import { useGame } from "../../../context/GameContext";
 import styles from "../SupportFlowModal.module.scss";
 
 const SUPPORT_COUNTDOWN_MS = 3000;
@@ -12,10 +14,12 @@ interface ActivityRewardScreenProps {
   xpGained?: number | null;
   baseXp?: number | null;
   xpMultiplier?: number | null;
+  taskXpMultiplier?: number | null;
   levelUps?: number[];
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
   elapsedSeconds?: number | null;
+  taskId?: number | null;
   enableAutoSupportCountdown?: boolean;
   onContinue?: () => void;
   onSupport?: () => void;
@@ -26,10 +30,12 @@ export default function ActivityRewardScreen({
   xpGained,
   baseXp,
   xpMultiplier,
+  taskXpMultiplier = null,
   levelUps = [],
   isAutoStopped = false,
   showUpgradePrompt = false,
   elapsedSeconds,
+  taskId = null,
   enableAutoSupportCountdown = true,
   onContinue,
   onSupport,
@@ -38,6 +44,34 @@ export default function ActivityRewardScreen({
   const [remainingMs, setRemainingMs] = useState(SUPPORT_COUNTDOWN_MS);
   const [isCountdownPaused, setIsCountdownPaused] = useState(false);
   const hasAutoContinuedRef = useRef(false);
+
+  const { fetchPlayerAndCharacter } = useGame();
+  const { data: tasks = [] } = useTasks();
+  const updateTask = useUpdateTask();
+  const linkedTask = taskId != null ? tasks.find((t) => t.id === taskId) ?? null : null;
+  const [isTaskComplete, setIsTaskComplete] = useState<boolean>(linkedTask?.is_complete ?? false);
+  // Sync initial value once linkedTask loads (it may arrive after first render)
+  const hasInitialisedTaskComplete = useRef(false);
+  useEffect(() => {
+    if (linkedTask && !hasInitialisedTaskComplete.current) {
+      setIsTaskComplete(linkedTask.is_complete);
+      hasInitialisedTaskComplete.current = true;
+    }
+  }, [linkedTask]);
+
+  function handleToggleTaskComplete() {
+    if (!linkedTask) return;
+    const next = !isTaskComplete;
+    setIsTaskComplete(next);
+    updateTask.mutate(
+      { id: linkedTask.id, data: { is_complete: next } },
+      {
+        onSuccess: (data) => {
+          if (data.completion_xp_gained > 0) fetchPlayerAndCharacter();
+        },
+      }
+    );
+  }
 
   useEffect(() => {
     if (!shouldEnableCountdown || isCountdownPaused || hasAutoContinuedRef.current) {
@@ -84,17 +118,25 @@ export default function ActivityRewardScreen({
   const condensedElapsed = hasElapsedSeconds
     ? formatDuration(parsedElapsedSeconds)
     : null;
-  const formattedMultiplier = hasRewardBreakdown
-    ? Number.isInteger(parsedMultiplier)
-      ? String(parsedMultiplier)
-      : parsedMultiplier.toFixed(2).replace(/\.?0+$/, "")
-    : null;
+  const parsedTaskXpMultiplier = Number(taskXpMultiplier);
+  const hasTaskBonus =
+    Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1;
+  // Infer premium component: combined / task (or combined if no task bonus)
+  const premiumMultiplier =
+    hasRewardBreakdown && hasTaskBonus && parsedTaskXpMultiplier > 0
+      ? parsedMultiplier / parsedTaskXpMultiplier
+      : parsedMultiplier;
+
+  function fmtMult(m: number): string {
+    return Number.isInteger(m) ? String(m) : m.toFixed(2).replace(/\.?0+$/, "");
+  }
+
   const normalizedLevelUps = Array.isArray(levelUps)
     ? levelUps
         .map((level) => Number(level))
         .filter((level) => Number.isInteger(level) && level > 0)
     : [];
-  const isLikelyPremiumUser = parsedMultiplier === 2;
+  const isLikelyPremiumUser = premiumMultiplier >= 2;
   const shouldShowUpgradePrompt = Boolean(showUpgradePrompt) && !isLikelyPremiumUser;
   const upgradeMessage = shouldShowUpgradePrompt
     ? isAutoStopped
@@ -112,11 +154,12 @@ export default function ActivityRewardScreen({
     rewardSummaryLine = `Nice work ⚔️ You spent ${formattedElapsed} focused.`;
   }
 
-  if (hasRewardBreakdown && parsedMultiplier > 1) {
-    if (parsedMultiplier === 2) {
-      multiplierLines.push({ label: "Premium bonus", value: `x${formattedMultiplier}` });
-    } else {
-      multiplierLines.push({ label: "Activity XP", value: `x${formattedMultiplier}` });
+  if (hasRewardBreakdown) {
+    if (premiumMultiplier > 1) {
+      multiplierLines.push({ label: "Premium bonus", value: `x${fmtMult(premiumMultiplier)}` });
+    }
+    if (hasTaskBonus) {
+      multiplierLines.push({ label: "Task bonus", value: `x${fmtMult(parsedTaskXpMultiplier)}` });
     }
   }
 
@@ -150,6 +193,30 @@ export default function ActivityRewardScreen({
         <p key={level}>Level up! You reached level {level}.</p>
       ))}
       {!hasActivityName && hasXp && <p>You gained {parsedXp} XP!</p>}
+
+      {linkedTask && (
+        <div className={styles.taskCompletionPanel}>
+          <p className={styles.taskCompletionTitle}>Task: {linkedTask.name}</p>
+          <div className={styles.taskCompletionRow}>
+            <span className={styles.taskCompletionTime}>
+              Total time: {formatRewardDuration(linkedTask.total_time)}
+            </span>
+            <label className={styles.taskCompletionCheck}>
+              Completed task?
+              <input
+                type="checkbox"
+                checked={isTaskComplete}
+                onChange={handleToggleTaskComplete}
+              />
+            </label>
+          </div>
+          {(updateTask.data?.completion_xp_gained ?? 0) > 0 && (
+            <p className={styles.taskCompletionXp}>
+              +{updateTask.data!.completion_xp_gained} XP for completing the task!
+            </p>
+          )}
+        </div>
+      )}
 
       <div className={styles.actionRow}>
         <div

@@ -82,6 +82,7 @@ const initialCtx = (entrypoint: string | null = null) => ({
   rewardShowUpgradePrompt: false,
   completedActivityName: null,
   completedActivityElapsedSeconds: null,
+  completedActivityTaskId: null,
   supportActionId: null,
   activityPresetId: null,
   activityText: "",
@@ -153,6 +154,11 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
           Number.isFinite(parsedXpMultiplier) && parsedXpMultiplier > 0
             ? parsedXpMultiplier
             : null;
+        const parsedTaskXpMultiplier = Number(event.taskXpMultiplier);
+        const normalizedTaskXpMultiplier =
+          Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1
+            ? parsedTaskXpMultiplier
+            : null;
         const normalizedLevelUps = Array.isArray(event.levelUps)
           ? event.levelUps
               .map((level) => Number(level))
@@ -169,6 +175,7 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
           xpGained: normalizedXp,
           rewardBaseXp: normalizedBaseXp,
           rewardXpMultiplier: normalizedXpMultiplier,
+          rewardTaskXpMultiplier: normalizedTaskXpMultiplier,
           rewardLevelUps: normalizedLevelUps,
           rewardIsAutoStopped: normalizedIsAutoStopped,
           rewardShowUpgradePrompt: normalizedShowUpgradePrompt,
@@ -177,6 +184,10 @@ export function supportFlowReducer(state: LooseFlowState, event: Record<string, 
               ? event.activityName.trim()
               : null,
           completedActivityElapsedSeconds: normalizedElapsedSeconds,
+          completedActivityTaskId:
+            typeof event.taskId === "number" && Number.isInteger(event.taskId) && event.taskId > 0
+              ? event.taskId
+              : null,
         },
       };
       }

@@ -36,6 +36,7 @@ class GameSettingsAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "default_activity_xp_per_second",
+                    "task_activity_xp_multiplier",
                     "premium_activity_xp_multiplier",
                     "activity_search_includes_tasks",
                 )
