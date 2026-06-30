@@ -7,6 +7,7 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 import { WebSocketProvider } from './context/WebSocketContext';
 
 import MaintenanceWatcher from './components/MaintenanceWatcher';
+import { TooltipProvider } from './components/Tooltip/Tooltip';
 import AppContent from "./AppContent";
 
 import { initGA, logPageView } from './utils/analytics';
@@ -66,9 +67,11 @@ function App(): React.ReactElement {
   return (
     <MaintenanceProvider>
       <ToastProvider>
-        <AuthProvider>
-          <AppWithAuth />
-        </AuthProvider>
+        <TooltipProvider>
+          <AuthProvider>
+            <AppWithAuth />
+          </AuthProvider>
+        </TooltipProvider>
       </ToastProvider>
     </MaintenanceProvider>
   );

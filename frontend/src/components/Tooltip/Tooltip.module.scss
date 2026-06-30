@@ -1,0 +1,93 @@
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/colors' as c;
+
+.content {
+  z-index: v.$z-index-tooltip;
+  max-width: min(20rem, calc(100vw - (2 * #{v.$spacing-md})));
+  border: 1px solid rgba(c.$color-border-primary, 0.22);
+  border-radius: v.$border-radius;
+  background: rgba(c.$color-bg-invert, 0.96);
+  color: c.$color-text-invert;
+  padding: v.$spacing-xs v.$spacing-sm;
+  box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
+  font-size: 0.875rem;
+  line-height: 1.4;
+  transform-origin: var(--radix-tooltip-content-transform-origin);
+  animation-duration: v.$duration-fast;
+  animation-timing-function: v.$easing-standard;
+  animation-fill-mode: both;
+
+  &[data-side='top'] {
+    animation-name: tooltip-slide-up;
+  }
+
+  &[data-side='bottom'] {
+    animation-name: tooltip-slide-down;
+  }
+
+  &[data-side='left'] {
+    animation-name: tooltip-slide-left;
+  }
+
+  &[data-side='right'] {
+    animation-name: tooltip-slide-right;
+  }
+}
+
+.arrow {
+  fill: rgba(c.$color-bg-invert, 0.96);
+}
+
+@keyframes tooltip-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tooltip-slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes tooltip-slide-left {
+  from {
+    opacity: 0;
+    transform: translateX(4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes tooltip-slide-right {
+  from {
+    opacity: 0;
+    transform: translateX(-4px) scale(0.98);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0) scale(1);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation: none;
+  }
+}

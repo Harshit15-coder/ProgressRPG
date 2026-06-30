@@ -7,6 +7,7 @@ import type { Task } from "../../types";
 import EntitySearchInput from "../../components/EntitySearchInput/EntitySearchInput";
 import Button from "../../components/Button/Button";
 import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
+import Tooltip from "../../components/Tooltip/Tooltip";
 import type { SortOption } from "../../components/PlayerItemList/PlayerItemList";
 import { formatRewardDuration } from "../../utils/formatUtils";
 import styles from "./TasksPage.module.scss";
@@ -216,25 +217,26 @@ export default function TasksPage(): React.ReactElement | null {
           }}
           hoverEdit
           renderRowActions={(task) => (
-            <button
-              type="button"
-              className={styles.taskPlayButton}
-              aria-label={`Start working on ${(task as Task).name}`}
-              title="Start working on this task"
-              onClick={async (event) => {
-                event.currentTarget.blur();
-                const name = (task as Task).name;
-                if (!name || activityTimer?.status === "active") return;
-                await activityTimer?.startActivity({
-                  text: name,
-                  taskId: (task as Task).id,
-                  limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                });
-                navigate("/timer");
-              }}
-            >
-              ▷
-            </button>
+            <Tooltip content="Start working on this task">
+              <button
+                type="button"
+                className={styles.taskPlayButton}
+                aria-label={`Start working on ${(task as Task).name}`}
+                onClick={async (event) => {
+                  event.currentTarget.blur();
+                  const name = (task as Task).name;
+                  if (!name || activityTimer?.status === "active") return;
+                  await activityTimer?.startActivity({
+                    text: name,
+                    taskId: (task as Task).id,
+                    limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                  });
+                  navigate("/timer");
+                }}
+              >
+                ▷
+              </button>
+            </Tooltip>
           )}
           onEdit={handleEdit}
           onDelete={handleDelete}
