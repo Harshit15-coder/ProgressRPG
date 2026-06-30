@@ -17,8 +17,13 @@ export function createTask(data: Partial<Task>): Promise<Task> {
   });
 }
 
-export function updateTask(id: number, data: Partial<Task>): Promise<Task> {
-  return apiFetch<Task>(`/tasks/${id}/`, {
+export interface TaskUpdateResponse extends Task {
+  completion_xp_gained: number;
+  level_ups: number[];
+}
+
+export function updateTask(id: number, data: Partial<Task>): Promise<TaskUpdateResponse> {
+  return apiFetch<TaskUpdateResponse>(`/tasks/${id}/`, {
     method: "PATCH",
     body: JSON.stringify(data),
   });

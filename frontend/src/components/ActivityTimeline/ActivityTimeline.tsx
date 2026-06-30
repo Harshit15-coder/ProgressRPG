@@ -1,5 +1,7 @@
 import React, { useMemo, useEffect } from "react";
 import { useGame } from "../../context/GameContext";
+import { useTasks } from "../../hooks/useTasks";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import List from "../List/List";
 import styles from "./ActivityTimeline.module.scss";
 import type { PlayerActivity, CharacterActivity } from "../../types";
@@ -43,6 +45,13 @@ export default function ActivityTimeline() {
   } = useGame();
 
   const isPremium = Boolean(player?.is_premium);
+  const hasTasksFeature = useFeatureFlag("tasksFeature");
+  const { data: tasks } = useTasks({ enabled: hasTasksFeature });
+
+  const completedTaskIds = useMemo(() => {
+    if (!tasks) return new Set<number>();
+    return new Set(tasks.filter(t => Boolean(t.completed_at ?? t.is_complete)).map(t => t.id));
+  }, [tasks]);
 
   useEffect(() => {
     fetchActivities();
@@ -84,34 +93,59 @@ export default function ActivityTimeline() {
           items={unifiedActivities}
           getKey={(act, i) => `${'player' in act ? 'player' : 'character'}-${act.id ?? i}`}
           getItemClassName={() => styles.activityLineItem}
-          renderItem={(act) => (
-            <div className={styles.line}>
-              <span className={styles.lineText}>
-                <strong>{act.name || act.kind || "an activity"}</strong> —{" "}
-                {formatDuration(act.duration)}
-              </span>
-              <button
-                type="button"
-                className={styles.playButton}
-                onClick={async (event) => {
-                  event.currentTarget.blur();
+          renderItem={(act) => {
+            const linkedTaskId = "player" in act ? (act as PlayerActivity).task : null;
+            const linkedTaskIsComplete = linkedTaskId !== null && completedTaskIds.has(linkedTaskId);
+            const activityText = (act.name || act.kind || "").trim();
 
-                  const activityText = (act.name || act.kind || "").trim();
-                  if (!activityText) return;
-                  if (activityTimer?.status === "active") return;
-
-                  await activityTimer?.startActivity({
-                    text: activityText,
-                    limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                  });
-                }}
-                aria-label={`Restart ${act.name || act.kind || "activity"}`}
-                title="Do this activity again"
-              >
-                ▷
-              </button>
-            </div>
-          )}
+            return (
+              <div className={styles.line}>
+                <span className={styles.lineText}>
+                  <strong>{act.name || act.kind || "an activity"}</strong> —{" "}
+                  {formatDuration(act.duration)}
+                </span>
+                {linkedTaskIsComplete ? (
+                  <button
+                    type="button"
+                    className={styles.warningButton}
+                    data-tooltip="Task complete — activity will start unlinked"
+                    onClick={async (event) => {
+                      event.currentTarget.blur();
+                      if (!activityText) return;
+                      if (activityTimer?.status === "active") return;
+                      await activityTimer?.startActivity({
+                        text: activityText,
+                        taskId: null,
+                        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                      });
+                    }}
+                    aria-label={`Restart ${act.name || act.kind || "activity"} (task complete)`}
+                  >
+                    ▷
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    className={styles.playButton}
+                    onClick={async (event) => {
+                      event.currentTarget.blur();
+                      if (!activityText) return;
+                      if (activityTimer?.status === "active") return;
+                      await activityTimer?.startActivity({
+                        text: activityText,
+                        taskId: linkedTaskId,
+                        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                      });
+                    }}
+                    aria-label={`Restart ${act.name || act.kind || "activity"}`}
+                    title="Do this activity again"
+                  >
+                    ▷
+                  </button>
+                )}
+              </div>
+            );
+          }}
         />
       )}
     </div>

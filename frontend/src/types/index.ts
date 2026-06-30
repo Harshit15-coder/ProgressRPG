@@ -19,6 +19,7 @@ export type {
 
 // Enums and literal union types
 export type {
+  AccessGroup,
   FeatureFlagValue,
   FeatureFlagKey,
   TimerStatus,

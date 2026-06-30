@@ -222,8 +222,9 @@ class TaskSerializer(serializers.ModelSerializer):
             "last_updated",
             "is_complete",
             "completed_at",
+            "first_completed_at",
             "total_time",
             "total_records",
             "last_worked_on",
         ]
-        read_only_fields = ["player"]
+        read_only_fields = ["player", "first_completed_at"]

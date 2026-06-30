@@ -30,11 +30,13 @@ interface FlowCtx {
   xpGained?: number | null;
   rewardBaseXp?: number | null;
   rewardXpMultiplier?: number | null;
+  rewardTaskXpMultiplier?: number | null;
   rewardLevelUps?: number[];
   rewardIsAutoStopped?: boolean;
   rewardShowUpgradePrompt?: boolean;
   completedActivityName?: string | null;
   completedActivityElapsedSeconds?: number | null;
+  completedActivityTaskId?: number | null;
   [key: string]: unknown;
 }
 
@@ -57,7 +59,7 @@ const SCREEN_TITLES: Record<string, string> = {
 interface SupportFlowModalProps {
   state: FlowState;
   dispatch: Dispatch<FlowAction>;
-  onConfirmActivity?: (text?: string) => void;
+  onConfirmActivity?: (text?: string, taskId?: number | null) => void | Promise<void>;
 }
 
 export default function SupportFlowModal({ state, dispatch, onConfirmActivity }: SupportFlowModalProps) {
@@ -102,11 +104,13 @@ export default function SupportFlowModal({ state, dispatch, onConfirmActivity }:
             xpGained={ctx.xpGained}
             baseXp={ctx.rewardBaseXp}
             xpMultiplier={ctx.rewardXpMultiplier}
+            taskXpMultiplier={ctx.rewardTaskXpMultiplier}
             levelUps={ctx.rewardLevelUps}
             isAutoStopped={ctx.rewardIsAutoStopped}
             showUpgradePrompt={ctx.rewardShowUpgradePrompt}
             activityName={ctx.completedActivityName}
             elapsedSeconds={ctx.completedActivityElapsedSeconds}
+            taskId={ctx.completedActivityTaskId}
             enableAutoSupportCountdown={false}
             onContinue={close}
             onSupport={() => dispatch({ type: "GO_SUPPORT_MENU", origin: "reward" })}
@@ -140,7 +144,7 @@ export default function SupportFlowModal({ state, dispatch, onConfirmActivity }:
               dispatch({ type: "SET_ACTIVITY_TEXT", text })
             }
             onConfirm={onConfirmActivity}
-            onConfirmWithText={(text) => onConfirmActivity?.(text)}
+            onConfirmWithText={(text, taskId) => onConfirmActivity?.(text, taskId)}
           />
         );
 

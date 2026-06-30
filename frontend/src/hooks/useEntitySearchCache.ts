@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchActivities } from "../api/activities";
 import { fetchTasks } from "../api/tasks";
-import { useGame } from "../context/GameContext";
+import { useFeatureFlag } from "./useFeatureFlag";
 import type { PlayerActivity, Task } from "../types";
 
 // ---------------------------------------------------------------------------
@@ -21,7 +21,7 @@ interface SearchEntity {
   frequency: number;
 }
 
-type EntityType = "activity";
+type EntityType = "activity" | "task";
 
 // ---------------------------------------------------------------------------
 // Cache keys
@@ -30,12 +30,27 @@ type EntityType = "activity";
 const ACTIVITY_LIST_CACHE_KEY = ["entity-search", "activity", "activities"];
 const TASK_LIST_CACHE_KEY = ["entity-search", "activity", "tasks"];
 
-const ENTITY_CONFIG: Record<EntityType, { queryKey: string[]; queryFn: () => Promise<PlayerActivity[]> }> = {
+const ENTITY_CONFIG: Record<EntityType, { queryKey: string[]; fetchAndNormalize: () => Promise<SearchEntity[]> }> = {
   activity: {
     queryKey: ["entity-search", "activity"],
-    queryFn: async () => {
+    fetchAndNormalize: async () => {
       const activities = await fetchActivities();
-      return Array.isArray(activities) ? activities : [];
+      return dedupeEntities(
+        (Array.isArray(activities) ? activities : [])
+          .map(normalizeActivityEntity)
+          .filter((e): e is SearchEntity => e !== null)
+      );
+    },
+  },
+  task: {
+    queryKey: ["entity-search", "task"],
+    fetchAndNormalize: async () => {
+      const tasks = await fetchTasks();
+      return dedupeEntities(
+        (Array.isArray(tasks) ? tasks : [])
+          .map((t) => normalizeTaskEntity(t, true))
+          .filter((e): e is SearchEntity => e !== null)
+      );
     },
   },
 };
@@ -71,9 +86,10 @@ function normalizeActivityEntity(activity: Partial<PlayerActivity> & { isOptimis
   };
 }
 
-function normalizeTaskEntity(task: Partial<Task> | null | undefined): SearchEntity | null {
+function normalizeTaskEntity(task: Partial<Task> | null | undefined, includeCompleted = false): SearchEntity | null {
   const name = normalizeEntityName(task?.name);
   if (!name) return null;
+  if (!includeCompleted && (task?.is_complete || task?.completed_at)) return null;
 
   return {
     id: task?.id ?? `task-${name.toLowerCase()}`,
@@ -117,29 +133,30 @@ export function useEntitySearchCache(type: EntityType) {
     throw new Error(`Unsupported entity search type: ${type}`);
   }
 
-  const { gameSettings } = useGame();
-  const includesTasks = gameSettings?.activity_search_includes_tasks ?? false;
+  const includesTasks = useFeatureFlag("tasksFeature");
 
   const query = useQuery<SearchEntity[]>({
     queryKey: config.queryKey,
     queryFn: async () => {
-      const activities = await config.queryFn();
-      const deduped = dedupeEntities(activities.map(normalizeActivityEntity).filter((e): e is SearchEntity => e !== null));
-      queryClient.setQueryData(ACTIVITY_LIST_CACHE_KEY, deduped);
-      return deduped;
+      const entities = await config.fetchAndNormalize();
+      if (type === "activity") {
+        queryClient.setQueryData(ACTIVITY_LIST_CACHE_KEY, entities);
+      }
+      return entities;
     },
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
   });
 
+  // For activity type only: also fetch tasks to surface them as suggestions
   useQuery<SearchEntity[]>({
     queryKey: TASK_LIST_CACHE_KEY,
     queryFn: async () => {
       const tasks = await fetchTasks();
-      return Array.isArray(tasks) ? tasks.map(normalizeTaskEntity).filter((e): e is SearchEntity => e !== null) : [];
+      return Array.isArray(tasks) ? tasks.map((t) => normalizeTaskEntity(t)).filter((e): e is SearchEntity => e !== null) : [];
     },
-    enabled: includesTasks,
+    enabled: type === "activity" && includesTasks,
     staleTime: Number.POSITIVE_INFINITY,
     gcTime: Number.POSITIVE_INFINITY,
     refetchOnWindowFocus: false,
@@ -147,6 +164,8 @@ export function useEntitySearchCache(type: EntityType) {
 
   const addEntityToCache = useCallback(
     (entityInput: string | Partial<PlayerActivity> & { isOptimistic?: boolean; frequency?: number }): SearchEntity | null => {
+      if (type !== "activity") return null;
+
       const entity =
         typeof entityInput === "string"
           ? normalizeActivityEntity({ name: entityInput, isOptimistic: true })
@@ -170,14 +189,17 @@ export function useEntitySearchCache(type: EntityType) {
 
       return entity;
     },
-    [config.queryKey, queryClient]
+    [type, config.queryKey, queryClient]
   );
 
   const activities = (queryClient.getQueryData<SearchEntity[]>(ACTIVITY_LIST_CACHE_KEY)) ?? [];
-  const tasks = (queryClient.getQueryData<SearchEntity[]>(TASK_LIST_CACHE_KEY)) ?? [];
-  const entities = includesTasks
-    ? dedupeEntities([...(query.data ?? []), ...tasks])
-    : (query.data ?? []);
+  const taskEntities = (queryClient.getQueryData<SearchEntity[]>(TASK_LIST_CACHE_KEY)) ?? [];
+
+  const entities = type === "task"
+    ? (query.data ?? [])
+    : (includesTasks
+      ? dedupeEntities([...(query.data ?? []), ...taskEntities])
+      : (query.data ?? []));
 
   return {
     ...query,

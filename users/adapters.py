@@ -56,6 +56,3 @@ class CustomAccountAdapter(DefaultAccountAdapter):
             email_template = "account/email/email_confirmation"
 
         self.send_mail(email_template, emailconfirmation.email_address.email, ctx)
-
-    def get_reset_password_from_key_url(self, key):
-        return f"{settings.FRONTEND_URL.rstrip('/')}/reset-password/{key}"

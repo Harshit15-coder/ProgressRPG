@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
+import { useQueryClient } from "@tanstack/react-query";
 import { useGame } from "../../context/GameContext";
 import Button from "../Button/Button";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
@@ -10,6 +11,8 @@ import SupportFlowModal from "../SupportFlow/SupportFlowModal";
 import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
 
 const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
+const SUBMIT_ACTIVE_ACTIVITY_MESSAGE =
+  "You already have a timer running. Submit it before opening Task Support?";
 
 // Shape of a selected entity from EntitySearchInput
 interface SelectedEntity {
@@ -45,6 +48,7 @@ export default function ActivityInput() {
   } = activityTimer;
 
   const isPremium = Boolean(player?.is_premium);
+  const queryClient = useQueryClient();
   const { addEntityToCache } = useEntitySearchCache("activity");
 
   const [name, setName] = useState("");
@@ -63,7 +67,7 @@ export default function ActivityInput() {
     flowDispatch,
     handleConfirmActivity,
   } = useSupportFlow({
-    onStartActivity: ({ activityText, durationSeconds }) => {
+    onStartActivity: async ({ activityText, durationSeconds, taskId }) => {
       const parsedDuration = Number(durationSeconds);
       const hasCustomDuration = Number.isFinite(parsedDuration) && parsedDuration > 0;
 
@@ -83,7 +87,7 @@ export default function ActivityInput() {
         limitReason = "preset_limit";
       }
 
-      startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason });
+      await startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
     },
   });
 
@@ -147,6 +151,7 @@ export default function ActivityInput() {
         xpGained: completion.xpGained,
         baseXp: completion.baseXp,
         xpMultiplier: completion.xpMultiplier,
+        taskXpMultiplier: completion.taskXpMultiplier,
         levelUps: completion.levelUps,
         isAutoStopped: true,
         showUpgradePrompt: !isPremium && isFreeLimitAutoStop,
@@ -175,6 +180,7 @@ export default function ActivityInput() {
     primeAudio(); // unlock AudioContext while still in user-gesture context
     if (isActive) {
       const completedActivityName = (name || currentActivity?.name || "").trim();
+      const completedTaskId = currentActivity?.taskId ?? null;
       const localElapsed = elapsed; // capture before async operations clear it
 
       let completion: Awaited<ReturnType<typeof stop>> = null;
@@ -185,11 +191,13 @@ export default function ActivityInput() {
         // Continue — play sound and show popup with local data so the user isn't left hanging
       }
 
+
       // completion comes back as ActivityCompleteResponse or null — fields use snake_case from API
       const completionRaw = completion as Record<string, unknown> | null;
       const xpGained = completionRaw?.xp_gained != null ? Number(completionRaw.xp_gained) : null;
       const baseXp = completionRaw?.base_xp != null ? Number(completionRaw.base_xp) : null;
       const xpMultiplier = completionRaw?.xp_multiplier != null ? Number(completionRaw.xp_multiplier) : null;
+      const taskXpMultiplier = completionRaw?.task_xp_multiplier != null ? Number(completionRaw.task_xp_multiplier) : null;
       const levelUps = Array.isArray(completionRaw?.level_ups) ? completionRaw.level_ups as number[] : [];
       const elapsedSeconds = completionRaw?.duration_seconds != null
         ? Number(completionRaw.duration_seconds)
@@ -201,21 +209,25 @@ export default function ActivityInput() {
           fetchPlayerAndCharacter(),
           fetchCharacterCurrent(),
           fetchActivities(),
+          completedTaskId ? queryClient.invalidateQueries({ queryKey: ["tasks"] }) : Promise.resolve(),
         ]);
       } catch (err) {
         console.error("[ActivityInput] Failed to refresh after stop:", err);
       }
+
 
       playLimitReachedSound();
       openActivityReward({
         xpGained,
         baseXp,
         xpMultiplier,
+        taskXpMultiplier,
         levelUps,
         isAutoStopped: false,
         showUpgradePrompt: !isPremium,
         activityName: completedActivityName || null,
         elapsedSeconds,
+        taskId: completedTaskId,
       });
       return;
     }
@@ -333,7 +345,30 @@ export default function ActivityInput() {
 
         <div className={styles.supportButtonRow}>
           <Button
-            onClick={openSupportMode}
+            onClick={async () => {
+              if (isActive) {
+                const shouldSubmitCurrent = window.confirm(SUBMIT_ACTIVE_ACTIVITY_MESSAGE);
+                if (!shouldSubmitCurrent) return;
+                const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
+                try {
+                  await stop({ activityName: completedActivityName });
+                } catch (err) {
+                  console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
+                  return;
+                }
+                setName("");
+                try {
+                  await Promise.all([
+                    fetchPlayerAndCharacter(),
+                    fetchCharacterCurrent(),
+                    fetchActivities(),
+                  ]);
+                } catch (err) {
+                  console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
+                }
+              }
+              openSupportMode();
+            }}
             variant="secondary"
             className={styles.supportModeButton}
             ariaLabel="Open support mode"

@@ -10,7 +10,7 @@ const RegisterPage = lazy(() => import("../pages/RegisterPage/RegisterPage"));
 const PasswordResetConfirmPage = lazy(() =>
   import("../pages/PasswordResetConfirmPage/PasswordResetConfirmPage")
 );
-const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage/ForgotPasswordPage"));
+const PasswordResetRequestPage = lazy(() => import("../pages/PasswordResetRequestPage/PasswordResetRequestPage"));
 const PrivacyPolicyPage = lazy(() => import("../pages/PrivacyPolicyPage/PrivacyPolicyPage"));
 const TermsOfServicePage = lazy(() => import("../pages/TermsOfServicePage/TermsOfServicePage"));
 const SupportPage = lazy(() => import("../pages/SupportPage/SupportPage"));
@@ -56,7 +56,7 @@ export const routes = [
   },
   {
     path: "/forgot-password",
-    element: <ForgotPasswordPage />,
+    element: <PasswordResetRequestPage />,
   },
   {
     path: "/privacy-policy",
@@ -158,7 +158,7 @@ export const routes = [
     path: "/tasks",
     element: (
       <PrivateRoute>
-        <FeatureToggle flag="tasksPage">
+        <FeatureToggle flag="tasksFeature">
           <TasksPage />
         </FeatureToggle>
       </PrivateRoute>

@@ -412,15 +412,21 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
         base_xp = self.calculate_base_xp(self.duration)
         player = self.player
         multiplier = player.get_activity_xp_multiplier()
-        multiplier_value = (
-            int(multiplier)
-            if multiplier == multiplier.to_integral_value()
-            else float(multiplier)
-        )
+        task_xp_multiplier = Decimal("1.0")
+        if self.task_id:
+            from core.models import GameSettings
+
+            task_xp_multiplier = GameSettings.current().task_activity_xp_multiplier
+            multiplier *= task_xp_multiplier
+
+        def _fmt(d: Decimal) -> int | float:
+            return int(d) if d == d.to_integral_value() else float(d)
+
         return {
             "duration_seconds": self.duration,
             "base_xp": base_xp,
-            "xp_multiplier": multiplier_value,
+            "xp_multiplier": _fmt(multiplier),
+            "task_xp_multiplier": _fmt(task_xp_multiplier),
             "xp_gained": int(Decimal(base_xp) * multiplier),
         }
 
@@ -656,6 +662,7 @@ class Task(models.Model, PlayerOwnedMixin):
     created_at = models.DateTimeField(auto_now_add=True)
     is_complete = models.BooleanField(default=False)
     completed_at = models.DateTimeField(null=True, blank=True)
+    first_completed_at = models.DateTimeField(null=True, blank=True)
 
     @property
     def total_time(self):

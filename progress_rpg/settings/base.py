@@ -162,6 +162,10 @@ REST_AUTH_REGISTER_SERIALIZERS = {
     "REGISTER_SERIALIZER": "api.serializers.CustomRegisterSerializer",
 }
 
+REST_AUTH = {
+    "PASSWORD_RESET_SERIALIZER": "api.serializers.CustomPasswordResetSerializer",
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Progress RPG API",
     "DESCRIPTION": "API documentation for Progress RPG, an ADHD-focused productivity game.",

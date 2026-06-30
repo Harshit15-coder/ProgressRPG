@@ -186,6 +186,30 @@
   .icons {
     display: none;
   }
+
+  .leftLinks,
+  .rightLinks {
+    gap: v.$spacing-xs;
+  }
+
+  .navLink {
+    padding-left: v.$spacing-sm;
+    padding-right: v.$spacing-sm;
+    font-size: 0.875rem;
+  }
+}
+
+@include m.respond-to(lg) {
+  .leftLinks,
+  .rightLinks {
+    gap: v.$spacing-md;
+  }
+
+  .navLink {
+    padding-left: v.$spacing-md;
+    padding-right: v.$spacing-md;
+    font-size: 1rem;
+  }
 }
 
 .menuButton {
