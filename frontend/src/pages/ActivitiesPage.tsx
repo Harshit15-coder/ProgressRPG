@@ -146,6 +146,7 @@ export default function ActivitiesPage(): React.ReactElement | null {
 
   return (
     <div className={styles.page}>
+      <div className={styles.content}>
       <div className={styles.header}>
         <h1>Activities</h1>
       </div>
@@ -233,6 +234,7 @@ export default function ActivitiesPage(): React.ReactElement | null {
           <p>No activities recorded yet.</p>
         </div>
       )}
+      </div>
     </div>
   );
 }

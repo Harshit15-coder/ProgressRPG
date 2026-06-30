@@ -83,4 +83,69 @@ describe("PlayerItemList", () => {
 
     expect(screen.getByText("Duration: 15m • 15 XP gained")).toBeInTheDocument();
   });
+
+  describe("generic sorting and filtering", () => {
+    const sortableItems = [
+      { id: 1, name: "Banana", done: false },
+      { id: 2, name: "Apple", done: true },
+    ];
+
+    const sortOptions = [
+      // First option is the default; a no-op comparator preserves input order.
+      { key: "created", label: "Created", compareFn: () => 0 },
+      {
+        key: "name",
+        label: "Name",
+        compareFn: (a: (typeof sortableItems)[number], b: (typeof sortableItems)[number]) =>
+          a.name.localeCompare(b.name),
+      },
+    ];
+
+    const itemOrder = () =>
+      screen
+        .getAllByRole("button", { name: /^Open task / })
+        .map((button) => button.getAttribute("aria-label"));
+
+    it("keeps input order under the default sort option", () => {
+      render(
+        <PlayerItemList items={sortableItems} itemLabel="task" sortOptions={sortOptions} />,
+      );
+
+      expect(itemOrder()).toEqual(["Open task Banana", "Open task Apple"]);
+    });
+
+    it("reorders items when a different sort option is chosen", async () => {
+      const user = userEvent.setup();
+      render(
+        <PlayerItemList items={sortableItems} itemLabel="task" sortOptions={sortOptions} />,
+      );
+
+      await user.selectOptions(screen.getByRole("combobox"), "name");
+
+      expect(itemOrder()).toEqual(["Open task Apple", "Open task Banana"]);
+    });
+
+    it("applies the active filter predicate", async () => {
+      const user = userEvent.setup();
+      render(
+        <PlayerItemList
+          items={sortableItems}
+          itemLabel="task"
+          filterOptions={[
+            { key: "all", label: "All", predicate: () => true },
+            { key: "incomplete", label: "Incomplete", predicate: (item) => !item.done },
+          ]}
+        />,
+      );
+
+      // Default filter ("All") shows everything.
+      expect(screen.getByText("Banana")).toBeInTheDocument();
+      expect(screen.getByText("Apple")).toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Incomplete" }));
+
+      expect(screen.getByText("Banana")).toBeInTheDocument();
+      expect(screen.queryByText("Apple")).not.toBeInTheDocument();
+    });
+  });
 });

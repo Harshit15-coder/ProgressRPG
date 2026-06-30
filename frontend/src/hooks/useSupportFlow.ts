@@ -34,9 +34,11 @@ interface OpenActivityRewardOptions {
   elapsedSeconds?: number | null;
   baseXp?: number | null;
   xpMultiplier?: number | null;
+  taskXpMultiplier?: number | null;
   levelUps?: number[];
   isAutoStopped?: boolean;
   showUpgradePrompt?: boolean;
+  taskId?: number | null;
 }
 
 interface OpenWelcomeMessageOptions {
@@ -47,7 +49,7 @@ interface OpenWelcomeMessageOptions {
 
 interface SupportFlowOptions {
   /** Invoked when the user confirms an activity in the modal. */
-  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null }) => boolean | void | Promise<boolean | void>;
+  onStartActivity?: (payload: { activityText: string; durationSeconds: number | null; taskId?: number | null }) => boolean | void | Promise<boolean | void>;
 }
 
 /**
@@ -79,9 +81,11 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       elapsedSeconds = null,
       baseXp = null,
       xpMultiplier = null,
+      taskXpMultiplier = null,
       levelUps = [],
       isAutoStopped = false,
       showUpgradePrompt = false,
+      taskId = null,
     }: OpenActivityRewardOptions = {}): void => {
       flowDispatch({
         type: "OPEN_ACTIVITY_REWARD",
@@ -90,9 +94,11 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
         elapsedSeconds,
         baseXp,
         xpMultiplier,
+        taskXpMultiplier,
         levelUps,
         isAutoStopped,
         showUpgradePrompt,
+        taskId,
       });
     },
     []
@@ -102,7 +108,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
     flowDispatch({ type: "OPEN_SUPPORT_MODE" });
   }, []);
 
-  const handleConfirmActivity = useCallback(async (activityTextOverride: string | null = null): Promise<void> => {
+  const handleConfirmActivity = useCallback(async (activityTextOverride: string | null = null, taskId?: number | null): Promise<void> => {
     const state = flowStateRef.current;
     if (!state.isOpen) return;
     const { activityText, durationSeconds } = state.ctx;
@@ -110,7 +116,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
       typeof activityTextOverride === "string"
         ? activityTextOverride
         : activityText;
-    const result = await onStartActivity?.({ activityText: finalActivityText, durationSeconds });
+    const result = await onStartActivity?.({ activityText: finalActivityText, durationSeconds, taskId });
     if (result === false) return;
     flowDispatch({ type: "CLOSE" });
   }, [onStartActivity]);

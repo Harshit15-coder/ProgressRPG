@@ -37,6 +37,7 @@ class PlayerSerializer(serializers.ModelSerializer):
     total_activities = serializers.IntegerField(read_only=True)
     achievements = serializers.SerializerMethodField()
     is_premium = serializers.BooleanField(source="user.is_premium", read_only=True)
+    is_tester = serializers.SerializerMethodField()
     has_previous_subscription = serializers.BooleanField(
         source="user.has_previous_subscription", read_only=True
     )
@@ -44,6 +45,9 @@ class PlayerSerializer(serializers.ModelSerializer):
         source="user.current_login_streak", read_only=True
     )
     unseen_tutorial_step_ids = serializers.SerializerMethodField()
+
+    def get_is_tester(self, obj):
+        return obj.user.groups.filter(name="Testers").exists()
 
     def get_unseen_tutorial_step_ids(self, obj):
         seen_ids = set(obj.tutorial_steps_seen.values_list("id", flat=True))
@@ -72,6 +76,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "total_activities",
             "achievements",
             "is_premium",
+            "is_tester",
             "has_previous_subscription",
             "onboarding_step",
             "onboarding_completed",
@@ -88,6 +93,7 @@ class PlayerSerializer(serializers.ModelSerializer):
             "total_activities",
             "achievements",
             "is_premium",
+            "is_tester",
             "has_previous_subscription",
             "login_streak",
             "unseen_tutorial_step_ids",

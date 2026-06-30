@@ -6,6 +6,73 @@
   width: 100%;
 }
 
+.wrapper {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.listScroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+  padding-right: v.$spacing-sm;
+  scrollbar-gutter: stable;
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(c.$color-border-primary, 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(c.$color-border-primary, 0.6);
+    }
+  }
+}
+
+.controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: v.$spacing-sm;
+  margin-bottom: v.$spacing-sm;
+}
+
+.controlGroup {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  flex-wrap: wrap;
+}
+
+.controlLabel {
+  font-size: 0.85em;
+  color: rgba(0, 0, 0, 0.55);
+}
+
+.sortSelect {
+  padding: v.$spacing-xs v.$spacing-sm;
+  border: 1px solid rgba(c.$color-border-primary, 0.35);
+  border-radius: v.$border-radius;
+  background: transparent;
+  font-size: 0.875em;
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+
+  &:focus {
+    outline: none;
+    border-color: c.$color-border-primary;
+  }
+}
+
 .list {
   gap: v.$spacing-sm;
   overflow: visible;
@@ -46,6 +113,49 @@
   cursor: pointer;
 }
 
+.itemContent {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: v.$spacing-sm;
+}
+
+.rowActions {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  flex-shrink: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease;
+}
+
+.item:hover .rowActions,
+.item:focus-within .rowActions {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.editHoverButton {
+  border: none;
+  background: transparent;
+  color: c.$color-border-primary;
+  border-radius: v.$border-radius;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(c.$color-border-primary, 0.1);
+  }
+}
+
 .itemCompleted {
   background: rgba(c.$color-border-primary, 0.03);
   border-color: rgba(c.$color-border-primary, 0.3);
@@ -81,6 +191,16 @@
   gap: v.$spacing-xs;
 }
 
+.itemDetailsButton {
+  border: none;
+  background: transparent;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
+  font: inherit;
+}
+
 .itemName {
   font-weight: 500;
   @include t.apply-text-style(t.$text-body);
@@ -91,7 +211,15 @@
   @include t.apply-text-style(t.$text-caption);
 }
 
+.editTitleRow {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-sm;
+}
+
 .editInput {
+  flex: 1;
+  min-width: 0;
   padding: v.$spacing-xs v.$spacing-sm;
   border: 2px solid rgba(c.$color-status-success, 0.45);
   border-radius: v.$border-radius;
@@ -108,6 +236,7 @@
 .editConfirmContent {
   display: grid;
   gap: v.$spacing-md;
+  width: 100%;
 
   p {
     margin: 0;
@@ -139,6 +268,9 @@
 }
 
 .editConfirmMeta {
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-xs;
   margin: 0;
   color: rgba(0, 0, 0, 0.65);
   @include t.apply-text-style(t.$text-caption);

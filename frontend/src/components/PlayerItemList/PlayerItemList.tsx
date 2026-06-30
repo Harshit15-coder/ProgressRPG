@@ -6,6 +6,18 @@ import List from "../List/List";
 import Modal from "../Modal/Modal";
 import styles from "./PlayerItemList.module.scss";
 
+export interface SortOption<T> {
+  key: string;
+  label: string;
+  compareFn: (a: T, b: T) => number;
+}
+
+export interface FilterOption<T> {
+  key: string;
+  label: string;
+  predicate: (item: T) => boolean;
+}
+
 interface PlayerItemListProps<T extends { id?: string | number; name?: string; [key: string]: unknown }> {
   items?: T[];
   itemLabel?: string;
@@ -18,8 +30,13 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string; [
   renderEditSummary?: (item: T) => React.ReactNode;
   onEdit?: (item: T, name: string) => void;
   onDelete?: (item: T) => void;
+  hoverEdit?: boolean;
+  renderRowActions?: (item: T) => React.ReactNode;
   listClassName?: string;
   sectionClassName?: string;
+  sortOptions?: SortOption<T>[];
+  filterOptions?: FilterOption<T>[];
+  controls?: React.ReactNode;
 }
 
 export default function PlayerItemList<T extends { id?: string | number; name?: string; [key: string]: unknown }>({
@@ -34,10 +51,21 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   renderEditSummary,
   onEdit,
   onDelete,
+  hoverEdit = false,
+  renderRowActions,
   listClassName,
   sectionClassName,
+  sortOptions,
+  filterOptions,
+  controls,
 }: PlayerItemListProps<T>) {
   const [activeItem, setActiveItem] = useState<T | null>(null);
+  const [activeFilterKey, setActiveFilterKey] = useState<string | null>(
+    () => filterOptions?.[0]?.key ?? null,
+  );
+  const [activeSortKey, setActiveSortKey] = useState<string | null>(
+    () => sortOptions?.[0]?.key ?? null,
+  );
   const [editingName, setEditingName] = useState("");
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -45,11 +73,6 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   const canToggleComplete = typeof onToggleComplete === "function";
   const canEdit = typeof onEdit === "function";
   const canDelete = typeof onDelete === "function";
-
-  const activeItemName = activeItem ? getItemName(activeItem) : "";
-  const modalSummary = activeItem
-    ? (renderEditSummary?.(activeItem) ?? renderItemMeta?.(activeItem) ?? null)
-    : null;
 
   const handleOpenItem = useCallback(
     (item: T) => {
@@ -96,10 +119,73 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
     [itemLabelLower],
   );
 
+  const displayItems = useMemo(() => {
+    let result = items;
+    const activeFilter = filterOptions?.find((o) => o.key === activeFilterKey);
+    if (activeFilter) result = result.filter(activeFilter.predicate);
+    const activeSort = sortOptions?.find((o) => o.key === activeSortKey);
+    if (activeSort) result = [...result].sort(activeSort.compareFn);
+    return result;
+  }, [items, filterOptions, activeFilterKey, sortOptions, activeSortKey]);
+
+  // Keep dialog state in sync with the live items array so toggling complete
+  // inside the dialog reflects immediately without closing and reopening it.
+  const liveActiveItem = useMemo(
+    () => activeItem
+      ? (items.find((item) => item.id !== undefined && item.id === activeItem.id) ?? activeItem)
+      : null,
+    [activeItem, items],
+  );
+
+  const activeItemName = liveActiveItem ? getItemName(liveActiveItem) : "";
+  const modalSummary = liveActiveItem
+    ? (renderEditSummary?.(liveActiveItem) ?? renderItemMeta?.(liveActiveItem) ?? null)
+    : null;
+
+  const hasControls = Boolean(filterOptions?.length || sortOptions?.length || controls);
+
   return (
-    <>
+    <div className={styles.wrapper}>
+      {hasControls ? (
+        <div className={styles.controls}>
+          {controls ?? null}
+          {filterOptions?.length ? (
+            <div className={styles.controlGroup} role="group" aria-label={`Filter ${itemLabelLower}s`}>
+              {filterOptions.map((opt) => (
+                <Button
+                  key={opt.key}
+                  variant={activeFilterKey === opt.key ? "primary" : "secondary"}
+                  onClick={() => setActiveFilterKey(opt.key)}
+                >
+                  {opt.label}
+                </Button>
+              ))}
+            </div>
+          ) : null}
+          {sortOptions?.length ? (
+            <div className={styles.controlGroup}>
+              <label className={styles.controlLabel} htmlFor={`${modalIdPrefix}-sort`}>
+                Sort:
+              </label>
+              <select
+                id={`${modalIdPrefix}-sort`}
+                className={styles.sortSelect}
+                value={activeSortKey ?? ""}
+                onChange={(e) => setActiveSortKey(e.target.value)}
+              >
+                {sortOptions.map((opt) => (
+                  <option key={opt.key} value={opt.key}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+      <div className={styles.listScroll}>
       <List
-        items={items}
+        items={displayItems}
         ariaLabel={ariaLabel}
         canHover
         className={classNames(styles.list, listClassName)}
@@ -123,22 +209,61 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
                 />
               </label>
             ) : null}
-            <button
-              type="button"
-              className={styles.itemButton}
-              aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
-              onClick={() => handleOpenItem(item)}
-            >
-              <div className={styles.itemDetails}>
-                <div className={styles.itemName}>{getItemName(item)}</div>
-                {renderItemMeta ? (
-                  <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                ) : null}
+            {hoverEdit ? (
+              <div className={styles.itemContent}>
+                {canEdit ? (
+                  <button
+                    type="button"
+                    className={classNames(styles.itemDetails, styles.itemDetailsButton)}
+                    aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+                    onClick={() => handleOpenItem(item)}
+                  >
+                    <div className={styles.itemName}>{getItemName(item)}</div>
+                    {renderItemMeta ? (
+                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                    ) : null}
+                  </button>
+                ) : (
+                  <div className={styles.itemDetails}>
+                    <div className={styles.itemName}>{getItemName(item)}</div>
+                    {renderItemMeta ? (
+                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                    ) : null}
+                  </div>
+                )}
+                <div className={styles.rowActions}>
+                  {renderRowActions?.(item)}
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      className={styles.editHoverButton}
+                      aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+                      onClick={() => handleOpenItem(item)}
+                    >
+                      📝
+                    </button>
+                  ) : null}
+                </div>
               </div>
-            </button>
+            ) : (
+              <button
+                type="button"
+                className={styles.itemButton}
+                aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
+                onClick={() => handleOpenItem(item)}
+              >
+                <div className={styles.itemDetails}>
+                  <div className={styles.itemName}>{getItemName(item)}</div>
+                  {renderItemMeta ? (
+                    <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+                  ) : null}
+                </div>
+              </button>
+            )}
           </>
         )}
       />
+      </div>
 
       {activeItem ? (
         <Modal
@@ -146,7 +271,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           title={
             confirmingDelete
               ? `Delete ${itemLabelLower}?`
-              : activeItemName || `Edit ${itemLabelLower}`
+              : `Edit ${itemLabelLower}`
           }
           onClose={handleModalClose}
           onBack={confirmingDelete ? () => setConfirmingDelete(false) : undefined}
@@ -169,22 +294,37 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
             </div>
           ) : (
             <div className={styles.editConfirmContent}>
-              {canEdit ? (
-                <input
-                  type="text"
-                  className={styles.editInput}
-                  aria-label={`${itemLabel} name`}
-                  value={editingName}
-                  onChange={(event) => setEditingName(event.target.value)}
-                  autoFocus
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") handleEditSave();
-                    if (event.key === "Escape") handleModalClose();
-                  }}
-                />
+              {(canToggleComplete || canEdit) ? (
+                <div className={styles.editTitleRow}>
+                  {canToggleComplete && liveActiveItem ? (
+                    <label className={styles.completeCheckboxLabel}>
+                      <input
+                        className={styles.completeCheckbox}
+                        type="checkbox"
+                        checked={Boolean(isItemComplete?.(liveActiveItem))}
+                        onChange={() => onToggleComplete!(liveActiveItem)}
+                        aria-label={`Mark ${activeItemName || itemLabelLower} as complete`}
+                      />
+                    </label>
+                  ) : null}
+                  {canEdit ? (
+                    <input
+                      type="text"
+                      className={styles.editInput}
+                      aria-label={`${itemLabel} name`}
+                      value={editingName}
+                      onChange={(event) => setEditingName(event.target.value)}
+                      autoFocus
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") handleEditSave();
+                        if (event.key === "Escape") handleModalClose();
+                      }}
+                    />
+                  ) : null}
+                </div>
               ) : null}
               {modalSummary ? (
-                <p className={styles.editConfirmMeta}>{modalSummary}</p>
+                <div className={styles.editConfirmMeta}>{modalSummary}</div>
               ) : null}
               <div className={styles.editConfirmActions}>
                 {canEdit ? (
@@ -205,6 +345,6 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
           )}
         </Modal>
       ) : null}
-    </>
+    </div>
   );
 }

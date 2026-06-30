@@ -1,7 +1,11 @@
 from django.contrib import admin
 from django.utils.timezone import now
 from .models import FeatureFlag, MaintenanceWindow
+import re
 import subprocess
+from pathlib import Path
+from django import forms
+from django.conf import settings
 from django.shortcuts import redirect
 from django.http import HttpResponseRedirect
 from django.urls import path
@@ -9,6 +13,38 @@ from asgiref.sync import async_to_sync
 import logging
 from gameplay.utils import send_group_message
 from django.utils.html import format_html
+
+_FEATURE_FLAGS_TS = settings.BASE_DIR / "frontend" / "src" / "featureFlags.ts"
+_FLAG_KEY_RE = re.compile(r"^\s{2}(\w+):\s*\[", re.MULTILINE)
+
+_ACCESS_GROUP_CHOICES = [
+    ("all", "All users"),
+    ("premium", "Premium users"),
+    ("testers", "Testers"),
+]
+
+
+def _load_flag_key_choices():
+    try:
+        text = _FEATURE_FLAGS_TS.read_text()
+        keys = _FLAG_KEY_RE.findall(text)
+        return [(k, k) for k in keys]
+    except FileNotFoundError:
+        return []
+
+
+class FeatureFlagForm(forms.ModelForm):
+    key = forms.ChoiceField(choices=_load_flag_key_choices)
+    access_groups = forms.MultipleChoiceField(
+        choices=_ACCESS_GROUP_CHOICES,
+        widget=forms.CheckboxSelectMultiple,
+        required=False,
+    )
+
+    class Meta:
+        model = FeatureFlag
+        fields = "__all__"
+
 
 logger = logging.getLogger("general")
 
@@ -45,9 +81,13 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
         success = window.delete_scheduled_tasks()
 
         if success:
-            self.message_user(request, f"Scheduled tasks deleted for window '{window.name}'.")
+            self.message_user(
+                request, f"Scheduled tasks deleted for window '{window.name}'."
+            )
         else:
-            self.message_user(request, f"No scheduled tasks to delete: no action taken.")
+            self.message_user(
+                request, f"No scheduled tasks to delete: no action taken."
+            )
         return redirect(
             f"/admin/server_management/maintenancewindow/{maintenancewindow_id}/change/"
         )
@@ -138,7 +178,10 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
 
 @admin.register(FeatureFlag)
 class FeatureFlagAdmin(admin.ModelAdmin):
-    list_display = ("key", "access_level", "updated_at")
-    list_filter = ("access_level",)
+    form = FeatureFlagForm
+    list_display = ("key", "get_access_groups_display", "updated_at")
     search_fields = ("key", "description")
-    list_editable = ("access_level",)
+
+    @admin.display(description="Access groups")
+    def get_access_groups_display(self, obj):
+        return ", ".join(obj.access_groups) if obj.access_groups else "—"

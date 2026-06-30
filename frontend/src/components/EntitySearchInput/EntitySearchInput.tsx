@@ -20,7 +20,7 @@ interface SearchEntity {
 }
 
 interface EntitySearchInputProps {
-  type: "activity";
+  type: "activity" | "task";
   value: string;
   onChange?: (value: string) => void;
   onSelect?: (entity: SearchEntity) => void;
@@ -99,7 +99,7 @@ export default function EntitySearchInput({
     [searchableEntities]
   );
 
-  const results = useMemo(() => {
+  const rawResults = useMemo(() => {
     if (!canSearch) return [];
 
     const query = normalizeQuery(debouncedQuery);
@@ -112,7 +112,7 @@ export default function EntitySearchInput({
     const directIncludesMatches: typeof searchableEntities = [];
 
     for (const entity of searchableEntities) {
-      if (entity.nameKey === currentValueKey) continue;
+      if (entity.source !== "task" && entity.nameKey === currentValueKey) continue;
 
       if (entity.nameKey.startsWith(queryKey)) {
         directPrefixMatches.push(entity);
@@ -138,7 +138,7 @@ export default function EntitySearchInput({
     fuse
       .search(query, { limit: MAX_RESULTS })
       .map((result) => result.item)
-      .filter((entity) => entity.nameKey !== currentValueKey)
+      .filter((entity) => entity.source === "task" || entity.nameKey !== currentValueKey)
       .forEach((entity) => {
         const key = entity.nameKey;
         if (!seenNames.has(key)) {
@@ -149,6 +149,15 @@ export default function EntitySearchInput({
 
     return uniqueResults.slice(0, MAX_RESULTS);
   }, [canSearch, debouncedQuery, fuse, normalizedValue, searchableEntities]);
+
+  const results = useMemo(() => {
+    const taskResults = rawResults.filter((r) => r.source === "task");
+    const taskNames = new Set(taskResults.map((r) => r.nameKey));
+    const activityResults = rawResults.filter(
+      (r) => r.source !== "task" && !taskNames.has(r.nameKey ?? "")
+    );
+    return [...taskResults, ...activityResults];
+  }, [rawResults]);
 
   const isDropdownOpen = isFocused && results.length > 0;
 
@@ -249,26 +258,52 @@ export default function EntitySearchInput({
           role="listbox"
           aria-label={`${type} suggestions`}
         >
-          {results.map((entity, index) => {
-            const isHighlighted = index === activeHighlightedIndex;
+          {(() => {
+            const taskItems = results.filter((r) => r.source === "task");
+            const activityItems = results.filter((r) => r.source !== "task");
+            const showGroupLabels = taskItems.length > 0 && activityItems.length > 0;
+
+            const renderItem = (entity: typeof results[number], index: number) => {
+              const isHighlighted = index === activeHighlightedIndex;
+              return (
+                <li key={`${entity.id}-${entity.name}`} className={styles.optionItem}>
+                  <button
+                    type="button"
+                    role="option"
+                    aria-selected={isHighlighted}
+                    className={classNames(styles.optionButton, {
+                      [styles.optionButtonActive]: isHighlighted,
+                    })}
+                    onMouseDown={(event) => event.preventDefault()}
+                    onClick={() => commitSelection(entity)}
+                  >
+                    {entity.name}
+                  </button>
+                </li>
+              );
+            };
 
             return (
-              <li key={`${entity.id}-${entity.name}`} className={styles.optionItem}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={isHighlighted}
-                  className={classNames(styles.optionButton, {
-                    [styles.optionButtonActive]: isHighlighted,
-                  })}
-                  onMouseDown={(event) => event.preventDefault()}
-                  onClick={() => commitSelection(entity)}
-                >
-                  {entity.name}
-                </button>
-              </li>
+              <>
+                {taskItems.length > 0 && (
+                  <>
+                    {showGroupLabels && (
+                      <li role="presentation" className={styles.groupLabel}>Tasks</li>
+                    )}
+                    {taskItems.map((entity) => renderItem(entity, results.indexOf(entity)))}
+                  </>
+                )}
+                {activityItems.length > 0 && (
+                  <>
+                    {showGroupLabels && (
+                      <li role="presentation" className={styles.groupLabel}>Activities</li>
+                    )}
+                    {activityItems.map((entity) => renderItem(entity, results.indexOf(entity)))}
+                  </>
+                )}
+              </>
             );
-          })}
+          })()}
         </ul>
       )}
     </div>

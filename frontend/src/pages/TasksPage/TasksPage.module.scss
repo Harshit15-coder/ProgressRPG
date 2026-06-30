@@ -7,6 +7,12 @@
   @include m.page-layout();
 }
 
+.content {
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
 .header {
   @include lp.list-page-header;
 }
@@ -91,8 +97,45 @@
   }
 }
 
+.taskTimestamps {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: v.$spacing-sm;
+}
+
+.timestampLabel {
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
 .emptyState {
   @include lp.list-page-empty-state;
+}
+
+.filterToggle {
+  align-self: flex-start;
+  font-size: 0.875em;
+  padding: v.$spacing-xs v.$spacing-sm;
+  min-width: 9rem;
+}
+
+.taskPlayButton {
+  border: none;
+  background: transparent;
+  color: c.$color-border-primary;
+  border-radius: v.$border-radius;
+  width: 1.75rem;
+  height: 1.75rem;
+  font-size: 1.25rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+
+  &:hover {
+    background: rgba(c.$color-border-primary, 0.1);
+  }
 }
 
 .addButtonIcon {

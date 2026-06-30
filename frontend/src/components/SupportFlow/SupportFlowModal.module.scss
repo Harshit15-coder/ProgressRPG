@@ -7,6 +7,7 @@
   display: flex;
   flex-direction: column;
   gap: v.$spacing-md;
+  width: 100%;
 }
 
 .readableText {
@@ -82,16 +83,97 @@
   }
 }
 
+.tabBar {
+  display: flex;
+  border-bottom: 1px solid rgba(c.$color-border-primary, 0.25);
+  margin-bottom: v.$spacing-sm;
+}
+
+.tab {
+  padding: v.$spacing-xs v.$spacing-md;
+  border: none;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  background: transparent;
+  font-size: 0.875rem;
+  font-family: inherit;
+  cursor: pointer;
+  color: c.$color-text-muted;
+  transition: color 0.15s ease, border-color 0.15s ease;
+
+  &:hover {
+    color: c.$color-text-body;
+  }
+}
+
+.tabActive {
+  color: c.$color-text-body;
+  border-bottom-color: c.$color-border-primary;
+  font-weight: 500;
+}
+
+.taskPickList {
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-xs;
+  max-height: 220px;
+  overflow-y: auto;
+
+  &::-webkit-scrollbar {
+    width: 6px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(c.$color-border-primary, 0.35);
+    border-radius: 3px;
+  }
+}
+
+.taskPickRow {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-sm;
+  padding: v.$spacing-xs v.$spacing-sm;
+  border: 1px solid rgba(c.$color-border-primary, 0.15);
+  border-radius: v.$border-radius;
+  background: rgba(c.$color-bg, 0.4);
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.taskPickName {
+  flex: 1;
+  min-width: 0;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.taskPickEmpty {
+  text-align: center;
+  padding: v.$spacing-md;
+  color: c.$color-text-muted;
+  font-size: 0.9rem;
+  margin: 0;
+}
+
 .priorityThreeContainer {
   display: flex;
   flex-direction: column;
   gap: v.$spacing-sm;
+  width: 100%;
 }
 
 .priorityRow {
   display: flex;
   align-items: center;
   gap: v.$spacing-sm;
+  width: 100%;
 }
 
 .priorityInput {
@@ -143,8 +225,7 @@
   display: grid;
   gap: v.$spacing-sm;
   margin-bottom: v.$spacing-md;
-  width: min(100%, 58ch);
-  margin-inline: auto;
+  width: 100%;
   padding: v.$spacing-md;
   border: 2px solid rgba(c.$color-border-primary, 0.4);
   border-radius: v.$border-radius;
@@ -185,6 +266,58 @@
   white-space: nowrap;
   font-weight: 700;
   font-size: 1.125rem;
+}
+
+.taskCompletionPanel {
+  width: 100%;
+  margin-bottom: v.$spacing-md;
+  padding: v.$spacing-xs v.$spacing-md;
+  border: 1px solid rgba(c.$color-border-primary, 0.5);
+  border-radius: v.$border-radius;
+  background: rgba(c.$color-bg, 0.45);
+}
+
+.taskCompletionTitle {
+  margin: 0 0 v.$spacing-xs;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+
+.taskCompletionRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$spacing-md;
+}
+
+.taskCompletionTime {
+  margin: 0;
+  color: c.$color-text-muted;
+  font-size: 0.9rem;
+}
+
+.taskCompletionCheck {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  font-size: 0.9rem;
+  color: c.$color-text-muted;
+  cursor: pointer;
+  white-space: nowrap;
+  margin: 0;
+
+  input[type="checkbox"] {
+    cursor: pointer;
+    width: 1rem;
+    height: 1rem;
+  }
+}
+
+.taskCompletionXp {
+  margin: v.$spacing-xs 0 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: c.$color-text-body;
 }
 
 .upgradePanel {
@@ -268,8 +401,7 @@
 }
 
 .actionRow {
-  width: min(100%, 58ch);
-  margin-inline: auto;
+  width: 100%;
   display: grid;
   gap: v.$spacing-md;
 }
