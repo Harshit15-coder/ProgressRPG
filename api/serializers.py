@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from django.conf import settings
 from django.contrib.sites.shortcuts import get_current_site
 from dj_rest_auth.registration.serializers import RegisterSerializer
+from dj_rest_auth.serializers import PasswordResetSerializer
 from rest_framework import serializers
 from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
@@ -173,6 +174,19 @@ class WaitlistSignupRequestSerializer(serializers.Serializer):
 class WaitlistSignupResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
     state = serializers.ChoiceField(choices=["pending", "subscribed"])
+
+
+def _frontend_password_reset_url(request, user, temp_key):
+    from allauth.account.utils import user_pk_to_url_str
+
+    uid = user_pk_to_url_str(user)
+    frontend_url = getattr(settings, "FRONTEND_URL", "http://localhost:5173")
+    return f"{frontend_url}/reset-password/{uid}-{temp_key}"
+
+
+class CustomPasswordResetSerializer(PasswordResetSerializer):
+    def get_email_options(self):
+        return {"url_generator": _frontend_password_reset_url}
 
 
 def _verify_turnstile(token: str) -> bool:
