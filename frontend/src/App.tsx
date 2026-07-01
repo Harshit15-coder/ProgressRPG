@@ -48,13 +48,15 @@ function AppWithAuth(): React.ReactElement {
 
   return (
     <GameProvider>
-      <WebSocketProvider>
-        <BrowserRouter>
-          <RouteChangeTracker />
-          <MaintenanceWatcher />
-          <AppContent />
-        </BrowserRouter>
-      </WebSocketProvider>
+      <ToastProvider>
+        <WebSocketProvider>
+          <BrowserRouter>
+            <RouteChangeTracker />
+            <MaintenanceWatcher />
+            <AppContent />
+          </BrowserRouter>
+        </WebSocketProvider>
+      </ToastProvider>
     </GameProvider>
   );
 }
@@ -66,13 +68,11 @@ function App(): React.ReactElement {
 
   return (
     <MaintenanceProvider>
-      <ToastProvider>
-        <TooltipProvider>
-          <AuthProvider>
-            <AppWithAuth />
-          </AuthProvider>
-        </TooltipProvider>
-      </ToastProvider>
+      <TooltipProvider>
+        <AuthProvider>
+          <AppWithAuth />
+        </AuthProvider>
+      </TooltipProvider>
     </MaintenanceProvider>
   );
 }

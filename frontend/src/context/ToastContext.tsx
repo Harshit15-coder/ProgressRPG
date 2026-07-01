@@ -1,9 +1,10 @@
 // context/ToastContext.tsx
 
-import { createContext, useContext } from 'react';
+import { createContext } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import * as RadixToast from '@radix-ui/react-toast';
 import { useToasts } from '../hooks/useToasts';
+import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import ToastManager from '../components/Toast/ToastManager';
 
 // ---------------------------------------------------------------------------
@@ -29,7 +30,7 @@ interface ProviderProps {
 // Context
 // ---------------------------------------------------------------------------
 
-const ToastContext = createContext<ToastContextValue | null>(null);
+export const ToastContext = createContext<ToastContextValue | null>(null);
 
 // ---------------------------------------------------------------------------
 // Provider
@@ -37,22 +38,14 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 
 export function ToastProvider({ children, duration = 3300 }: ProviderProps): ReactElement {
   const { toasts, showToast, dismissToast } = useToasts();
+  const toastsEnabled = useFeatureFlag('toastsFeature');
 
   return (
     <RadixToast.Provider duration={duration}>
       <ToastContext.Provider value={{ toasts, showToast }}>
         {children}
-        <ToastManager messages={toasts} onDismiss={dismissToast} />
+        {toastsEnabled && <ToastManager messages={toasts} onDismiss={dismissToast} />}
       </ToastContext.Provider>
     </RadixToast.Provider>
   );
-}
-
-// eslint-disable-next-line react-refresh/only-export-components
-export function useToast(): ToastContextValue {
-  const context = useContext(ToastContext);
-  if (!context) {
-    throw new Error('useToast must be used within a ToastProvider');
-  }
-  return context;
 }
