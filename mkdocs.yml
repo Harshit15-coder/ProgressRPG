@@ -12,11 +12,11 @@ theme:
     - content.code.copy
 
 nav:
-  - Home: docs/internal/index.md
-  - Backend Structure: docs/internal/backend-structure.md
-  - Environment & Configuration: docs/internal/environment-and-configuration.md
-  - Deployment Runbook: docs/internal/deployment-runbook.md
-  - Architectural Decisions: docs/internal/architectural-decisions.md
+  - Home: index.md
+  - Backend Structure: internal/backend-structure.md
+  - Environment & Configuration: internal/environment-and-configuration.md
+  - Deployment Runbook: internal/deployment-runbook.md
+  - Architectural Decisions: internal/architectural-decisions.md
 
 markdown_extensions:
   - admonition
