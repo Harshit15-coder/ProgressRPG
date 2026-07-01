@@ -54,11 +54,16 @@ function withSettledTimerBootstrap(payload: unknown): unknown {
     return payload;
   }
 
+  const stoppedTimer = isJsonRecord(payload.activity_timer)
+    ? { ...payload.activity_timer, status: 'none' }
+    : payload.activity_timer;
+
   return {
     ...payload,
     player: isJsonRecord(payload.player)
       ? withSettledPlayerState(payload.player)
       : payload.player,
+    activity_timer: stoppedTimer,
     login_state: 'none',
     loginState: 'none',
     login_event_at: null,
@@ -67,6 +72,36 @@ function withSettledTimerBootstrap(payload: unknown): unknown {
     loginRewardXp: 0,
     login_streak: 0,
     loginStreak: 0,
+  };
+}
+
+function withStableAppConfig(payload: unknown): unknown {
+  if (!isJsonRecord(payload)) {
+    return payload;
+  }
+
+  const rawFeatureFlags = isJsonRecord(payload.feature_flags)
+    ? payload.feature_flags
+    : {};
+
+  return {
+    ...payload,
+    stripe_live_mode:
+      typeof payload.stripe_live_mode === 'boolean'
+        ? payload.stripe_live_mode
+        : false,
+    trial_period_days:
+      typeof payload.trial_period_days === 'number'
+        ? payload.trial_period_days
+        : 14,
+    feature_flags: {
+      ...rawFeatureFlags,
+      tasksFeature: ['all'],
+      projectsPage: ['all'],
+      categoriesPage: ['all'],
+      skillsPage: ['all'],
+      activityList: ['all'],
+    },
   };
 }
 
@@ -87,17 +122,26 @@ export async function stabilizeAuthenticatedPlayer(page: Page) {
         return payload;
       }
 
+      const stoppedTimer = isJsonRecord(payload.activity_timer)
+        ? { ...payload.activity_timer, status: 'none' }
+        : payload.activity_timer;
+
       return {
         ...payload,
         player: isJsonRecord(payload.player)
           ? withSettledPlayerState(payload.player)
           : payload.player,
+        activity_timer: stoppedTimer,
       };
     });
   });
 
   await page.route('**/me/player/', async (route) => {
     await fulfillPatchedRoute(route, withSettledPlayerState);
+  });
+
+  await page.route('**/app_config/', async (route) => {
+    await fulfillPatchedRoute(route, withStableAppConfig);
   });
 }
 
@@ -108,6 +152,10 @@ export async function stabilizeTimerPage(page: Page) {
 
   await page.route('**/me/player/', async (route) => {
     await fulfillPatchedRoute(route, withSettledPlayerState);
+  });
+
+  await page.route('**/app_config/', async (route) => {
+    await fulfillPatchedRoute(route, withStableAppConfig);
   });
 }
 
