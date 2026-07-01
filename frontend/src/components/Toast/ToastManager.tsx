@@ -1,6 +1,6 @@
 import * as Toast from '@radix-ui/react-toast';
 import styles from './Toast.module.scss';
-import type { Toast as ToastMessage } from '../../context/ToastContext';
+import type { Toast as ToastMessage } from '../../context/toastContextDef';
 
 interface ToastManagerProps {
   messages: ToastMessage[];

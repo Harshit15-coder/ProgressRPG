@@ -1,43 +1,28 @@
-// context/ToastContext.tsx
-
-import { createContext } from 'react';
+import { useState, useCallback } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 import * as RadixToast from '@radix-ui/react-toast';
-import { useToasts } from '../hooks/useToasts';
+import { v4 as uuidv4 } from 'uuid';
+import { ToastContext } from './toastContextDef';
+import type { Toast } from './toastContextDef';
 import { useFeatureFlag } from '../hooks/useFeatureFlag';
 import ToastManager from '../components/Toast/ToastManager';
-
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
-export interface Toast {
-  id: string;
-  message: string;
-}
-
-export interface ToastContextValue {
-  toasts: Toast[];
-  showToast: (message: string) => void;
-}
 
 interface ProviderProps {
   children: ReactNode;
   duration?: number;
 }
 
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
-export const ToastContext = createContext<ToastContextValue | null>(null);
-
-// ---------------------------------------------------------------------------
-// Provider
-// ---------------------------------------------------------------------------
-
 export function ToastProvider({ children, duration = 3300 }: ProviderProps): ReactElement {
-  const { toasts, showToast, dismissToast } = useToasts();
+  const [toasts, setToasts] = useState<Toast[]>([]);
+
+  const showToast = useCallback((message: string): void => {
+    setToasts((prev) => [...prev, { id: uuidv4(), message: String(message) }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string): void => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   const toastsEnabled = useFeatureFlag('toastsFeature');
 
   return (
