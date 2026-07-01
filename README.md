@@ -65,6 +65,28 @@ Some features may be intentionally simplified or handled in “concierge” ways
 
 ---
 
+## 📚 Internal Backend Docs
+
+Lightweight internal Django backend documentation is available via MkDocs.
+
+- Config file: `mkdocs.yml`
+- Docs index: `docs/internal/index.md`
+
+Run locally:
+
+```bash
+pip install -r requirements-docs.txt
+mkdocs serve
+```
+
+Build static site:
+
+```bash
+mkdocs build
+```
+
+---
+
 ## 🤝 Contributing
 
 This project is evolving quickly and prioritises:
