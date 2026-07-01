@@ -14,7 +14,6 @@ export interface SearchEntity {
   nameKey?: string;
   taskId?: number | null;
   source?: string;
-  [key: string]: unknown;
 }
 
 interface UseEntitySearchInputProps {

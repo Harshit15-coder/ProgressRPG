@@ -14,7 +14,6 @@ interface SelectedEntity {
   id?: number | string | null;
   taskId?: number | null;
   source?: string;
-  [key: string]: unknown;
 }
 
 function resolveSelectedTaskId(entity: SelectedEntity): number | null {
