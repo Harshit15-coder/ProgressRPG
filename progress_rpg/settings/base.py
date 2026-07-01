@@ -162,6 +162,10 @@ REST_AUTH_REGISTER_SERIALIZERS = {
     "REGISTER_SERIALIZER": "api.serializers.CustomRegisterSerializer",
 }
 
+REST_AUTH = {
+    "PASSWORD_RESET_SERIALIZER": "api.serializers.CustomPasswordResetSerializer",
+}
+
 SPECTACULAR_SETTINGS = {
     "TITLE": "Progress RPG API",
     "DESCRIPTION": "API documentation for Progress RPG, an ADHD-focused productivity game.",
@@ -200,6 +204,7 @@ AUTHENTICATION_BACKENDS = [
 
 
 ACCOUNT_ADAPTER = "users.adapters.CustomAccountAdapter"
+ACCOUNT_EMAIL_SUBJECT_PREFIX = ""
 AUTH_USER_MODEL = "users.CustomUser"
 ACCOUNT_USER_MODEL_USERNAME_FIELD = None
 ACCOUNT_LOGIN_METHODS = {"email"}
