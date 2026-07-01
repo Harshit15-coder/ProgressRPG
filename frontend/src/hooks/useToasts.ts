@@ -3,17 +3,17 @@ import { useState, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import type { Toast } from '../context/ToastContext';
 
-export function useToasts(duration = 3300) {
+export function useToasts() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const showToast = useCallback((message: string): void => {
     const id = uuidv4();
     setToasts((prev) => [...prev, { id, message: String(message) }]);
+  }, []);
 
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((toast) => toast.id !== id));
-    }, duration);
-  }, [duration]);
+  const dismissToast = useCallback((id: string): void => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
+  }, []);
 
-  return { toasts, showToast };
+  return { toasts, showToast, dismissToast };
 }

@@ -1,4 +1,5 @@
 import React, { useRef, useState, useEffect } from "react";
+import * as Progress from "@radix-ui/react-progress";
 import styles from "./ProgressBar.module.scss";
 import type { TimerStatus } from "../../types";
 
@@ -60,17 +61,23 @@ const ProgressBar = ({
         <span className={styles.labelOutside}>{label}</span>
       )}
 
-      <div className={styles.progressTrack}>
+      <Progress.Root
+        className={styles.progressTrack}
+        value={Math.min(value, max)}
+        max={max}
+        aria-label={label || undefined}
+      >
         <div
           ref={fillRef}
           className={progressClass}
           style={{ width: `${percent}%` }}
+          aria-hidden="true"
         >
           {label && showInsideLabel && (
             <span className={styles.labelInside}>{label}</span>
           )}
         </div>
-      </div>
+      </Progress.Root>
     </div>
   );
 };

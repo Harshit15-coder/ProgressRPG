@@ -3,6 +3,23 @@ import { render, screen } from '@testing-library/react';
 import ProgressBar from './ProgressBar';
 
 describe('ProgressBar', () => {
+  it('renders with role="progressbar" and correct aria-value attributes', () => {
+    render(<ProgressBar value={50} max={200} />);
+
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toBeInTheDocument();
+    expect(bar).toHaveAttribute('aria-valuenow', '50');
+    expect(bar).toHaveAttribute('aria-valuemin', '0');
+    expect(bar).toHaveAttribute('aria-valuemax', '200');
+  });
+
+  it('exposes label as aria-label on the progressbar', () => {
+    render(<ProgressBar value={50} max={100} label="50/100 XP" />);
+
+    const bar = screen.getByRole('progressbar', { name: '50/100 XP' });
+    expect(bar).toBeInTheDocument();
+  });
+
   it('renders progress bar with default values', () => {
     const { container } = render(<ProgressBar />);
 

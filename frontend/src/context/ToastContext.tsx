@@ -2,9 +2,9 @@
 
 import { createContext, useContext } from 'react';
 import type { ReactElement, ReactNode } from 'react';
+import * as RadixToast from '@radix-ui/react-toast';
 import { useToasts } from '../hooks/useToasts';
-// ToastManager is temporarily deactivated
-// import ToastManager from '../components/Toast/ToastManager';
+import ToastManager from '../components/Toast/ToastManager';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -35,14 +35,16 @@ const ToastContext = createContext<ToastContextValue | null>(null);
 // Provider
 // ---------------------------------------------------------------------------
 
-export function ToastProvider({ children, duration }: ProviderProps): ReactElement {
-  const { toasts, showToast } = useToasts(duration);
+export function ToastProvider({ children, duration = 3300 }: ProviderProps): ReactElement {
+  const { toasts, showToast, dismissToast } = useToasts();
 
   return (
-    <ToastContext.Provider value={{ toasts, showToast }}>
-      {children}
-      {/* <ToastManager messages={toasts} /> */}
-    </ToastContext.Provider>
+    <RadixToast.Provider duration={duration}>
+      <ToastContext.Provider value={{ toasts, showToast }}>
+        {children}
+        <ToastManager messages={toasts} onDismiss={dismissToast} />
+      </ToastContext.Provider>
+    </RadixToast.Provider>
   );
 }
 
