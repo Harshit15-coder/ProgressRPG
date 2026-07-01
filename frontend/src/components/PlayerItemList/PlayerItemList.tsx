@@ -1,9 +1,11 @@
-import React, { useCallback, useMemo, useState } from "react";
+import React from "react";
 import classNames from "classnames";
 
 import Button from "../Button/Button";
 import List from "../List/List";
 import Modal from "../Modal/Modal";
+import { usePlayerItemListControls } from "./usePlayerItemListControls";
+import { usePlayerItemModal } from "./usePlayerItemModal";
 import styles from "./PlayerItemList.module.scss";
 
 export interface SortOption<T> {
@@ -59,90 +61,49 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   filterOptions,
   controls,
 }: PlayerItemListProps<T>) {
-  const [activeItem, setActiveItem] = useState<T | null>(null);
-  const [activeFilterKey, setActiveFilterKey] = useState<string | null>(
-    () => filterOptions?.[0]?.key ?? null,
-  );
-  const [activeSortKey, setActiveSortKey] = useState<string | null>(
-    () => sortOptions?.[0]?.key ?? null,
-  );
-  const [editingName, setEditingName] = useState("");
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
+  const {
+    activeFilterKey,
+    setActiveFilterKey,
+    activeSortKey,
+    setActiveSortKey,
+    itemLabelLower,
+    modalIdPrefix,
+    displayItems,
+    hasControls,
+  } = usePlayerItemListControls({
+    items,
+    itemLabel,
+    filterOptions,
+    sortOptions,
+    controls,
+  });
 
-  const itemLabelLower = itemLabel.toLowerCase();
+  const {
+    activeItem,
+    liveActiveItem,
+    editingName,
+    confirmingDelete,
+    activeItemName,
+    modalSummary,
+    setEditingName,
+    setConfirmingDelete,
+    handleOpenItem,
+    handleModalClose,
+    handleEditSave,
+    handleDeleteRequest,
+    handleDeleteConfirm,
+  } = usePlayerItemModal({
+    items,
+    getItemName,
+    renderItemMeta,
+    renderEditSummary,
+    onEdit,
+    onDelete,
+  });
+
   const canToggleComplete = typeof onToggleComplete === "function";
   const canEdit = typeof onEdit === "function";
   const canDelete = typeof onDelete === "function";
-
-  const handleOpenItem = useCallback(
-    (item: T) => {
-      setActiveItem(item);
-      setEditingName(getItemName(item));
-    },
-    [getItemName],
-  );
-
-  const handleModalClose = useCallback(() => {
-    setActiveItem(null);
-    setEditingName("");
-    setConfirmingDelete(false);
-  }, []);
-
-  const handleEditSave = useCallback(() => {
-    if (!activeItem || !canEdit) {
-      return;
-    }
-
-    const trimmedName = editingName.trim();
-    if (!trimmedName) {
-      return;
-    }
-
-    onEdit!(activeItem, trimmedName);
-    handleModalClose();
-  }, [activeItem, canEdit, editingName, handleModalClose, onEdit]);
-
-  const handleDeleteRequest = useCallback(() => {
-    setConfirmingDelete(true);
-  }, []);
-
-  const handleDeleteConfirm = useCallback(() => {
-    if (!activeItem || !canDelete) {
-      return;
-    }
-    onDelete!(activeItem);
-    handleModalClose();
-  }, [activeItem, canDelete, handleModalClose, onDelete]);
-
-  const modalIdPrefix = useMemo(
-    () => itemLabelLower.replace(/\s+/g, "-"),
-    [itemLabelLower],
-  );
-
-  const displayItems = useMemo(() => {
-    let result = items;
-    const activeFilter = filterOptions?.find((o) => o.key === activeFilterKey);
-    if (activeFilter) result = result.filter(activeFilter.predicate);
-    const activeSort = sortOptions?.find((o) => o.key === activeSortKey);
-    if (activeSort) result = [...result].sort(activeSort.compareFn);
-    return result;
-  }, [items, filterOptions, activeFilterKey, sortOptions, activeSortKey]);
-
-  // Keep dialog state in sync with the live items array so toggling complete
-  // inside the dialog reflects immediately without closing and reopening it.
-  const liveActiveItem = useMemo(
-    () => activeItem
-      ? (items.find((item) => item.id !== undefined && item.id === activeItem.id) ?? activeItem)
-      : null,
-    [activeItem, items],
-  );
-
-  const activeItemName = liveActiveItem ? getItemName(liveActiveItem) : "";
-  const modalSummary = liveActiveItem
-    ? (renderEditSummary?.(liveActiveItem) ?? renderItemMeta?.(liveActiveItem) ?? null)
-    : null;
-
-  const hasControls = Boolean(filterOptions?.length || sortOptions?.length || controls);
 
   return (
     <div className={styles.wrapper}>

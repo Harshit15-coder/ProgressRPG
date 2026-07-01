@@ -1,108 +1,43 @@
-import React, { useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { useGame } from "../../context/GameContext";
-import { useMutation } from "@tanstack/react-query";
-import { updatePlayer, downloadUserData, deleteAccount } from "../../api/player";
+import React from "react";
+
 import Achievements from "../../components/Achievements/Achievements";
 import Button from "../../components/Button/Button";
 import {
   PLAYER_NAME_MAX_LENGTH,
-  getPlayerNameErrorMessage,
-  getPlayerNameValidation,
 } from "../../utils/playerNameValidation";
-import { useAppConfig } from "../../hooks/useAppConfig";
+import { useAccountPage } from "./useAccountPage";
 import styles from "./Account.module.scss";
 
 export default function Account(): React.ReactElement {
-  const { player, loading, fetchPlayerAndCharacter } = useGame();
-  const { data: appConfig } = useAppConfig();
-  const billingPortalUrl = appConfig?.stripe_billing_portal_url;
-  const navigate = useNavigate();
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [deleteConfirmText, setDeleteConfirmText] = useState("");
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [draftName, setDraftName] = useState("");
-  const [nameError, setNameError] = useState("");
-
-  const nameValidation = useMemo(
-    () => getPlayerNameValidation(draftName),
-    [draftName]
-  );
-
-  const downloadUserDataMutation = useMutation({
-    mutationFn: downloadUserData,
-  });
-
-  const updateNameMutation = useMutation({
-    mutationFn: updatePlayer,
-    onSuccess: async () => {
-      setNameError("");
-      setIsEditingName(false);
-      await fetchPlayerAndCharacter();
-    },
-    onError: (error) => {
-      setNameError(getPlayerNameErrorMessage(error));
-    },
-  });
-
-  const deleteAccountMutation = useMutation({
-    mutationFn: deleteAccount,
-    onSuccess: () => {
-      localStorage.clear();
-      sessionStorage.clear();
-      navigate("/");
-    },
-  });
-
-  const currentXp = player?.xp ?? 0;
-  const nextLevelXp = player?.xp_next_level ?? 0;
-  const totalTimeSeconds = player?.total_time ?? 0;
-  const totalHours = Math.floor(totalTimeSeconds / 3600);
-  const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60);
-  const achievements = Array.isArray(player?.achievements)
-    ? player.achievements
-    : [];
-  const nameDisplay = loading
-    ? "Loading..."
-    : (player?.name?.trim() || "Unnamed player");
-  const currentPlayerName = player?.name?.trim() || "";
-  const accountType = player?.is_premium ? "Premium" : "Free";
-  const isSaveDisabled = (
-    updateNameMutation.isPending
-    || !nameValidation.isValid
-    || nameValidation.normalized === currentPlayerName
-  );
-
-  const handleDownloadData = () => {
-    downloadUserDataMutation.mutate();
-  };
-
-  const handleDeleteAccount = () => {
-    if (deleteConfirmText === "DELETE") {
-      deleteAccountMutation.mutate();
-    }
-  };
-
-  const handleStartEditingName = () => {
-    setDraftName(currentPlayerName);
-    setNameError("");
-    setIsEditingName(true);
-  };
-
-  const handleCancelEditingName = () => {
-    setDraftName(currentPlayerName);
-    setNameError("");
-    setIsEditingName(false);
-  };
-
-  const handleSaveName = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (isSaveDisabled) {
-      return;
-    }
-
-    updateNameMutation.mutate({ name: nameValidation.normalized });
-  };
+  const {
+    player,
+    billingPortalUrl,
+    currentXp,
+    nextLevelXp,
+    totalHours,
+    totalMinutes,
+    achievements,
+    nameDisplay,
+    isEditingName,
+    draftName,
+    nameError,
+    nameValidation,
+    updateNameMutation,
+    isSaveDisabled,
+    handleStartEditingName,
+    handleCancelEditingName,
+    handleDraftNameChange,
+    handleSaveName,
+    downloadUserDataMutation,
+    handleDownloadData,
+    showDeleteConfirm,
+    deleteConfirmText,
+    deleteAccountMutation,
+    openDeleteConfirm,
+    closeDeleteConfirm,
+    handleDeleteConfirmTextChange,
+    handleDeleteAccount,
+  } = useAccountPage();
 
   return (
     <div className={styles.page}>
@@ -130,12 +65,7 @@ export default function Account(): React.ReactElement {
                   <input
                     type="text"
                     value={draftName}
-                    onChange={(event) => {
-                      setDraftName(event.target.value);
-                      if (nameError) {
-                        setNameError("");
-                      }
-                    }}
+                    onChange={(event) => handleDraftNameChange(event.target.value)}
                     className={styles.input}
                     placeholder="Enter your name"
                     maxLength={PLAYER_NAME_MAX_LENGTH}
@@ -280,7 +210,7 @@ export default function Account(): React.ReactElement {
 
           {!showDeleteConfirm ? (
             <Button
-              onClick={() => setShowDeleteConfirm(true)}
+              onClick={openDeleteConfirm}
               variant="danger"
             >
               Delete My Account
@@ -293,7 +223,7 @@ export default function Account(): React.ReactElement {
               <input
                 type="text"
                 value={deleteConfirmText}
-                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                onChange={(e) => handleDeleteConfirmTextChange(e.target.value)}
                 className={styles.input}
                 placeholder="Type DELETE to confirm"
               />
@@ -306,10 +236,7 @@ export default function Account(): React.ReactElement {
                   {deleteAccountMutation.isPending ? "Deleting..." : "Confirm Delete"}
                 </Button>
                 <Button
-                  onClick={() => {
-                    setShowDeleteConfirm(false);
-                    setDeleteConfirmText("");
-                  }}
+                  onClick={closeDeleteConfirm}
                   variant="secondary"
                 >
                   Cancel
