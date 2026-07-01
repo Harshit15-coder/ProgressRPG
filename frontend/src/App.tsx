@@ -7,6 +7,7 @@ import { BrowserRouter, useLocation } from 'react-router-dom';
 import { WebSocketProvider } from './context/WebSocketContext';
 
 import MaintenanceWatcher from './components/MaintenanceWatcher';
+import { TooltipProvider } from './components/Tooltip/Tooltip';
 import AppContent from "./AppContent";
 
 import { initGA, logPageView } from './utils/analytics';
@@ -47,13 +48,15 @@ function AppWithAuth(): React.ReactElement {
 
   return (
     <GameProvider>
-      <WebSocketProvider>
-        <BrowserRouter>
-          <RouteChangeTracker />
-          <MaintenanceWatcher />
-          <AppContent />
-        </BrowserRouter>
-      </WebSocketProvider>
+      <ToastProvider>
+        <WebSocketProvider>
+          <BrowserRouter>
+            <RouteChangeTracker />
+            <MaintenanceWatcher />
+            <AppContent />
+          </BrowserRouter>
+        </WebSocketProvider>
+      </ToastProvider>
     </GameProvider>
   );
 }
@@ -65,11 +68,11 @@ function App(): React.ReactElement {
 
   return (
     <MaintenanceProvider>
-      <ToastProvider>
+      <TooltipProvider>
         <AuthProvider>
           <AppWithAuth />
         </AuthProvider>
-      </ToastProvider>
+      </TooltipProvider>
     </MaintenanceProvider>
   );
 }

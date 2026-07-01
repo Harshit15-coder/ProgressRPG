@@ -4,7 +4,7 @@
 @use '../../styles/semantic/colors' as c;
 
 
-.toastContainer {
+.toastViewport {
   position: fixed;
   top: 33vh;
   left: 50%;
@@ -16,6 +16,11 @@
   align-items: center;
   gap: v.$spacing-gap;
   width: min(96vw, 720px);
+  /* Required by Radix to be a list */
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  outline: none;
 }
 
 .toast {
@@ -26,7 +31,7 @@
   /* Base look */
   background: rgba(c.$color-bg, 1);
   border-radius: v.$border-radius;
-  padding: 0; /* inner handles padding */
+  padding: 0;
   overflow: hidden;
 
   /* Accent rail + subtle outline */
@@ -35,13 +40,19 @@
     0 10px 20px rgba(0, 0, 0, 0.22),
     0 2px 8px rgba(0, 0, 0, 0.20);
 
-  /* keep your existing timing */
-  opacity: 0;
-  transform: translateY(-(v.$spacing-sm));
-  animation: fadeInUp 0.25s ease forwards, fadeOut 0.25s ease 3s forwards;
+  &[data-state='open'] {
+    animation: fadeInUp 0.25s ease forwards;
+  }
 
+  &[data-state='closed'] {
+    animation: fadeOut 0.25s ease forwards;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none !important;
+    opacity: 1;
+  }
 }
-
 
 .inner {
   display: grid;
@@ -62,28 +73,21 @@
   @include t.apply-text-style(t.$text-body);
 }
 
-.title {
-  @include t.apply-text-style(t.$text-button);
-  margin-bottom: 2px;
-}
-
 .message {
   opacity: 0.95;
   @include t.apply-text-style(t.$text-body);
 }
 
-/* Optional icon slot (kept subtle if you don't set it) */
+/* Optional icon slot */
 .icon {
-  display: none; /* enable later if you actually render an icon */
+  display: none;
 }
 
-/* Types (map to your semantic colours) */
-.info    { --toast-accent: c.$color-status-info; }
-.success { --toast-accent: c.$color-status-success; }
-.warning { --toast-accent: c.$color-status-warning; }
-.error   { --toast-accent: c.$color-status-danger; }
-
 @keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(-(v.$spacing-sm));
+  }
   to {
     opacity: 1;
     transform: translateY(0);
@@ -91,6 +95,10 @@
 }
 
 @keyframes fadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
   to {
     opacity: 0;
     transform: translateY(-(v.$spacing-sm));

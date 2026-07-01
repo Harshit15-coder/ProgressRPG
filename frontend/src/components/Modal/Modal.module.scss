@@ -10,13 +10,16 @@
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.5);
-  display: flex;
-  justify-content: center;
-  align-items: center;
   z-index: v.$z-index-modal;
 }
 
 .modal {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: v.$z-index-modal;
+
   display: flex;
   flex-direction: column;
   background: c.$color-bg;

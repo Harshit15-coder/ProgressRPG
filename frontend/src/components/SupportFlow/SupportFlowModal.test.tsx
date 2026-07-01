@@ -8,10 +8,25 @@ import SupportFlowModal from "./SupportFlowModal";
 import type { FlowState } from "./SupportFlowModal";
 import { supportFlowReducer } from "./supportFlowReducer";
 
+const mockUseGame = vi.fn();
+
 vi.mock("../../hooks/useTasks", () => ({
   useTasks: () => ({ data: [] }),
   useUpdateTask: () => ({ mutate: vi.fn() }),
 }));
+
+vi.mock("../../hooks/useFeatureFlag", () => ({
+  useFeatureFlag: () => false,
+}));
+
+vi.mock("../../context/GameContext", () => ({
+  useGame: () => mockUseGame(),
+}));
+
+mockUseGame.mockReturnValue({
+  player: { is_premium: false, is_tester: false },
+  fetchPlayerAndCharacter: vi.fn(),
+});
 
 type FlowAction = { type: string; [key: string]: unknown };
 
@@ -134,7 +149,7 @@ describe("SupportFlowModal", () => {
     await user.click(screen.getByRole("button", { name: "Open" }));
     expect(screen.getByText("How are you feeling?")).toBeInTheDocument();
     expect(
-      screen.getByRole("button", { name: "I'm ready to start" })
+      screen.getByRole("button", { name: "Ready for next step" })
     ).toBeInTheDocument();
   });
 
@@ -184,7 +199,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     expect(screen.getByText("Choose an activity")).toBeInTheDocument();
     expect(
       screen.getByText(
@@ -211,7 +226,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(screen.getByRole("button", { name: "Help me choose a task" }));
     expect(screen.getByText("Describe your activity")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Back" }));
@@ -223,7 +238,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );
@@ -242,7 +257,7 @@ describe("SupportFlowModal", () => {
     );
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Write down the tiniest first step" })
     );
@@ -305,7 +320,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );
@@ -321,7 +336,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );
@@ -345,14 +360,14 @@ describe("SupportFlowModal", () => {
     );
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );
     await user.type(screen.getByRole("textbox", { name: "Task option 2" }), "Send project update");
     await user.click(screen.getAllByRole("button", { name: "Start this" })[1]);
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledWith("Send project update");
+    expect(onConfirm).toHaveBeenCalledWith("Send project update", undefined);
   });
 
   it("priority-three randomise starts one of filled tasks", async () => {
@@ -365,7 +380,7 @@ describe("SupportFlowModal", () => {
     );
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );
@@ -379,7 +394,7 @@ describe("SupportFlowModal", () => {
 
     await user.click(randomizeButton);
     expect(onConfirm).toHaveBeenCalledTimes(1);
-    expect(onConfirm).toHaveBeenCalledWith("Review PR");
+    expect(onConfirm).toHaveBeenCalledWith("Review PR", undefined);
 
     randomSpy.mockRestore();
   });
@@ -389,7 +404,7 @@ describe("SupportFlowModal", () => {
     render(<Fixture initialEvent="OPEN_WELCOME_MESSAGE" />);
     await user.click(screen.getByRole("button", { name: "Open" }));
     await user.click(screen.getByRole("button", { name: "Get support" }));
-    await user.click(screen.getByRole("button", { name: "I'm ready to start" }));
+    await user.click(screen.getByRole("button", { name: "Ready for next step" }));
     await user.click(
       screen.getByRole("button", { name: "Help me choose a task" })
     );

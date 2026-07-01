@@ -65,11 +65,14 @@ test.describe('Tasks core loop', () => {
       await expect(checkbox).toBeVisible({ timeout: 10000 });
 
       // Completing the task hides it under the default "hide complete" filter.
+      // Use click() rather than check() because the task disappears from the DOM
+      // immediately after completion (hideCompleted=true), so Playwright can't
+      // verify the checked state before the element is removed.
       await Promise.all([
         page.waitForResponse(
           (r) => r.url().includes('/tasks/') && r.request().method() === 'PATCH',
         ),
-        checkbox.check(),
+        checkbox.click(),
       ]);
       await expect(
         page.getByRole('checkbox', { name: `Mark ${taskName} as complete` }),
