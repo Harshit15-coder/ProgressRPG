@@ -5,16 +5,16 @@ import { TEST_EMAIL, TEST_PASSWORD } from '../../playwright/testUser';
 test.describe('Login flow', () => {
   test('valid credentials redirect to timer or onboarding', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[name="email"]', TEST_EMAIL);
-    await page.fill('input[name="password"]', TEST_PASSWORD);
+    await page.fill('#email', TEST_EMAIL);
+    await page.fill('#password', TEST_PASSWORD);
     await page.getByRole('button', { name: 'Log In', exact: true }).click();
     await page.waitForURL(/\/(timer|onboarding)/);
   });
 
   test('invalid credentials show error message', async ({ page }) => {
     await page.goto('/login');
-    await page.fill('input[name="email"]', TEST_EMAIL);
-    await page.fill('input[name="password"]', 'wrongpassword');
+    await page.fill('#email', TEST_EMAIL);
+    await page.fill('#password', 'wrongpassword');
     await page.getByRole('button', { name: 'Log In', exact: true }).click();
     await expect(page.getByRole('alert')).toBeVisible();
     await expect(page).toHaveURL(/\/login/);

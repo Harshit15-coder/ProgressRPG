@@ -1,280 +1,34 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useState } from "react";
 import classNames from "classnames";
-import { useQueryClient } from "@tanstack/react-query";
-import { useGame } from "../../context/GameContext";
+
 import Button from "../Button/Button";
+import AlertDialog from "../AlertDialog/AlertDialog";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
-import { useEntitySearchCache } from "../../hooks/useEntitySearchCache";
 import styles from "./ActivityInput.module.scss";
-import { useSupportFlow } from "../../hooks/useSupportFlow";
+import { useActivityInput } from "./useActivityInput";
 import SupportFlowModal from "../SupportFlow/SupportFlowModal";
-import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
-
-const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
-const SUBMIT_ACTIVE_ACTIVITY_MESSAGE =
-  "You already have a timer running. Submit it before opening Task Support?";
-
-// Shape of a selected entity from EntitySearchInput
-interface SelectedEntity {
-  name: string;
-  id?: number | string | null;
-  taskId?: number | null;
-  source?: string;
-  [key: string]: unknown;
-}
 
 export default function ActivityInput() {
   const {
-    activityTimer,
-    fetchPlayerAndCharacter,
-    fetchCharacterCurrent,
-    fetchActivities,
-    loginState,
-    loginStreak,
-    loginEventAt,
-    loginRewardXp,
-    player,
-    freeTimerLimitSeconds,
-  } = useGame();
-  const {
-    currentActivity,
-    status,
-    stop,
-    startActivity,
-    elapsed,
-    limitSeconds,
-    autoStopCompletion,
-    clearAutoStopCompletion,
-  } = activityTimer;
-
-  const isPremium = Boolean(player?.is_premium);
-  const queryClient = useQueryClient();
-  const { addEntityToCache } = useEntitySearchCache("activity");
-
-  const [name, setName] = useState("");
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  const isActive = status === "active";
-  const inputValue = isActive
-    ? (name || currentActivity?.name || "")
-    : name;
-
-  const {
-    openWelcomeMessage,
-    openActivityReward,
-    openSupportMode,
+    name,
+    setName,
+    isActive,
+    inputValue,
+    minutes,
+    seconds,
+    formattedLimit,
+    showAutoStopWarning,
     flowState,
     flowDispatch,
     handleConfirmActivity,
-  } = useSupportFlow({
-    onStartActivity: async ({ activityText, durationSeconds, taskId }) => {
-      const parsedDuration = Number(durationSeconds);
-      const hasCustomDuration = Number.isFinite(parsedDuration) && parsedDuration > 0;
+    handleToggle,
+    handleSelectActivity,
+    handleCreateActivity,
+    submitAndOpenSupport,
+    openSupportMode,
+  } = useActivityInput();
 
-      let resolvedLimitSeconds: number | null = null;
-      let limitReason: string | null = null;
-
-      if (isPremium) {
-        resolvedLimitSeconds = hasCustomDuration ? parsedDuration : null;
-      } else if (!hasCustomDuration) {
-        resolvedLimitSeconds = freeTimerLimitSeconds;
-        limitReason = "free_limit";
-      } else if (parsedDuration > freeTimerLimitSeconds) {
-        resolvedLimitSeconds = freeTimerLimitSeconds;
-        limitReason = "free_limit";
-      } else {
-        resolvedLimitSeconds = parsedDuration;
-        limitReason = "preset_limit";
-      }
-
-      await startActivity({ text: activityText, limitSeconds: resolvedLimitSeconds, limitReason, taskId });
-    },
-  });
-
-  useEffect(() => {
-    if (loginState === "none" || !loginEventAt) return;
-
-    let lastShownEventAt: string | null = null;
-    try {
-      lastShownEventAt = sessionStorage.getItem(WELCOME_MESSAGE_LAST_EVENT_KEY);
-    } catch {
-      // If sessionStorage is unavailable, fall back to opening the modal.
-    }
-
-    if (lastShownEventAt === loginEventAt) return;
-
-    openWelcomeMessage({ loginState, loginStreak, loginRewardXp });
-
-    try {
-      sessionStorage.setItem(WELCOME_MESSAGE_LAST_EVENT_KEY, loginEventAt);
-    } catch {
-      // Ignore storage failures and keep app flow functional.
-    }
-  }, [loginState, loginStreak, loginEventAt, loginRewardXp, openWelcomeMessage]);
-
-  useEffect(() => () => {
-    if (timeoutRef.current) clearTimeout(timeoutRef.current);
-  }, []);
-
-  useEffect(() => {
-    if (isActive) (document.activeElement as HTMLElement | null)?.blur();
-  }, [isActive]);
-
-  useEffect(() => {
-    if (!autoStopCompletion) return;
-
-    let cancelled = false;
-
-    // Capture non-null reference — the if(!autoStopCompletion) guard above ensures this
-    const completion = autoStopCompletion!;
-
-    async function handleAutoStopCompletion() {
-      setName("");
-
-      try {
-        await Promise.all([
-          fetchPlayerAndCharacter(),
-          fetchCharacterCurrent(),
-          fetchActivities(),
-        ]);
-      } catch (err) {
-        console.error("[ActivityInput] Failed to refresh after auto-stop:", err);
-      }
-
-      if (cancelled) return;
-
-      playLimitReachedSound();
-
-      const isFreeLimitAutoStop = completion.stopReason === "free_limit";
-
-      openActivityReward({
-        xpGained: completion.xpGained,
-        baseXp: completion.baseXp,
-        xpMultiplier: completion.xpMultiplier,
-        taskXpMultiplier: completion.taskXpMultiplier,
-        levelUps: completion.levelUps,
-        isAutoStopped: true,
-        showUpgradePrompt: !isPremium && isFreeLimitAutoStop,
-        activityName: completion.activityName,
-        elapsedSeconds: completion.elapsedSeconds,
-      });
-      clearAutoStopCompletion();
-    }
-
-    handleAutoStopCompletion();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    autoStopCompletion,
-    clearAutoStopCompletion,
-    fetchPlayerAndCharacter,
-    fetchActivities,
-    fetchCharacterCurrent,
-    isPremium,
-    openActivityReward,
-  ]);
-
-  async function handleToggle() {
-    primeAudio(); // unlock AudioContext while still in user-gesture context
-    if (isActive) {
-      const completedActivityName = (name || currentActivity?.name || "").trim();
-      const completedTaskId = currentActivity?.taskId ?? null;
-      const localElapsed = elapsed; // capture before async operations clear it
-
-      let completion: Awaited<ReturnType<typeof stop>> = null;
-      try {
-        completion = await stop({ activityName: completedActivityName });
-      } catch (err) {
-        console.error("[ActivityInput] Failed to stop timer:", err);
-        // Continue — play sound and show popup with local data so the user isn't left hanging
-      }
-
-
-      // completion comes back as ActivityCompleteResponse or null — fields use snake_case from API
-      const completionRaw = completion as Record<string, unknown> | null;
-      const xpGained = completionRaw?.xp_gained != null ? Number(completionRaw.xp_gained) : null;
-      const baseXp = completionRaw?.base_xp != null ? Number(completionRaw.base_xp) : null;
-      const xpMultiplier = completionRaw?.xp_multiplier != null ? Number(completionRaw.xp_multiplier) : null;
-      const taskXpMultiplier = completionRaw?.task_xp_multiplier != null ? Number(completionRaw.task_xp_multiplier) : null;
-      const levelUps = Array.isArray(completionRaw?.level_ups) ? completionRaw.level_ups as number[] : [];
-      const elapsedSeconds = completionRaw?.duration_seconds != null
-        ? Number(completionRaw.duration_seconds)
-        : localElapsed;
-      setName("");
-
-      try {
-        await Promise.all([
-          fetchPlayerAndCharacter(),
-          fetchCharacterCurrent(),
-          fetchActivities(),
-          completedTaskId ? queryClient.invalidateQueries({ queryKey: ["tasks"] }) : Promise.resolve(),
-        ]);
-      } catch (err) {
-        console.error("[ActivityInput] Failed to refresh after stop:", err);
-      }
-
-
-      playLimitReachedSound();
-      openActivityReward({
-        xpGained,
-        baseXp,
-        xpMultiplier,
-        taskXpMultiplier,
-        levelUps,
-        isAutoStopped: false,
-        showUpgradePrompt: !isPremium,
-        activityName: completedActivityName || null,
-        elapsedSeconds,
-        taskId: completedTaskId,
-      });
-      return;
-    }
-
-    if (!name.trim()) return;
-    addEntityToCache(name.trim());
-    await startActivity({ text: name.trim(), limitSeconds: isPremium ? null : freeTimerLimitSeconds });
-  }
-
-  const minutes = Math.floor(elapsed / 60);
-  const seconds = elapsed % 60;
-  const formattedLimit =
-    typeof limitSeconds === "number" && limitSeconds > 0
-      ? `${Math.floor(limitSeconds / 60)}:${(limitSeconds % 60)
-          .toString()
-          .padStart(2, "0")}`
-      : null;
-  const warningThresholdSeconds =
-    typeof limitSeconds === "number" && limitSeconds > 0
-      ? limitSeconds * 0.9
-      : null;
-  const showAutoStopWarning =
-    isActive &&
-    typeof limitSeconds === "number" &&
-    limitSeconds > 0 &&
-    warningThresholdSeconds !== null &&
-    elapsed >= warningThresholdSeconds &&
-    elapsed < limitSeconds;
-
-  const resolveSelectedTaskId = (entity: SelectedEntity): number | null => {
-    if (entity?.source !== "task") return null;
-
-    if (entity?.taskId !== null && entity?.taskId !== undefined) {
-      return entity.taskId;
-    }
-
-    // Fallback for legacy cached task entities that may only carry id.
-    if (typeof entity?.id === "number") {
-      return entity.id;
-    }
-
-    if (typeof entity?.id === "string" && /^\d+$/.test(entity.id)) {
-      return parseInt(entity.id, 10);
-    }
-
-    return null;
-  };
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
   return (
     <>
@@ -292,23 +46,10 @@ export default function ActivityInput() {
                 value={inputValue}
                 onChange={setName}
                 onSelect={async (activity) => {
-                  setName(activity.name);
-                  // SearchEntity and addEntityToCache's input type differ slightly;
-                  // cast via Partial<PlayerActivity> since both share name/id fields.
-                  addEntityToCache(activity as unknown as Partial<import("../../types").PlayerActivity>);
-                  await startActivity({
-                    text: activity.name,
-                    taskId: resolveSelectedTaskId(activity as SelectedEntity),
-                    limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                  });
+                  await handleSelectActivity(activity);
                 }}
                 onCreate={async (activityName) => {
-                  setName(activityName);
-                  addEntityToCache(activityName);
-                  await startActivity({
-                    text: activityName,
-                    limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                  });
+                  await handleCreateActivity(activityName);
                 }}
                 placeholder="What are you working on? e.g. washing dishes"
                 ariaLabel="Activity name"
@@ -345,29 +86,12 @@ export default function ActivityInput() {
 
         <div className={styles.supportButtonRow}>
           <Button
-            onClick={async () => {
+            onClick={() => {
               if (isActive) {
-                const shouldSubmitCurrent = window.confirm(SUBMIT_ACTIVE_ACTIVITY_MESSAGE);
-                if (!shouldSubmitCurrent) return;
-                const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
-                try {
-                  await stop({ activityName: completedActivityName });
-                } catch (err) {
-                  console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
-                  return;
-                }
-                setName("");
-                try {
-                  await Promise.all([
-                    fetchPlayerAndCharacter(),
-                    fetchCharacterCurrent(),
-                    fetchActivities(),
-                  ]);
-                } catch (err) {
-                  console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
-                }
+                setSubmitConfirmOpen(true);
+              } else {
+                openSupportMode();
               }
-              openSupportMode();
             }}
             variant="secondary"
             className={styles.supportModeButton}
@@ -378,6 +102,19 @@ export default function ActivityInput() {
         </div>
 
       </div>
+
+      <AlertDialog
+        open={submitConfirmOpen}
+        title="Submit active timer?"
+        description="You already have a timer running. Submit it before opening Task Support?"
+        confirmLabel="Submit & continue"
+        cancelLabel="Cancel"
+        onCancel={() => setSubmitConfirmOpen(false)}
+        onConfirm={() => {
+          setSubmitConfirmOpen(false);
+          submitAndOpenSupport();
+        }}
+      />
 
       <SupportFlowModal
         state={flowState}

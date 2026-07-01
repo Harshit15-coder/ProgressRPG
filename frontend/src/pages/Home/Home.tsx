@@ -1,12 +1,10 @@
-import React, { useEffect, useId, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import React from 'react';
+import { Link } from 'react-router-dom';
 import BackToTopButton from '../../components/BackToTopButton/BackToTopButton';
 import Button from '../../components/Button/Button';
 import Seo from '../../components/Seo/Seo';
 import styles from './Home.module.scss';
-import { trackEvent } from '../../utils/analytics';
-import useWaitlistSignup from '../../hooks/useWaitlistSignup';
+import { useHomePage, useMailchimpSignupForm } from './useHomePage';
 const HOME_URL = 'https://progressrpg.com/';
 const HOME_TITLE = 'Progress RPG | ADHD-Friendly Productivity Support Game';
 const HOME_DESCRIPTION =
@@ -35,68 +33,19 @@ const heroHighlights = [
   'Use the support flow to choose a task, write the tiniest first step, or reset before you begin.',
   'Watch your effort build into progress you can return to tomorrow.',
 ];
-const DEFAULT_WAITLIST_SUCCESS_MESSAGE = "You're on the list! We'll be in touch soon.";
-
-function getEmailValidationMessage(value: string): string {
-  const trimmedValue = value.trim();
-
-  if (!trimmedValue) {
-    return 'Enter an email address to join the waitlist.';
-  }
-
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmedValue)) {
-    return 'Enter a valid email address, like name@example.com.';
-  }
-
-  return '';
-}
-
-type SignupStatus = 'idle' | 'submitting' | 'success' | 'error';
-
 function MailchimpSignupForm(): React.ReactElement {
-  const { requestWaitlistSignup } = useWaitlistSignup();
-  const [email, setEmail] = useState('');
-  const [status, setStatus] = useState<SignupStatus>('idle');
-  const [errorMsg, setErrorMsg] = useState('');
-  const [successMsg, setSuccessMsg] = useState(DEFAULT_WAITLIST_SUCCESS_MESSAGE);
-  const emailInputId = useId();
-  const emailHelpId = useId();
-  const emailErrorId = useId();
-
-  useEffect(() => {
-    if (status === 'success') {
-      trackEvent('waitlist_signup_submitted', {
-        form_name: 'mailchimp_waitlist',
-        page: 'home',
-      });
-    }
-  }, [status]);
-
-  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
-    e.preventDefault();
-    const validationMessage = getEmailValidationMessage(email);
-
-    if (validationMessage) {
-      setStatus('error');
-      setErrorMsg(validationMessage);
-      return;
-    }
-
-    setStatus('submitting');
-    setErrorMsg('');
-    setSuccessMsg(DEFAULT_WAITLIST_SUCCESS_MESSAGE);
-
-    const result = await requestWaitlistSignup(email.trim());
-    if (!result.success) {
-      setStatus('error');
-      setErrorMsg(result.errorMessage);
-      return;
-    }
-
-    setStatus('success');
-    setSuccessMsg(result.message || DEFAULT_WAITLIST_SUCCESS_MESSAGE);
-    setEmail('');
-  };
+  const {
+    email,
+    status,
+    errorMsg,
+    successMsg,
+    emailInputId,
+    emailHelpId,
+    emailErrorId,
+    emailDescribedBy,
+    setEmail,
+    handleSubmit,
+  } = useMailchimpSignupForm();
 
   if (status === 'success') {
     return (
@@ -129,15 +78,9 @@ function MailchimpSignupForm(): React.ReactElement {
           className={styles.signupInput}
           placeholder="your@email.com"
           value={email}
-          onChange={(e) => {
-            setEmail(e.target.value);
-            if (status === 'error') {
-              setStatus('idle');
-              setErrorMsg('');
-            }
-          }}
+          onChange={(e) => setEmail(e.target.value)}
           required
-          aria-describedby={status === 'error' ? `${emailHelpId} ${emailErrorId}` : emailHelpId}
+          aria-describedby={emailDescribedBy}
           aria-invalid={status === 'error' ? 'true' : 'false'}
           autoComplete="email"
           inputMode="email"
@@ -161,42 +104,35 @@ function MailchimpSignupForm(): React.ReactElement {
 
 const features = [
   {
-    icon: '✅',
-    title: 'Helps you get started',
+    icon: "✅",
+    title: "Helps you get started",
     description:
-      'Whether it’s chores, admin, or the task you’ve been avoiding for weeks, Progress RPG gives you a gentle structure for taking the first step.',
+      "Whether it's chores, admin, or the task you've been avoiding for weeks, Progress RPG gives you a gentle structure for taking the first step.",
   },
   {
-    icon: '⚡',
-    title: 'Build momentum',
+    icon: "⚡",
+    title: "Build momentum",
     description:
-      'Use a task timer, return to your routines, and watch your progress accumulate one session at a time.',
+      "Use a task timer, return to your routines, and watch your progress accumulate one session at a time.",
   },
   {
-    icon: '🤝',
-    title: 'Support when you feel stuck',
+    icon: "🤝",
+    title: "Support when you feel stuck",
     description:
-      'Check in with how you are feeling, choose whether you are ready, and get help picking a task or resetting before you start.',
+      "Check in with how you are feeling, choose whether you are ready, and get help picking a task or resetting before you start.",
   },
   {
-    icon: '🎯',
-    title: 'Meaningful progress',
+    icon: "🎯",
+    title: "Meaningful progress",
     description:
-      'Timers, support steps, storylines, and progression all work together so everyday effort feels rewarding to come back to.',
+      "Timers, support steps, storylines, and progression all work together so everyday effort feels rewarding to come back to.",
   },
 ];
 
 export default function Home(): React.ReactElement | null {
-  const { isAuthenticated, loading } = useAuth();
-  const navigate = useNavigate();
+  const { shouldRender } = useHomePage();
 
-  useEffect(() => {
-    if (!loading && isAuthenticated) {
-      navigate('/timer', { replace: true });
-    }
-  }, [isAuthenticated, loading, navigate]);
-
-  if (loading || isAuthenticated) {
+  if (!shouldRender) {
     return null;
   }
 

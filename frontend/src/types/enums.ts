@@ -18,7 +18,8 @@ export type FeatureFlagKey =
   | "tasksFeature"
   | "categoriesPage"
   | "skillsPage"
-  | "projectsPage";
+  | "projectsPage"
+  | "toastsFeature";
 
 // ---------------------------------------------------------------------------
 // Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)

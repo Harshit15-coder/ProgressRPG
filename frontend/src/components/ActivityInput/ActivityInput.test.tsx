@@ -42,6 +42,14 @@ vi.mock('../../utils/sounds', () => ({
   primeAudio,
 }));
 
+vi.mock('@tanstack/react-query', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@tanstack/react-query')>();
+  return {
+    ...actual,
+    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+  };
+});
+
 describe('ActivityInput', () => {
   beforeEach(() => {
     mockUseSupportFlow.mockReset();
@@ -166,11 +174,13 @@ describe('ActivityInput', () => {
         xpGained: 16,
         baseXp: 16,
         xpMultiplier: 1,
+        taskXpMultiplier: null,
         levelUps: [2],
         isAutoStopped: false,
         showUpgradePrompt: true,
         activityName: 'Write docs',
         elapsedSeconds: 16,
+        taskId: null,
       });
       expect(playLimitReachedSound).toHaveBeenCalledTimes(1);
     });
@@ -285,8 +295,6 @@ describe('ActivityInput', () => {
 
   it('does not submit the timer or open Task Support when the user cancels', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.fn(() => false);
-    Object.defineProperty(window, 'confirm', { value: confirmSpy, configurable: true });
 
     mockUseGame.mockReturnValue({
       activityTimer: {
@@ -314,17 +322,16 @@ describe('ActivityInput', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open support mode' }));
 
-    expect(confirmSpy).toHaveBeenCalledWith(
-      'You already have a timer running. Submit it before opening Task Support?'
-    );
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
     expect(stop).not.toHaveBeenCalled();
     expect(openSupportMode).not.toHaveBeenCalled();
   });
 
   it('submits the active timer and opens Task Support when confirmed', async () => {
     const user = userEvent.setup();
-    const confirmSpy = vi.fn(() => true);
-    Object.defineProperty(window, 'confirm', { value: confirmSpy, configurable: true });
     stop.mockResolvedValue(null);
 
     mockUseGame.mockReturnValue({
@@ -353,8 +360,11 @@ describe('ActivityInput', () => {
 
     await user.click(screen.getByRole('button', { name: 'Open support mode' }));
 
+    expect(screen.getByRole('alertdialog')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Submit & continue' }));
+
     await waitFor(() => {
-      expect(confirmSpy).toHaveBeenCalledTimes(1);
       expect(stop).toHaveBeenCalledWith({ activityName: 'Write docs' });
       expect(fetchPlayerAndCharacter).toHaveBeenCalledTimes(1);
       expect(fetchCharacterCurrent).toHaveBeenCalledTimes(1);

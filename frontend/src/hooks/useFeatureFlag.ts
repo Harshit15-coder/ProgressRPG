@@ -8,6 +8,8 @@ const hasOwn = (obj: Record<string, unknown>, key: string): boolean =>
 
 function resolveGroups(value: unknown): AccessGroup[] {
   if (Array.isArray(value)) return value as AccessGroup[];
+  if (value === true) return ['all'];
+  if (typeof value === 'string' && value !== 'no') return [value as AccessGroup];
   return [];
 }
 
@@ -18,7 +20,7 @@ export function useFeatureFlag(flag: FeatureFlagKey): boolean {
 
   const groups: AccessGroup[] = hasOwn(remoteFeatureFlags, flag)
     ? resolveGroups(remoteFeatureFlags[flag])
-    : featureFlags[flag];
+    : resolveGroups(featureFlags[flag]);
 
   if (groups.includes("all")) return true;
   if (groups.includes("premium") && Boolean(player?.is_premium)) return true;
