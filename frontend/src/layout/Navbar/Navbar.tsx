@@ -1,5 +1,6 @@
-import React, { useEffect, useRef, useState } from "react";
+import React from "react";
 import { useLocation, Link } from "react-router-dom";
+import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import styles from "./Navbar.module.scss";
 import Button from "../../components/Button/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -13,8 +14,6 @@ interface NavbarProps {
 export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const { isAuthenticated } = useAuth();
   const location = useLocation();
-  const [accountOpenMobile, setAccountOpenMobile] = useState(false);
-  const accountMobileRef = useRef<HTMLDivElement>(null);
 
   const isTasksEnabled = useFeatureFlag("tasksFeature");
 
@@ -23,20 +22,6 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const isActivitiesPage = location.pathname === "/activities";
   const isTasksPage = location.pathname === "/tasks";
   const isAccountPage = location.pathname === "/account";
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const clickInsideMobile = accountMobileRef.current?.contains(
-        event.target as Node
-      );
-      if (!clickInsideMobile) {
-        setAccountOpenMobile(false);
-      }
-    };
-
-    document.addEventListener("mousedown", handleClickOutside);
-    return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
 
   return (
     <header className={styles.header}>
@@ -156,59 +141,52 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   <path d="M12 3 3 10h2v10h6v-6h2v6h6V10h2L12 3z" />
                 </svg>
               </Link>
-              <div className={styles.accountMenu} ref={accountMobileRef}>
-                <button
-                  className={styles.accountTrigger}
-                  onClick={() => setAccountOpenMobile((open) => !open)}
-                  aria-label="Account menu"
-                  aria-haspopup="true"
-                  aria-expanded={accountOpenMobile}
-                >
-                  <svg
-                    className={styles.personIcon}
-                    viewBox="0 0 24 24"
-                    aria-hidden="true"
-                    focusable="false"
-                  >
-                    <circle cx="12" cy="8" r="4" />
-                    <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
-                  </svg>
-                </button>
-                {accountOpenMobile && (
-                  <ul className={styles.accountDropdown} role="menu">
-                    {onHelpClick && (
-                      <li role="none">
-                        <button
-                          role="menuitem"
-                          onClick={() => {
-                            setAccountOpenMobile(false);
-                            onHelpClick();
-                          }}
+              <div className={styles.accountMenu}>
+                <DropdownMenu.Root>
+                  <DropdownMenu.Trigger asChild>
+                    <button
+                      className={styles.accountTrigger}
+                      aria-label="Account menu"
+                    >
+                      <svg
+                        className={styles.personIcon}
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                        focusable="false"
+                      >
+                        <circle cx="12" cy="8" r="4" />
+                        <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
+                      </svg>
+                    </button>
+                  </DropdownMenu.Trigger>
+
+                  <DropdownMenu.Portal>
+                    <DropdownMenu.Content
+                      className={styles.accountDropdownContent}
+                      align="end"
+                      sideOffset={4}
+                    >
+                      {onHelpClick && (
+                        <DropdownMenu.Item
+                          className={styles.accountDropdownItem}
+                          onSelect={onHelpClick}
                         >
                           <span aria-hidden="true">❓ </span>Tutorial
-                        </button>
-                      </li>
-                    )}
-                    <li role="none">
-                      <Link
-                        to="/account"
-                        role="menuitem"
-                        onClick={() => setAccountOpenMobile(false)}
-                      >
-                        <span aria-hidden="true">👤 </span>Account
-                      </Link>
-                    </li>
-                    <li role="none">
-                      <Link
-                        to="/logout"
-                        role="menuitem"
-                        onClick={() => setAccountOpenMobile(false)}
-                      >
-                        <span aria-hidden="true">👋 </span>Log out
-                      </Link>
-                    </li>
-                  </ul>
-                )}
+                        </DropdownMenu.Item>
+                      )}
+                      <DropdownMenu.Item className={styles.accountDropdownItem} asChild>
+                        <Link to="/account">
+                          <span aria-hidden="true">👤 </span>Account
+                        </Link>
+                      </DropdownMenu.Item>
+                      <DropdownMenu.Item className={styles.accountDropdownItem} asChild>
+                        <Link to="/logout">
+                          <span aria-hidden="true">👋 </span>Log out
+                        </Link>
+                      </DropdownMenu.Item>
+                    </DropdownMenu.Content>
+                  </DropdownMenu.Portal>
+                </DropdownMenu.Root>
               </div>
             </>
           ) : (

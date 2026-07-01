@@ -3,6 +3,7 @@ import { useGame } from "../../context/GameContext";
 import { useTasks } from "../../hooks/useTasks";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import List from "../List/List";
+import Tooltip from "../Tooltip/Tooltip";
 import styles from "./ActivityTimeline.module.scss";
 import type { PlayerActivity, CharacterActivity } from "../../types";
 
@@ -105,43 +106,45 @@ export default function ActivityTimeline() {
                   {formatDuration(act.duration)}
                 </span>
                 {linkedTaskIsComplete ? (
-                  <button
-                    type="button"
-                    className={styles.warningButton}
-                    data-tooltip="Task complete — activity will start unlinked"
-                    onClick={async (event) => {
-                      event.currentTarget.blur();
-                      if (!activityText) return;
-                      if (activityTimer?.status === "active") return;
-                      await activityTimer?.startActivity({
-                        text: activityText,
-                        taskId: null,
-                        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                      });
-                    }}
-                    aria-label={`Restart ${act.name || act.kind || "activity"} (task complete)`}
-                  >
-                    ▷
-                  </button>
+                  <Tooltip content="Task complete — activity will start unlinked">
+                    <button
+                      type="button"
+                      className={styles.warningButton}
+                      onClick={async (event) => {
+                        event.currentTarget.blur();
+                        if (!activityText) return;
+                        if (activityTimer?.status === "active") return;
+                        await activityTimer?.startActivity({
+                          text: activityText,
+                          taskId: null,
+                          limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                        });
+                      }}
+                      aria-label={`Restart ${act.name || act.kind || "activity"} (task complete)`}
+                    >
+                      ▷
+                    </button>
+                  </Tooltip>
                 ) : (
-                  <button
-                    type="button"
-                    className={styles.playButton}
-                    onClick={async (event) => {
-                      event.currentTarget.blur();
-                      if (!activityText) return;
-                      if (activityTimer?.status === "active") return;
-                      await activityTimer?.startActivity({
-                        text: activityText,
-                        taskId: linkedTaskId,
-                        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-                      });
-                    }}
-                    aria-label={`Restart ${act.name || act.kind || "activity"}`}
-                    title="Do this activity again"
-                  >
-                    ▷
-                  </button>
+                  <Tooltip content="Do this activity again">
+                    <button
+                      type="button"
+                      className={styles.playButton}
+                      onClick={async (event) => {
+                        event.currentTarget.blur();
+                        if (!activityText) return;
+                        if (activityTimer?.status === "active") return;
+                        await activityTimer?.startActivity({
+                          text: activityText,
+                          taskId: linkedTaskId,
+                          limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+                        });
+                      }}
+                      aria-label={`Restart ${act.name || act.kind || "activity"}`}
+                    >
+                      ▷
+                    </button>
+                  </Tooltip>
                 )}
               </div>
             );

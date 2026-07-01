@@ -1,5 +1,5 @@
-import React, { useEffect, useRef } from "react";
-import { createPortal } from "react-dom";
+import React from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import styles from "./Modal.module.scss";
 import Button from "../Button/Button";
 
@@ -28,114 +28,47 @@ export default function Modal({
   className,
   style,
 }: ModalProps) {
-  const modalRef = useRef<HTMLDivElement>(null);
-  const previousFocusRef = useRef<Element | null>(null);
-
-  const handleHeaderControlPointerDown = (e: React.MouseEvent | React.PointerEvent) => {
-    // Keep focused text inputs from swallowing the first tap/click on modal controls.
-    e.preventDefault();
-  };
-
-  const handleBackdropClick = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (e.target === e.currentTarget) {
-      onClose?.();
-    }
-  };
-
-  useEffect(() => {
-    // Store previous focus
-    previousFocusRef.current = document.activeElement;
-
-    // Focus modal
-    modalRef.current?.focus();
-
-    // Prevent body scroll
-    document.body.style.overflow = 'hidden';
-
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        onClose?.();
-      }
-
-      // Tab key focus trap
-      if (e.key === "Tab") {
-        const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
-          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-        );
-
-        if (!focusableElements || focusableElements.length === 0) return;
-
-        const firstElement = focusableElements[0];
-        const lastElement = focusableElements[focusableElements.length - 1];
-
-        if (e.shiftKey && document.activeElement === firstElement) {
-          e.preventDefault();
-          lastElement.focus();
-        } else if (!e.shiftKey && document.activeElement === lastElement) {
-          e.preventDefault();
-          firstElement.focus();
-        }
-      }
-    };
-
-    // Listen for keydown when modal is mounted
-    document.addEventListener("keydown", handleKeyDown);
-
-    // Cleanup listener on unmount
-    return () => {
-      document.removeEventListener("keydown", handleKeyDown);
-      document.body.style.overflow = '';
-      (previousFocusRef.current as HTMLElement | null)?.focus();
-    };
-  }, [onClose]);
-
-  const titleId = `${id}-title`;
-
-  return createPortal(
-    <div className={styles.modalBackdrop} onClick={handleBackdropClick} role="presentation">
-      <div
-        ref={modalRef}
-        className={[styles.modal, size ? styles[size] : '', className || ''].join(' ').trim()}
-        style={style}
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby={titleId}
-        tabIndex={-1}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className={styles.modalHeader}>
-          {onBack ? (
-            <Button
-              onClick={onBack}
-              onMouseDown={handleHeaderControlPointerDown}
-              onPointerDown={handleHeaderControlPointerDown}
-              ariaLabel={backLabel}
-              className={styles.backButton}
-            >
-              ← {backLabel}
-            </Button>
-          ) : null}
-          <h2 id={titleId}>{title}</h2>
-          <Button
-            onClick={onClose}
-            onMouseDown={handleHeaderControlPointerDown}
-            onPointerDown={handleHeaderControlPointerDown}
-            ariaLabel="Close modal"
-            className={styles.closeButton}
-          >
-            &times;
-          </Button>
-        </div>
-        <div className={styles.modalContent}>
-          {children}
-        </div>
-        {footer && (
-          <div className={styles.modalFooter}>
-            {footer}
+  return (
+    <DialogPrimitive.Root open onOpenChange={(open) => { if (!open) onClose?.(); }}>
+      <DialogPrimitive.Portal>
+        <DialogPrimitive.Overlay className={styles.modalBackdrop} data-testid="modal-overlay" />
+        <DialogPrimitive.Content
+          id={id}
+          className={[styles.modal, size ? styles[size] : '', className || ''].join(' ').trim()}
+          style={style}
+        >
+          <div className={styles.modalHeader}>
+            {onBack ? (
+              <Button
+                onClick={onBack}
+                ariaLabel={backLabel}
+                className={styles.backButton}
+              >
+                ← {backLabel}
+              </Button>
+            ) : null}
+            <DialogPrimitive.Title asChild>
+              <h2>{title}</h2>
+            </DialogPrimitive.Title>
+            <DialogPrimitive.Close asChild>
+              <Button
+                ariaLabel="Close modal"
+                className={styles.closeButton}
+              >
+                &times;
+              </Button>
+            </DialogPrimitive.Close>
           </div>
-        )}
-      </div>
-    </div>,
-    document.body,
+          <div className={styles.modalContent}>
+            {children}
+          </div>
+          {footer && (
+            <div className={styles.modalFooter}>
+              {footer}
+            </div>
+          )}
+        </DialogPrimitive.Content>
+      </DialogPrimitive.Portal>
+    </DialogPrimitive.Root>
   );
 }

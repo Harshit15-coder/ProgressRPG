@@ -8,8 +8,6 @@ import type { PlayerActivity } from "../../types";
 import { playLimitReachedSound, primeAudio } from "../../utils/sounds";
 
 const WELCOME_MESSAGE_LAST_EVENT_KEY = "supportFlow_lastLoginEventAtShown";
-const SUBMIT_ACTIVE_ACTIVITY_MESSAGE =
-  "You already have a timer running. Submit it before opening Task Support?";
 
 interface SelectedEntity {
   name: string;
@@ -346,27 +344,23 @@ export function useActivityInput() {
     [addEntityToCache, freeTimerLimitSeconds, isPremium, startActivity]
   );
 
-  const handleSupportModeClick = useCallback(async () => {
-    if (isActive) {
-      const shouldSubmitCurrent = window.confirm(SUBMIT_ACTIVE_ACTIVITY_MESSAGE);
-      if (!shouldSubmitCurrent) return;
+  // Called when user confirms the "submit active timer?" AlertDialog in ActivityInput.
+  const submitAndOpenSupport = useCallback(async () => {
+    const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
 
-      const completedActivityName = (name || currentActivity?.name || currentActivity?.text || "").trim();
+    try {
+      await stop({ activityName: completedActivityName });
+    } catch (err) {
+      console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
+      return;
+    }
 
-      try {
-        await stop({ activityName: completedActivityName });
-      } catch (err) {
-        console.error("[ActivityInput] Failed to submit active timer before Task Support:", err);
-        return;
-      }
+    setName("");
 
-      setName("");
-
-      try {
-        await Promise.all([fetchPlayerAndCharacter(), fetchCharacterCurrent(), fetchActivities()]);
-      } catch (err) {
-        console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
-      }
+    try {
+      await Promise.all([fetchPlayerAndCharacter(), fetchCharacterCurrent(), fetchActivities()]);
+    } catch (err) {
+      console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
     }
 
     openSupportMode();
@@ -376,7 +370,6 @@ export function useActivityInput() {
     fetchActivities,
     fetchCharacterCurrent,
     fetchPlayerAndCharacter,
-    isActive,
     name,
     openSupportMode,
     stop,
@@ -422,7 +415,8 @@ export function useActivityInput() {
     handleToggle,
     handleSelectActivity,
     handleCreateActivity,
-    handleSupportModeClick,
+    submitAndOpenSupport,
+    openSupportMode,
     isPremium,
   };
 }

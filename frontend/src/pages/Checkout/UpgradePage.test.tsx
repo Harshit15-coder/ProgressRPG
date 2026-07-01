@@ -48,12 +48,11 @@ describe("UpgradePage", () => {
     mockApiFetch.mockReset();
   });
 
-  it("shows only the monthly option", () => {
+  it("shows the single plan with benefits", () => {
     renderUpgradePage();
 
-    expect(screen.getByRole("heading", { name: "Premium benefits" })).toBeInTheDocument();
-    expect(screen.getByText("Double XP on all activity rewards.")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Premium membership" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Upgrade to Premium" })).toBeInTheDocument();
+    expect(screen.getByText("Double XP on all activity rewards")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Monthly" })).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Annual" })).not.toBeInTheDocument();
     expect(screen.queryByText(/You selected Monthly/i)).not.toBeInTheDocument();

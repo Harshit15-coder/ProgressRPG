@@ -1,5 +1,6 @@
 // SupportFlow/screens/ActivityInputScreen.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import * as Tabs from "@radix-ui/react-tabs";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { ACTIVITY_PRESETS } from "../supportFlowReducer";
@@ -124,31 +125,28 @@ export default function ActivityInputScreen({
       )}
 
       {isPriorityThreePreset && (
-        <>
+        <Tabs.Root
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "memory" | "tasks")}
+        >
           {showTabs && (
-            <div className={styles.tabBar} role="tablist">
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "memory"}
+            <Tabs.List className={styles.tabBar}>
+              <Tabs.Trigger
+                value="memory"
                 className={`${styles.tab} ${activeTab === "memory" ? styles.tabActive : ""}`}
-                onClick={() => setActiveTab("memory")}
               >
                 From memory
-              </button>
-              <button
-                type="button"
-                role="tab"
-                aria-selected={activeTab === "tasks"}
+              </Tabs.Trigger>
+              <Tabs.Trigger
+                value="tasks"
                 className={`${styles.tab} ${activeTab === "tasks" ? styles.tabActive : ""}`}
-                onClick={() => setActiveTab("tasks")}
               >
                 My tasks
-              </button>
-            </div>
+              </Tabs.Trigger>
+            </Tabs.List>
           )}
 
-          {(!showTabs || activeTab === "memory") && (
+          <Tabs.Content value="memory">
             <div className={styles.priorityThreeContainer}>
               <p className={styles.readableText}>Write down the first three things that come into your head.</p>
               {hint && <p className={`${styles.hint} ${styles.readableText}`}>{hint}</p>}
@@ -178,9 +176,9 @@ export default function ActivityInputScreen({
                 Randomise and start
               </Button>
             </div>
-          )}
+          </Tabs.Content>
 
-          {showTabs && activeTab === "tasks" && (
+          <Tabs.Content value="tasks">
             <div className={styles.priorityThreeContainer}>
               {incompleteTasks.length === 0 ? (
                 <p className={styles.taskPickEmpty}>
@@ -202,8 +200,8 @@ export default function ActivityInputScreen({
                 </>
               )}
             </div>
-          )}
-        </>
+          </Tabs.Content>
+        </Tabs.Root>
       )}
 
       {!isPriorityThreePreset && (

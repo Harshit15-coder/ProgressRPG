@@ -3,6 +3,7 @@ import React from "react";
 import EntitySearchInput from "../../components/EntitySearchInput/EntitySearchInput";
 import Button from "../../components/Button/Button";
 import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
+import Tooltip from "../../components/Tooltip/Tooltip";
 import { isTaskComplete, taskSortOptions, useTasksPage, type ItemRecord } from "./useTasksPage";
 import styles from "./TasksPage.module.scss";
 
@@ -91,18 +92,19 @@ export default function TasksPage(): React.ReactElement | null {
           }}
           hoverEdit
           renderRowActions={(task) => (
-            <button
-              type="button"
-              className={styles.taskPlayButton}
-              aria-label={`Start working on ${task.name}`}
-              title="Start working on this task"
-              onClick={async (event) => {
-                event.currentTarget.blur();
-                await handleStartTask(task);
-              }}
-            >
-              ▷
-            </button>
+            <Tooltip content="Start working on this task">
+              <button
+                type="button"
+                className={styles.taskPlayButton}
+                aria-label={`Start working on ${task.name}`}
+                onClick={async (event) => {
+                  event.currentTarget.blur();
+                  await handleStartTask(task);
+                }}
+              >
+                ▷
+              </button>
+            </Tooltip>
           )}
           onEdit={handleEdit}
           onDelete={handleDelete}

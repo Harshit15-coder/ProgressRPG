@@ -1,7 +1,8 @@
-import React from "react";
+import React, { useState } from "react";
 import classNames from "classnames";
 
 import Button from "../Button/Button";
+import AlertDialog from "../AlertDialog/AlertDialog";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
 import styles from "./ActivityInput.module.scss";
 import { useActivityInput } from "./useActivityInput";
@@ -23,8 +24,11 @@ export default function ActivityInput() {
     handleToggle,
     handleSelectActivity,
     handleCreateActivity,
-    handleSupportModeClick,
+    submitAndOpenSupport,
+    openSupportMode,
   } = useActivityInput();
+
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
 
   return (
     <>
@@ -82,7 +86,13 @@ export default function ActivityInput() {
 
         <div className={styles.supportButtonRow}>
           <Button
-            onClick={handleSupportModeClick}
+            onClick={() => {
+              if (isActive) {
+                setSubmitConfirmOpen(true);
+              } else {
+                openSupportMode();
+              }
+            }}
             variant="secondary"
             className={styles.supportModeButton}
             ariaLabel="Open support mode"
@@ -92,6 +102,19 @@ export default function ActivityInput() {
         </div>
 
       </div>
+
+      <AlertDialog
+        open={submitConfirmOpen}
+        title="Submit active timer?"
+        description="You already have a timer running. Submit it before opening Task Support?"
+        confirmLabel="Submit & continue"
+        cancelLabel="Cancel"
+        onCancel={() => setSubmitConfirmOpen(false)}
+        onConfirm={() => {
+          setSubmitConfirmOpen(false);
+          submitAndOpenSupport();
+        }}
+      />
 
       <SupportFlowModal
         state={flowState}
