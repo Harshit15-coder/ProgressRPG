@@ -26,6 +26,7 @@ from datetime import timedelta
 from decimal import Decimal
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models, transaction
+from django.db.models import Case, F, Value, When
 from django.db.models import Sum
 from django.utils import timezone
 from typing import TYPE_CHECKING, Optional
@@ -345,20 +346,49 @@ class Player(Person):
         return currency
 
     def set_online(self):
-        """Marks player as online."""
+        """Registers a new active connection and updates online status."""
         logger.debug("[SET ONLINE] Running set_online for player")
-        self.is_online = True
-        self.save(update_fields=["is_online"])
+        self.register_connection()
 
     def set_offline(self):
-        """Marks player as offline."""
-        self.is_online = False
-        self.save(update_fields=["is_online"])
+        """Registers a closed connection and updates online status."""
+        self.unregister_connection()
+
+    @transaction.atomic
+    def register_connection(self):
+        """Increment active connections and mark player online."""
+        type(self).objects.filter(pk=self.pk).update(
+            active_connections=F("active_connections") + 1,
+            is_online=True,
+        )
+        self.refresh_from_db(fields=["active_connections", "is_online"])
+
+    @transaction.atomic
+    def unregister_connection(self):
+        """Decrement active connections safely and update online status."""
+        type(self).objects.filter(pk=self.pk).update(
+            active_connections=Case(
+                When(active_connections__gt=0, then=F("active_connections") - 1),
+                default=Value(0),
+                output_field=models.PositiveIntegerField(),
+            ),
+            # Condition is evaluated on the pre-update value.
+            is_online=Case(
+                When(active_connections__gt=1, then=Value(True)),
+                default=Value(False),
+                output_field=models.BooleanField(),
+            ),
+        )
+        self.refresh_from_db(fields=["active_connections", "is_online"])
 
     @classmethod
     def get_online_players(cls):
         """Returns a QuerySet of all currently online players."""
         return cls.objects.filter(is_online=True)
+
+    @classmethod
+    def online_count(cls) -> int:
+        return cls.objects.filter(is_online=True).count()
 
     @property
     def active_link(self):

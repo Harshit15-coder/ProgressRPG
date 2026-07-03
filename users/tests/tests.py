@@ -281,6 +281,50 @@ class PlayerMethodsTest(TestCase):
 
         self.assertIsNone(player.current_character)
 
+    def test_register_connection_increments_and_sets_online(self):
+        player = self.user.player
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
+        player.register_connection()
+
+        self.assertEqual(player.active_connections, 1)
+        self.assertTrue(player.is_online)
+
+    def test_unregister_connection_stays_online_with_other_connections(self):
+        player = self.user.player
+        player.active_connections = 2
+        player.is_online = True
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 1)
+        self.assertTrue(player.is_online)
+
+    def test_unregister_connection_transitions_offline_at_zero(self):
+        player = self.user.player
+        player.active_connections = 1
+        player.is_online = True
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
+    def test_unregister_connection_is_idempotent_at_zero(self):
+        player = self.user.player
+        player.active_connections = 0
+        player.is_online = False
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
 
 class UserLoginModelTest(TestCase):
     def setUp(self):

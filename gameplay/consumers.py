@@ -24,6 +24,20 @@ logger_errors = logging.getLogger("errors")
 
 
 class TimerConsumer(AsyncJsonWebsocketConsumer):
+    @database_sync_to_async
+    def get_online_count(self):
+        return Player.online_count()
+
+    async def broadcast_online_count(self):
+        online_count = await self.get_online_count()
+        await self.channel_layer.group_send(
+            "online_users",
+            {
+                "type": "online_count",
+                "count": online_count,
+            },
+        )
+
     async def connect(self):
         from django.contrib.auth.models import AnonymousUser
 
@@ -78,7 +92,7 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                     f"[CONNECT] Player {self.player.id} has no active character link; continuing with player-only websocket session."
                 )
 
-            await database_sync_to_async(self.player.set_online)()
+            await database_sync_to_async(self.player.register_connection)()
             is_online_now = await database_sync_to_async(
                 lambda: self.player.is_online
             )()
@@ -96,6 +110,8 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
             logger.info(
                 f"[CONNECT] WebSocket connection accepted for player {self.player.id}"
             )
+
+            await self.broadcast_online_count()
 
             await self._send_pending_messages()
 
@@ -134,8 +150,9 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
         if not hasattr(self, "player"):
             return
 
-        await database_sync_to_async(self.player.set_offline)()
+        await database_sync_to_async(self.player.unregister_connection)()
         await self.channel_layer.group_discard("online_users", self.channel_name)
+        await self.broadcast_online_count()
 
         if hasattr(self, "player_group"):
             logger.info(f"[DISCONNECT] Removed from group: {self.player_group}")
@@ -216,6 +233,14 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                 logger.warning(f"[RECEIVE JSON] Unknown type received: {message_type}")
         else:
             logger.warning(f"[RECEIVE JSON] Received data without type: {event}")
+
+    async def online_count(self, event):
+        await self.send_json(
+            {
+                "type": "online_count",
+                "count": event["count"],
+            }
+        )
 
     async def action(self, event):
         logger.info(f"[HANDLE ACTION] Handling action: {event}")

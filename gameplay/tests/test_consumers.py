@@ -10,12 +10,16 @@ from gameplay.consumers import TimerConsumer
 class DummyChannelLayer:
     def __init__(self):
         self.groups = set()
+        self.group_messages = []
 
     async def group_add(self, group, channel_name):
         self.groups.add(group)
 
     async def group_discard(self, group, channel_name):
         self.groups.discard(group)
+
+    async def group_send(self, group, message):
+        self.group_messages.append((group, message))
 
 
 class AsyncCallRecorder:
@@ -83,6 +87,10 @@ class TimerConsumerNoCharacterTests(TransactionTestCase):
         self.assertIsNone(consumer.character)
         self.assertIsNone(consumer.link)
 
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 1)
+        self.assertTrue(self.player.is_online)
+
         sent_payloads = [args[0] for args, _ in send_json_recorder.calls]
         self.assertIn(
             {
@@ -92,6 +100,12 @@ class TimerConsumerNoCharacterTests(TransactionTestCase):
             },
             sent_payloads,
         )
+
+        group_messages = consumer.channel_layer.group_messages
+        self.assertEqual(len(group_messages), 1)
+        self.assertEqual(group_messages[0][0], "online_users")
+        self.assertEqual(group_messages[0][1]["type"], "online_count")
+        self.assertEqual(group_messages[0][1]["count"], 1)
 
 
 class TimerConsumerAuthTests(TransactionTestCase):
@@ -181,6 +195,34 @@ class TimerConsumerDisconnectTests(TransactionTestCase):
         self.assertNotIn(consumer.player_group, consumer.channel_layer.groups)
         self.assertNotIn("online_users", consumer.channel_layer.groups)
 
+    def test_disconnect_broadcasts_online_count(self):
+        consumer = self._make_connected_consumer()
+
+        self.player.active_connections = 1
+        self.player.is_online = True
+        self.player.save(update_fields=["active_connections", "is_online"])
+
+        async_to_sync(consumer.disconnect)(1000)
+
+        group_messages = consumer.channel_layer.group_messages
+        self.assertEqual(len(group_messages), 1)
+        self.assertEqual(group_messages[0][0], "online_users")
+        self.assertEqual(group_messages[0][1]["type"], "online_count")
+        self.assertEqual(group_messages[0][1]["count"], 0)
+
+    def test_disconnect_keeps_player_online_with_other_connections(self):
+        consumer = self._make_connected_consumer()
+
+        self.player.active_connections = 2
+        self.player.is_online = True
+        self.player.save(update_fields=["active_connections", "is_online"])
+
+        async_to_sync(consumer.disconnect)(1000)
+
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 1)
+        self.assertTrue(self.player.is_online)
+
     def test_disconnect_does_not_pause_timers_when_already_paused(self):
         """Timer in a terminal state must not trigger control_timers."""
         consumer = self._make_connected_consumer()
@@ -189,3 +231,15 @@ class TimerConsumerDisconnectTests(TransactionTestCase):
         # If control_timers were called it would hit the DB and raise; passing
         # without error is the assertion.
         async_to_sync(consumer.disconnect)(1000)
+
+
+class TimerConsumerOnlineCountEventTests(TransactionTestCase):
+    def test_online_count_event_sends_payload(self):
+        consumer = TimerConsumer()
+        consumer.send_json = AsyncCallRecorder()
+
+        async_to_sync(consumer.online_count)({"type": "online_count", "count": 7})
+
+        self.assertEqual(len(consumer.send_json.calls), 1)
+        sent_payload = consumer.send_json.calls[0][0][0]
+        self.assertEqual(sent_payload, {"type": "online_count", "count": 7})
