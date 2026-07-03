@@ -1,10 +1,17 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
+import * as Popover from "@radix-ui/react-popover";
 import styles from "./Navbar.module.scss";
 import Button from "../../components/Button/Button";
 import { useAuth } from "../../context/AuthContext";
+import { useGame } from "../../context/GameContext";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
+import {
+  useAnnouncements,
+  useMarkAllAnnouncementsRead,
+  useMarkAnnouncementRead,
+} from "../../hooks/useAnnouncements";
 
 interface NavbarProps {
   onMenuClick?: () => void;
@@ -13,7 +20,11 @@ interface NavbarProps {
 
 export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const { isAuthenticated } = useAuth();
+  const { announcementUnreadCount, setAnnouncementUnreadCount } = useGame();
   const location = useLocation();
+  const { data: announcementsData, isLoading: announcementsLoading } = useAnnouncements();
+  const markAnnouncementReadMutation = useMarkAnnouncementRead();
+  const markAllAnnouncementsReadMutation = useMarkAllAnnouncementsRead();
 
   const isTasksEnabled = useFeatureFlag("tasksFeature");
 
@@ -22,6 +33,26 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const isActivitiesPage = location.pathname === "/activities";
   const isTasksPage = location.pathname === "/tasks";
   const isAccountPage = location.pathname === "/account";
+
+  const announcements = announcementsData?.results ?? [];
+  const unreadCount = announcementsData?.unread_count ?? announcementUnreadCount;
+  const [mobileAnnouncementsOpen, setMobileAnnouncementsOpen] = useState(false);
+
+  useEffect(() => {
+    if (announcementsData) {
+      setAnnouncementUnreadCount(announcementsData.unread_count);
+    }
+  }, [announcementsData, setAnnouncementUnreadCount]);
+
+  const handleMarkOneRead = async (announcementId: number) => {
+    const result = await markAnnouncementReadMutation.mutateAsync(announcementId);
+    setAnnouncementUnreadCount(result.unread_count);
+  };
+
+  const handleMarkAllRead = async () => {
+    const result = await markAllAnnouncementsReadMutation.mutateAsync();
+    setAnnouncementUnreadCount(result.unread_count);
+  };
 
   return (
     <header className={styles.header}>
@@ -84,6 +115,84 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   ❓
                 </Button>
               )}
+              <Popover.Root>
+                <Popover.Trigger asChild>
+                  <Button
+                    className={`${styles.navLink} ${styles.announcementsTrigger}`}
+                    variant="secondary"
+                    ariaLabel="Announcements"
+                  >
+                    <span aria-hidden="true">🔔</span>
+                    {unreadCount > 0 && (
+                      <span className={`${styles.unreadBadge} ${styles.unreadBadgeOnTrigger}`}>
+                        {unreadCount > 99 ? "99+" : unreadCount}
+                      </span>
+                    )}
+                  </Button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    className={styles.announcementsPopoverContent}
+                    side="bottom"
+                    align="end"
+                    sideOffset={6}
+                  >
+                    <div className={styles.announcementsPopoverHeader}>
+                      <strong>Announcements</strong>
+                      <button
+                        className={styles.popoverActionButton}
+                        type="button"
+                        onClick={() => {
+                          void handleMarkAllRead();
+                        }}
+                        disabled={unreadCount === 0 || markAllAnnouncementsReadMutation.isPending}
+                      >
+                        Mark all read
+                      </button>
+                    </div>
+
+                    {announcementsLoading && (
+                      <p className={styles.announcementsEmpty}>Loading announcements...</p>
+                    )}
+
+                    {!announcementsLoading && announcements.length === 0 && (
+                      <p className={styles.announcementsEmpty}>No announcements yet.</p>
+                    )}
+
+                    {!announcementsLoading && announcements.length > 0 && (
+                      <ul className={styles.announcementsList}>
+                        {announcements.map((announcement) => (
+                          <li key={announcement.id} className={styles.announcementItem}>
+                            <div className={styles.announcementTitleRow}>
+                              <span>{announcement.title}</span>
+                              {!announcement.is_read && <span className={styles.unreadDot} aria-hidden="true" />}
+                            </div>
+                            {announcement.summary && (
+                              <p className={styles.announcementSummary}>{announcement.summary}</p>
+                            )}
+                            <details className={styles.announcementDetails}>
+                              <summary>View full</summary>
+                              <p className={styles.announcementBody}>{announcement.body}</p>
+                            </details>
+                            {!announcement.is_read && (
+                              <button
+                                className={styles.popoverActionButton}
+                                type="button"
+                                onClick={() => {
+                                  void handleMarkOneRead(announcement.id);
+                                }}
+                                disabled={markAnnouncementReadMutation.isPending}
+                              >
+                                Mark read
+                              </button>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
               <Link to="/account" aria-label="Go to your account">
                 <Button
                   className={styles.navLink}
@@ -92,6 +201,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   <span aria-hidden="true">👤 </span>Account
                 </Button>
               </Link>
+
               <Link to="/logout" aria-label="Log out of your account">
                 <Button variant="secondary" className={styles.navLink}>
                   <span aria-hidden="true">👋 </span>Log out
@@ -173,6 +283,81 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                         >
                           <span aria-hidden="true">❓ </span>Tutorial
                         </DropdownMenu.Item>
+                      )}
+                      <DropdownMenu.Item
+                        className={styles.accountDropdownItem}
+                        onSelect={(event) => {
+                          event.preventDefault();
+                          setMobileAnnouncementsOpen((prev) => !prev);
+                        }}
+                      >
+                        <span aria-hidden="true">🔔</span>Announcements
+                        {unreadCount > 0 && (
+                          <span className={styles.unreadBadge}>
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
+                      </DropdownMenu.Item>
+                      {mobileAnnouncementsOpen && (
+                        <div className={styles.mobileAnnouncementsPanel}>
+                          <div className={styles.mobileAnnouncementsHeader}>
+                            <strong>Announcements</strong>
+                            <button
+                              className={styles.popoverActionButton}
+                              type="button"
+                              onClick={() => {
+                                void handleMarkAllRead();
+                              }}
+                              disabled={
+                                unreadCount === 0 || markAllAnnouncementsReadMutation.isPending
+                              }
+                            >
+                              Mark all read
+                            </button>
+                          </div>
+
+                          {announcementsLoading && (
+                            <p className={styles.announcementsEmpty}>Loading announcements...</p>
+                          )}
+
+                          {!announcementsLoading && announcements.length === 0 && (
+                            <p className={styles.announcementsEmpty}>No announcements yet.</p>
+                          )}
+
+                          {!announcementsLoading && announcements.length > 0 && (
+                            <ul className={styles.announcementsList}>
+                              {announcements.map((announcement) => (
+                                <li key={announcement.id} className={styles.announcementItem}>
+                                  <div className={styles.announcementTitleRow}>
+                                    <span>{announcement.title}</span>
+                                    {!announcement.is_read && (
+                                      <span className={styles.unreadDot} aria-hidden="true" />
+                                    )}
+                                  </div>
+                                  {announcement.summary && (
+                                    <p className={styles.announcementSummary}>{announcement.summary}</p>
+                                  )}
+                                  <details className={styles.announcementDetails}>
+                                    <summary>View full</summary>
+                                    <p className={styles.announcementBody}>{announcement.body}</p>
+                                  </details>
+                                  {!announcement.is_read && (
+                                    <button
+                                      className={styles.popoverActionButton}
+                                      type="button"
+                                      onClick={() => {
+                                        void handleMarkOneRead(announcement.id);
+                                      }}
+                                      disabled={markAnnouncementReadMutation.isPending}
+                                    >
+                                      Mark read
+                                    </button>
+                                  )}
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       )}
                       <DropdownMenu.Item className={styles.accountDropdownItem} asChild>
                         <Link to="/account">

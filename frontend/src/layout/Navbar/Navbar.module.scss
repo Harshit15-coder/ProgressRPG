@@ -58,6 +58,130 @@
     @include c.apply-text-tone(map.get(c.$text-tone, invert));
 }
 
+.unreadBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.2rem;
+  height: 1.2rem;
+  border-radius: 999px;
+  padding: 0 0.35rem;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(c.$color-border-accent, 0.8);
+}
+
+.announcementsTrigger {
+  position: relative;
+  width: 2.4rem;
+  min-width: 2.4rem;
+  height: 2.4rem;
+  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.unreadBadgeOnTrigger {
+  position: absolute;
+  top: -0.25rem;
+  right: -0.25rem;
+  margin-left: 0;
+}
+
+.announcementsPopoverContent {
+  width: min(22rem, 92vw);
+  max-height: 65vh;
+  overflow: auto;
+  background: c.$color-bg;
+  border: 1px solid rgba(c.$color-border-primary, 0.25);
+  border-radius: v.$border-radius;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  padding: v.$spacing-sm;
+  z-index: v.$z-indexdropdown;
+}
+
+.announcementsPopoverHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$spacing-sm;
+  margin-bottom: v.$spacing-sm;
+}
+
+.announcementsList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-sm;
+}
+
+.announcementItem {
+  border: 1px solid rgba(c.$color-border-primary, 0.2);
+  border-radius: v.$border-radius;
+  padding: v.$spacing-sm;
+}
+
+.announcementTitleRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$spacing-sm;
+  font-weight: 600;
+}
+
+.announcementSummary {
+  margin: v.$spacing-xs 0;
+  font-size: 0.9rem;
+  opacity: 0.9;
+}
+
+.announcementDetails {
+  margin: 0 0 v.$spacing-xs;
+
+  summary {
+    cursor: pointer;
+    font-size: 0.85rem;
+    text-decoration: underline;
+  }
+}
+
+.announcementBody {
+  margin: v.$spacing-xs 0 0;
+  font-size: 0.9rem;
+  white-space: pre-wrap;
+  line-height: 1.35;
+}
+
+.announcementsEmpty {
+  margin: 0;
+  opacity: 0.8;
+}
+
+.popoverActionButton {
+  border: none;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  text-decoration: underline;
+  font-size: 0.85rem;
+  padding: 0;
+
+  &:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+}
+
+.unreadDot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: c.$color-border-primary;
+}
+
 .accountMenu {
   position: relative;
   display: flex;
@@ -141,11 +265,36 @@
   border: none;
   background: none;
 
+  a {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    gap: v.$spacing-xs;
+    text-decoration: none;
+    color: inherit;
+  }
+
   &:hover,
   &[data-highlighted] {
     background: rgba(c.$color-border-primary, 0.08);
     outline: none;
   }
+}
+
+.mobileAnnouncementsPanel {
+  margin: 0 v.$spacing-sm v.$spacing-sm;
+  padding: v.$spacing-sm;
+  border: 1px solid rgba(c.$color-border-primary, 0.2);
+  border-radius: v.$border-radius;
+  background: rgba(c.$color-bg, 0.95);
+}
+
+.mobileAnnouncementsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: v.$spacing-sm;
+  margin-bottom: v.$spacing-sm;
 }
 
 //.account {
