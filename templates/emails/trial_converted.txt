@@ -1,0 +1,12 @@
+Welcome to Progress RPG Premium!
+
+Hello {{ email }},
+
+Your trial has converted to a paid {{ plan_name }} subscription — welcome to Progress RPG Premium!
+
+Manage your subscription and billing details: {{ account_url }}
+
+Best wishes,
+Duncan (Founder, Progress RPG)
+
+© {{ current_year }} Progress RPG. All rights reserved.

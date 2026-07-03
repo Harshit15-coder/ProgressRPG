@@ -1,11 +1,11 @@
-<!-- templates/emails/welcome_email.html -->
+<!-- templates/emails/trial_converted.html -->
 <html>
 <head>
     <style>
         body {
             font-family: Arial, sans-serif;
             color: #333;
-            background-color: red;
+            background-color: #f4f4f4;
             padding: 20px;
         }
         .email-container {
@@ -34,12 +34,12 @@
 <body>
     <div class="email-container">
         <div class="email-header">
-            Welcome to Progress!
+            Welcome to Premium!
         </div>
         <div class="email-content">
             <p>Hello,</p>
-            <p>Thank you for signing up to Progress RPG! We are excited to have you as part of our community.</p>
-            <p>We recommend you complete your profile to get started with all the features available to you!</p>
+            <p>Your trial has converted to a paid {{ plan_name }} subscription — welcome to Progress RPG Premium!</p>
+            <p><a href="{{ account_url }}">Manage your subscription and billing details</a></p>
             <p>Best wishes, <br/> Duncan (Founder, Progress RPG)</p>
         </div>
         <div class="email-footer">
