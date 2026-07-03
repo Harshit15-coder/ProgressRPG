@@ -1,6 +1,7 @@
 from asgiref.sync import async_to_sync
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
+from django.core.cache import cache
 from django.test import TransactionTestCase
 
 from character.models import PlayerCharacterLink
@@ -39,6 +40,9 @@ class MockTimer:
 
 class TimerConsumerNoCharacterTests(TransactionTestCase):
     def setUp(self):
+        # The online-count cache is shared real Redis state across tests;
+        # clear it so a value cached by another test doesn't leak in here.
+        cache.clear()
         self.user = get_user_model().objects.create_user(
             email="ws-no-character@example.com",
             password="test-pass-123",
@@ -148,6 +152,7 @@ class TimerConsumerAuthTests(TransactionTestCase):
 
 class TimerConsumerDisconnectTests(TransactionTestCase):
     def setUp(self):
+        cache.clear()
         self.user = get_user_model().objects.create_user(
             email="ws-disconnect@example.com",
             password="test-pass-123",
@@ -243,3 +248,32 @@ class TimerConsumerOnlineCountEventTests(TransactionTestCase):
         self.assertEqual(len(consumer.send_json.calls), 1)
         sent_payload = consumer.send_json.calls[0][0][0]
         self.assertEqual(sent_payload, {"type": "online_count", "count": 7})
+
+
+class TimerConsumerHeartbeatTests(TransactionTestCase):
+    """A client 'ping' must refresh Player.last_seen so
+    reconcile_stale_online_players doesn't sweep up live connections."""
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="ws-heartbeat@example.com",
+            password="test-pass-123",
+        )
+        self.player = self.user.player
+
+    def test_ping_refreshes_last_seen(self):
+        consumer = TimerConsumer()
+        consumer.player = self.player
+        consumer.send_json = AsyncCallRecorder()
+
+        self.assertIsNone(self.player.last_seen)
+
+        async_to_sync(consumer.receive_json)({"type": "ping"})
+
+        self.player.refresh_from_db(fields=["last_seen"])
+        self.assertIsNotNone(self.player.last_seen)
+
+        sent_payloads = [args[0] for args, _ in consumer.send_json.calls]
+        self.assertIn(
+            {"type": "pong", "action": "pong", "message": "pong"}, sent_payloads
+        )

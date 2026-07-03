@@ -345,15 +345,6 @@ class Player(Person):
         currency, _ = self.currencies.get_or_create(currency=currency_def)
         return currency
 
-    def set_online(self):
-        """Registers a new active connection and updates online status."""
-        logger.debug("[SET ONLINE] Running set_online for player")
-        self.register_connection()
-
-    def set_offline(self):
-        """Registers a closed connection and updates online status."""
-        self.unregister_connection()
-
     @transaction.atomic
     def register_connection(self):
         """Increment active connections and mark player online."""

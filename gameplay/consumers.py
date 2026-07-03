@@ -6,7 +6,7 @@ from channels.db import database_sync_to_async
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
 from django.db import transaction
 
-# from django.utils.timezone import now
+from django.utils import timezone
 import json, logging
 from django.core.cache import cache
 
@@ -15,6 +15,8 @@ from users.models import Player
 
 DISCONNECT_GRACE_SECONDS = 30
 DISCONNECT_TASK_CACHE_KEY = "disconnect_task:{player_id}"
+ONLINE_COUNT_CACHE_KEY = "online_count"
+ONLINE_COUNT_CACHE_SECONDS = 2
 
 from .models import ServerMessage
 from .utils import process_completion, process_initiation, control_timers
@@ -26,7 +28,11 @@ logger_errors = logging.getLogger("errors")
 class TimerConsumer(AsyncJsonWebsocketConsumer):
     @database_sync_to_async
     def get_online_count(self):
-        return Player.online_count()
+        count = cache.get(ONLINE_COUNT_CACHE_KEY)
+        if count is None:
+            count = Player.online_count()
+            cache.set(ONLINE_COUNT_CACHE_KEY, count, timeout=ONLINE_COUNT_CACHE_SECONDS)
+        return count
 
     async def broadcast_online_count(self):
         online_count = await self.get_online_count()
@@ -36,6 +42,18 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                 "type": "online_count",
                 "count": online_count,
             },
+        )
+
+    @database_sync_to_async
+    def record_heartbeat(self):
+        """
+        Refresh `last_seen` so `reconcile_stale_online_players` knows this
+        connection is still alive. Without this, a player whose worker
+        process dies without running disconnect() would stay marked
+        online forever.
+        """
+        type(self.player).objects.filter(pk=self.player.pk).update(
+            last_seen=timezone.now()
         )
 
     async def connect(self):
@@ -93,11 +111,8 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                 )
 
             await database_sync_to_async(self.player.register_connection)()
-            is_online_now = await database_sync_to_async(
-                lambda: self.player.is_online
-            )()
             logger.debug(
-                f"[CONNECT] Player {self.player.id} is_online={is_online_now}"
+                f"[CONNECT] Player {self.player.id} is_online={self.player.is_online}"
             )  # ✅ Verify status
 
             await self.channel_layer.group_add(self.player_group, self.channel_name)
@@ -225,6 +240,7 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
                 # logger.debug(f"[RECEIVE JSON] Sending to handle_client_request")
                 await self.handle_client_request(event)
             elif message_type == "ping":
+                await self.record_heartbeat()
                 await self.send_json(
                     {"type": "pong", "action": "pong", "message": "pong"}
                 )
