@@ -1,4 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
+@use '../../styles/utilities/tier-colors' as tc;
 @use '../../styles/base/variables' as v;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
@@ -100,29 +101,23 @@
 }
 
 .tierGrey {
-  --achievement-color: #{c.$color-text-muted};
-  --achievement-bg: #{rgba(c.$color-text-muted, 0.12)};
+  @include tc.tier-vars(grey);
 }
 
 .tierGreen {
-  --achievement-color: #{c.$color-border-primary};
-  --achievement-bg: #{rgba(c.$color-border-primary, 0.12)};
+  @include tc.tier-vars(green);
 }
 
-// No blue or purple in the design system — intentional palette extensions for tiers 3 and 4
 .tierBlue {
-  --achievement-color: #1565c0;
-  --achievement-bg: rgba(21, 101, 192, 0.12);
+  @include tc.tier-vars(blue);
 }
 
 .tierPurple {
-  --achievement-color: #6a1b9a;
-  --achievement-bg: rgba(106, 27, 154, 0.12);
+  @include tc.tier-vars(purple);
 }
 
 .tierGold {
-  --achievement-color: #{c.$color-warning-dark};
-  --achievement-bg: #{rgba(c.$color-warning-dark, 0.14)};
+  @include tc.tier-vars(gold);
 }
 
 @include m.respond-to(md, down) {

@@ -1,0 +1,108 @@
+@use '../../styles/utilities/tier-colors' as tc;
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/colors' as c;
+
+.badgeRow {
+  display: flex;
+  align-items: center;
+  gap: v.$spacing-xs;
+  flex-shrink: 0;
+}
+
+.badge {
+  --achievement-color: #{c.$color-text-muted};
+  --achievement-bg: #{rgba(c.$color-text-muted, 0.12)};
+  --progress: 0;
+
+  --ring-width: 0.2rem;
+
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  padding: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--achievement-bg);
+  cursor: default;
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: conic-gradient(
+      var(--achievement-color) calc(var(--progress) * 1%),
+      c.$color-border-light 0
+    );
+    -webkit-mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - var(--ring-width)),
+      #000 calc(100% - var(--ring-width))
+    );
+    mask: radial-gradient(
+      farthest-side,
+      transparent calc(100% - var(--ring-width)),
+      #000 calc(100% - var(--ring-width))
+    );
+  }
+
+  span {
+    position: relative;
+    z-index: 1;
+    font-size: 0.6rem;
+    line-height: 1;
+  }
+
+  &:focus-visible {
+    outline: 2px solid var(--achievement-color);
+    outline-offset: 2px;
+  }
+
+  @include m.respond-to(sm, down) {
+    width: 1.5rem;
+    height: 1.5rem;
+
+    span {
+      font-size: 0.5rem;
+    }
+  }
+}
+
+.badgeComplete {
+  box-shadow: 0 0 0 1px rgba(c.$color-warning, 0.4);
+}
+
+.tierGrey {
+  @include tc.tier-vars(grey);
+}
+
+.tierGreen {
+  @include tc.tier-vars(green);
+}
+
+.tierBlue {
+  @include tc.tier-vars(blue);
+}
+
+.tierPurple {
+  @include tc.tier-vars(purple);
+}
+
+.tierGold {
+  @include tc.tier-vars(gold);
+}
+
+.tooltipContent {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+
+  strong {
+    font-weight: 700;
+  }
+}

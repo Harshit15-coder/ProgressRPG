@@ -1,4 +1,5 @@
 import styles from "./Achievements.module.scss";
+import { achievementProgress, formatAchievementValue, tierClassName } from "./achievementUtils";
 
 interface Achievement {
   type: string;
@@ -16,34 +17,6 @@ interface AchievementsProps {
   achievements?: Achievement[];
 }
 
-const formatAchievementValue = (type: string, value: number): string => {
-  const numericValue = Number(value) || 0;
-
-  if (type !== "time") {
-    return numericValue.toLocaleString();
-  }
-
-  const hours = Math.floor(numericValue / 3600);
-  const minutes = Math.floor((numericValue % 3600) / 60);
-
-  if (hours <= 0) {
-    return `${minutes}m`;
-  }
-
-  if (minutes <= 0) {
-    return `${hours}h`;
-  }
-
-  return `${hours}h ${minutes}m`;
-};
-
-const tierClassName = (color: string | undefined): string => {
-  const normalized = typeof color === "string"
-    ? color.charAt(0).toUpperCase() + color.slice(1)
-    : "";
-  return styles[`tier${normalized}`] || styles.tierGrey;
-};
-
 export default function Achievements({ achievements = [] }: AchievementsProps) {
   const normalizedAchievements = Array.isArray(achievements) ? achievements : [];
 
@@ -52,12 +25,7 @@ export default function Achievements({ achievements = [] }: AchievementsProps) {
       <h2>Achievements</h2>
       <div className={styles.achievementGrid}>
         {normalizedAchievements.map((achievement) => {
-          const progress = achievement.threshold > 0
-            ? Math.min(
-                100,
-                Math.round((achievement.value / achievement.threshold) * 100)
-              )
-            : 0;
+          const progress = achievementProgress(achievement);
           const valueLabel = formatAchievementValue(
             achievement.type,
             achievement.value
@@ -69,7 +37,7 @@ export default function Achievements({ achievements = [] }: AchievementsProps) {
 
           return (
             <article
-              className={`${styles.achievementBadge} ${tierClassName(achievement.color)} ${
+              className={`${styles.achievementBadge} ${tierClassName(styles, achievement.color)} ${
                 achievement.complete ? styles.achievementComplete : ""
               }`}
               key={achievement.type}
