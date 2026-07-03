@@ -141,10 +141,11 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
             logger.info(f"[DISCONNECT] Removed from group: {self.player_group}")
             await self.channel_layer.group_discard(self.player_group, self.channel_name)
 
-        # Re-fetch the timer from DB so we don't act on stale in-memory state
-        # (process_initiation/process_completion fetch their own copies and mutate
-        # those, not self.activity_timer).
-        activity_timer = await self.get_activity_timer()
+        # Prefer the current in-memory timer state for this socket session,
+        # falling back to DB if it is not set.
+        activity_timer = getattr(self, "activity_timer", None)
+        if activity_timer is None:
+            activity_timer = await self.get_activity_timer()
 
         if activity_timer and activity_timer.status == "active":
             # Give the player DISCONNECT_GRACE_SECONDS to reconnect before
