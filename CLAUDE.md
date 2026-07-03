@@ -117,6 +117,6 @@ React SPA served separately (port 5173 in dev, built via Vite for prod).
 
 ### Branch/Deploy Strategy
 
-- `development` → active dev branch
-- `staging` → base for PRs; deploys to staging via `render-staging.yaml`
+- `development` → active dev branch; base for feature-branch PRs
+- `staging` → receives periodic merges from `development`; deploys to staging via `render-staging.yaml`
 - Production deploys via `render.yaml`

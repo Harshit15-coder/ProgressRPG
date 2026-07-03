@@ -1,0 +1,50 @@
+import type { Meta, StoryObj } from '@storybook/react-vite';
+import { expect, within } from 'storybook/test';
+import AlertDialog from './AlertDialog';
+
+/**
+ * `AlertDialog` interrupts the user with a confirm/destructive prompt that
+ * requires an explicit decision before continuing (Radix `AlertDialog`
+ * under the hood). Use it in place of `window.confirm`. For non-blocking
+ * informational overlays, use `Modal`.
+ */
+const meta: Meta<typeof AlertDialog> = {
+  title: 'Shared/AlertDialog',
+  component: AlertDialog,
+  tags: ['autodocs'],
+  args: {
+    open: true,
+    title: 'Delete this activity?',
+    description: 'This action cannot be undone.',
+    onConfirm: () => {},
+    onCancel: () => {},
+  },
+};
+
+export default meta;
+type Story = StoryObj<typeof AlertDialog>;
+
+export const Default: Story = {};
+
+export const Destructive: Story = {
+  args: {
+    variant: 'destructive',
+    confirmLabel: 'Delete',
+  },
+  play: async ({ canvasElement }) => {
+    // AlertDialog renders via a Radix Portal into document.body, outside the canvas.
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole('alertdialog', { name: 'Delete this activity?' });
+    await expect(dialog).toBeVisible();
+    await expect(body.getByRole('button', { name: 'Delete' })).toBeVisible();
+  },
+};
+
+export const CustomLabels: Story = {
+  args: {
+    title: 'Discard changes?',
+    description: "You'll lose any unsaved edits.",
+    confirmLabel: 'Discard',
+    cancelLabel: 'Keep editing',
+  },
+};
