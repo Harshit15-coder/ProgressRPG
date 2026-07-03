@@ -84,7 +84,7 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
     refreshToken: string,
     options: { rememberMe?: boolean } = {}
   ): Promise<unknown> => {
-    const { rememberMe = true } = options;
+    const { rememberMe = false } = options;
     storeAuthTokens(accessToken, refreshToken, rememberMe);
     setAccessToken(accessToken);
     setRefreshToken(refreshToken);
