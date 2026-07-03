@@ -1,0 +1,12 @@
+Your Progress RPG trial has ended
+
+Hello {{ email }},
+
+Your Progress RPG premium trial has ended and premium features have been turned off, since no payment method was added.
+
+You can resubscribe at any time to get premium back: {{ upgrade_url }}
+
+Best regards,
+The Team
+
+© {{ current_year }} Progress RPG. All rights reserved.
