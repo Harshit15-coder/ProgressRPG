@@ -6,7 +6,7 @@ Your Progress RPG premium trial has ended and premium features have been turned 
 
 You can resubscribe at any time to get premium back: {{ upgrade_url }}
 
-Best regards,
-The Team
+Best wishes,
+Duncan (Founder, Progress RPG)
 
 © {{ current_year }} Progress RPG. All rights reserved.

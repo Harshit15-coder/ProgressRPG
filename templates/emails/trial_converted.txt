@@ -6,7 +6,7 @@ Your trial has converted to a paid {{ plan_name }} subscription — welcome to P
 
 Manage your subscription and billing details: {{ account_url }}
 
-Best regards,
-The Team
+Best wishes,
+Duncan (Founder, Progress RPG)
 
 © {{ current_year }} Progress RPG. All rights reserved.

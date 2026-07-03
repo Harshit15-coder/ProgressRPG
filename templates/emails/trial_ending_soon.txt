@@ -8,7 +8,7 @@ Manage your subscription: {{ account_url }}
 
 If you don't add payment details, your premium access will end automatically and you won't be charged.
 
-Best regards,
-The Team
+Best wishes,
+Duncan (Founder, Progress RPG)
 
 © {{ current_year }} Progress RPG. All rights reserved.
