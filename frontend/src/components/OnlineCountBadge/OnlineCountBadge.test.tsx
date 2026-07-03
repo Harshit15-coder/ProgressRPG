@@ -7,15 +7,15 @@ vi.mock('../../context/AuthContext', () => ({
   useAuth: () => ({ isAuthenticated: true }),
 }));
 
-const mockUseGame = vi.fn(() => ({ onlinePlayerCount: 12 }));
+const mockUseOnlineCount = vi.fn(() => ({ onlinePlayerCount: 12 }));
 
-vi.mock('../../context/GameContext', () => ({
-  useGame: () => mockUseGame(),
+vi.mock('../../context/OnlineCountContext', () => ({
+  useOnlineCount: () => mockUseOnlineCount(),
 }));
 
 describe('OnlineCountBadge', () => {
   it('shows the current online player count', () => {
-    mockUseGame.mockReturnValue({ onlinePlayerCount: 12 });
+    mockUseOnlineCount.mockReturnValue({ onlinePlayerCount: 12 });
 
     render(<OnlineCountBadge />);
 
@@ -23,7 +23,7 @@ describe('OnlineCountBadge', () => {
   });
 
   it('updates displayed count from shared state', () => {
-    mockUseGame.mockReturnValue({ onlinePlayerCount: 3 });
+    mockUseOnlineCount.mockReturnValue({ onlinePlayerCount: 3 });
 
     render(<OnlineCountBadge />);
 

@@ -1,5 +1,5 @@
 import React, { useMemo, useEffect } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { useTasks } from "../../hooks/useTasks";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import List from "../List/List";

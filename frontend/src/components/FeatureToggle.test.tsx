@@ -6,7 +6,7 @@ import type { FeatureFlagKey } from '../types';
 const mockUseGame = vi.fn();
 const mockUseAppConfig = vi.fn();
 
-vi.mock('../context/GameContext', () => ({
+vi.mock('../hooks/useGame', () => ({
   useGame: () => mockUseGame(),
 }));
 

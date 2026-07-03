@@ -29,6 +29,7 @@ export function useBootstrapGameData() {
   const [buildNumber, setBuildNumber] = useState<string | boolean>(true);
   const [freeTimerLimitSeconds, setFreeTimerLimitSeconds] = useState<number>(1800);
   const [gameSettings, setGameSettings] = useState<GameSettings | null>(null);
+  const [onlineCount, setOnlineCount] = useState<number>(0);
 
   useEffect(() => {
     if (authLoading) return;
@@ -59,6 +60,7 @@ export function useBootstrapGameData() {
         setLoginRewardXp(Number(info.login_reward_xp) || 0);
         setBuildNumber(info.build_number);
         setGameSettings(info.game_settings ?? null);
+        setOnlineCount(Number(info.online_count) || 0);
         setFreeTimerLimitSeconds(info.game_settings?.free_timer_limit_seconds ?? info.free_timer_limit_seconds ?? 1800);
       } catch (err) {
         console.error('[Bootstrap] Error loading game data:', err);
@@ -84,6 +86,7 @@ export function useBootstrapGameData() {
     buildNumber,
     freeTimerLimitSeconds,
     gameSettings,
+    onlineCount,
     loading,
     error
   };

@@ -1,11 +1,11 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useGame } from '../../context/GameContext';
+import { useOnlineCount } from '../../context/OnlineCountContext';
 import styles from './OnlineCountBadge.module.scss';
 
 export default function OnlineCountBadge() {
   const { isAuthenticated } = useAuth();
-  const { onlinePlayerCount } = useGame();
+  const { onlinePlayerCount } = useOnlineCount();
 
   if (!isAuthenticated) {
     return null;

@@ -1,6 +1,6 @@
 import React from "react";
 import { Navigate } from "react-router-dom";
-import { useGame } from "../context/GameContext";
+import { useGame } from "../hooks/useGame";
 
 interface RequirePremiumProps {
   children: React.ReactNode;

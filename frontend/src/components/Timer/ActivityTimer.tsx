@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import Button from "../Button/Button";
 import ButtonFrame from "../Button/ButtonFrame";
 import Input from "../Input/Input";

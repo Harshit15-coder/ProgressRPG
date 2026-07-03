@@ -10,7 +10,7 @@ import OnlineCountBadge from './components/OnlineCountBadge/OnlineCountBadge';
 import FeedbackWidget from './components/FeedbackWidget/FeedbackWidget';
 import TutorialModal from './components/TutorialModal/TutorialModal';
 import { useAuth } from './context/AuthContext';
-import { useGame } from './context/GameContext';
+import { useGame } from './hooks/useGame';
 import { apiFetch } from './utils/api';
 
 const announcement = `Progress RPG is in alpha status, and under active development. Bugs may appear, and data may be lost. Thank you for testing!`;

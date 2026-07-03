@@ -10,7 +10,7 @@ const mockUseGame = vi.fn();
 const mockUseAppConfig = vi.fn();
 const mockApiFetch = vi.fn();
 
-vi.mock("../../context/GameContext", () => ({
+vi.mock("../../hooks/useGame", () => ({
   useGame: () => mockUseGame(),
 }));
 

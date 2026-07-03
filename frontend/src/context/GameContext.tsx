@@ -1,12 +1,13 @@
 /* eslint-disable react-hooks/set-state-in-effect */
 // GameContext.tsx
-import { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import type { Dispatch, ReactElement, ReactNode, SetStateAction } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import type { ReactElement, ReactNode } from 'react';
 
 import { useBootstrapGameData } from '../hooks/useBootstrapGameData';
 import { apiFetch } from "../utils/api";
 import useActivityTimer from '../hooks/useActivityTimer';
 import { useAuth } from './AuthContext';
+import { GameContext, type GameContextValue } from './gameContext';
 import type {
   Player,
   Character,
@@ -14,9 +15,6 @@ import type {
   PlayerActivity,
   CharacterActivity,
   PopulationCentre,
-  GameSettings,
-  LoginState,
-  ActivityTimerReturn,
 } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -31,44 +29,9 @@ interface CharacterCurrentResponse {
   current: CharacterActivity | null;
 }
 
-export interface GameContextValue {
-  player: Player | null;
-  setPlayer: Dispatch<SetStateAction<Player | null>>;
-  character: Character | null;
-  setCharacter: Dispatch<SetStateAction<Character | null>>;
-  xpMods: XpModifier[];
-  setXpMods: Dispatch<SetStateAction<XpModifier[]>>;
-  fetchPlayerAndCharacter: () => Promise<void>;
-  activityTimer: ActivityTimerReturn;
-  playerActivities: PlayerActivity[];
-  characterActivities: CharacterActivity[];
-  fetchActivities: () => Promise<void>;
-  fetchCharacterCurrent: () => Promise<CharacterActivity | null>;
-  characterCurrentActivity: CharacterActivity | null;
-  setCharacterCurrentActivity: Dispatch<SetStateAction<CharacterActivity | null>>;
-  populationCentre: PopulationCentre | null;
-  fetchPopulationCentre: (pcId: number) => Promise<PopulationCentre>;
-  loginState: LoginState;
-  loginStreak: number;
-  loginEventAt: string | null;
-  loginRewardXp: number;
-  loading: boolean;
-  buildNumber: string | boolean;
-  freeTimerLimitSeconds: number;
-  gameSettings: GameSettings | null;
-  onlinePlayerCount: number;
-  setOnlinePlayerCount: Dispatch<SetStateAction<number>>;
-}
-
 interface ProviderProps {
   children: ReactNode;
 }
-
-// ---------------------------------------------------------------------------
-// Context
-// ---------------------------------------------------------------------------
-
-const GameContext = createContext<GameContextValue | null>(null);
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -80,19 +43,6 @@ const getActivityWindow = (): { start: string } => {
   return {
     start: since.toISOString(),
   };
-};
-
-// ---------------------------------------------------------------------------
-// Hook
-// ---------------------------------------------------------------------------
-
-// eslint-disable-next-line react-refresh/only-export-components
-export const useGame = (): GameContextValue => {
-  const ctx = useContext(GameContext);
-  if (!ctx) {
-    throw new Error('useGame must be used within a GameProvider');
-  }
-  return ctx;
 };
 
 // ---------------------------------------------------------------------------
@@ -115,6 +65,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
     buildNumber,
     freeTimerLimitSeconds,
     gameSettings,
+    onlineCount: initialOnlineCount,
   } = useBootstrapGameData();
 
 
@@ -125,7 +76,6 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
   const [characterActivities, setCharacterActivities] = useState<CharacterActivity[]>([]);
   const [characterCurrentActivity, setCharacterCurrentActivity] = useState<CharacterActivity | null>(null);
   const [populationCentre, setPopulationCentre] = useState<PopulationCentre | null>(populationCentreInfo);
-  const [onlinePlayerCount, setOnlinePlayerCount] = useState<number>(0);
 
   const activityTimer = useActivityTimer();
   const { loadFromServer } = activityTimer;
@@ -238,8 +188,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       buildNumber,
       freeTimerLimitSeconds,
       gameSettings,
-      onlinePlayerCount,
-      setOnlinePlayerCount,
+      initialOnlineCount,
     }),
     [
       player,
@@ -256,7 +205,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       buildNumber,
       freeTimerLimitSeconds,
       gameSettings,
-      onlinePlayerCount,
+      initialOnlineCount,
       populationCentre,
       fetchPopulationCentre,
       loginState,
