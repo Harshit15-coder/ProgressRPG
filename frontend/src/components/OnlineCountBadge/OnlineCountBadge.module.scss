@@ -2,6 +2,7 @@
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/spacing' as sp;
+@use '../../styles/utilities/mixins' as mix;
 @use 'sass:map';
 
 .badge {
@@ -14,16 +15,12 @@
   border-radius: v.$border-radius;
   padding: map.get(sp.$gap, xs) map.get(sp.$gap, sm);
   @include t.apply-text-style(t.$text-body);
-}
 
-@media (max-width: 768px) {
-  .badge {
+  @include mix.respond-to(md, down) {
     bottom: 8rem;
   }
-}
 
-@media (max-width: 576px) {
-  .badge {
+  @include mix.respond-to(sm, down) {
     bottom: 9rem;
   }
 }
