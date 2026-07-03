@@ -9,6 +9,5 @@ pip-review
 pip-tools
 pipdeptree
 pre_commit
-Sphinx
 types-PyYAML
 wheel

@@ -4,8 +4,6 @@
 #
 #    pip-compile dev-requirements.in
 #
-alabaster==1.0.0
-    # via sphinx
 amqp==5.3.1
     # via
     #   -r requirements.in
@@ -33,8 +31,6 @@ autobahn==26.6.2
     # via daphne
 automat==25.4.16
     # via twisted
-babel==2.18.0
-    # via sphinx
 billiard==4.2.4
     # via
     #   -r requirements.in
@@ -173,8 +169,6 @@ djangorestframework==3.17.1
     #   drf-spectacular
 djangorestframework-simplejwt==5.5.1
     # via -r requirements.in
-docutils==0.22.4
-    # via sphinx
 drf-spectacular==0.29.0
     # via -r requirements.in
 filelock==3.29.5
@@ -194,14 +188,10 @@ idna==3.18
     #   hyperlink
     #   requests
     #   twisted
-imagesize==2.0.0
-    # via sphinx
 incremental==24.11.0
     # via twisted
 inflection==0.5.1
     # via drf-spectacular
-jinja2==3.1.6
-    # via sphinx
 jsonschema==4.26.0
     # via
     #   -r requirements.in
@@ -215,9 +205,7 @@ kombu==5.6.2
 librt==0.12.0
     # via mypy
 markupsafe==3.0.3
-    # via
-    #   jinja2
-    #   werkzeug
+    # via werkzeug
 msgpack==1.2.1
     # via
     #   -r requirements.in
@@ -238,7 +226,6 @@ packaging==26.2
     #   kombu
     #   pip-review
     #   pipdeptree
-    #   sphinx
     #   wheel
 pathspec==1.1.1
     # via mypy
@@ -264,8 +251,6 @@ psycopg2-binary==2.9.12
     # via -r requirements.in
 pycparser==3.0
     # via cffi
-pygments==2.20.0
-    # via sphinx
 pyjwt==2.13.0
     # via
     #   -r requirements.in
@@ -310,10 +295,7 @@ referencing==0.37.0
 requests==2.34.2
     # via
     #   -r requirements.in
-    #   sphinx
     #   stripe
-roman-numerals==4.1.0
-    # via sphinx
 rpds-py==2026.6.3
     # via
     #   jsonschema
@@ -326,22 +308,6 @@ service-identity==26.1.0
     # via twisted
 six==1.17.0
     # via python-dateutil
-snowballstemmer==3.1.1
-    # via sphinx
-sphinx==9.1.0
-    # via -r dev-requirements.in
-sphinxcontrib-applehelp==2.0.0
-    # via sphinx
-sphinxcontrib-devhelp==2.0.0
-    # via sphinx
-sphinxcontrib-htmlhelp==2.1.0
-    # via sphinx
-sphinxcontrib-jsmath==1.0.1
-    # via sphinx
-sphinxcontrib-qthelp==2.0.0
-    # via sphinx
-sphinxcontrib-serializinghtml==2.0.0
-    # via sphinx
 sqlparse==0.5.5
     # via
     #   -r requirements.in
