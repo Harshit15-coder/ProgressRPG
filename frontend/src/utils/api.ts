@@ -1,6 +1,7 @@
 // src/utils/api.ts
 import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL } from "../config";
+import type { AccessTokenResponse } from "../types/api";
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
@@ -37,11 +38,11 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
 
     if (!response.ok) throw new Error("Failed to refresh access token");
 
-    const data: { access?: string } = await response.json();
+    const data: Partial<AccessTokenResponse> = await response.json();
 
-    if (data.access) {
-      localStorage.setItem("accessToken", data.access);
-      return data.access;
+    if (data.access_token) {
+      localStorage.setItem("accessToken", data.access_token);
+      return data.access_token;
     }
     throw new Error("No access token returned from refresh");
   } catch {
