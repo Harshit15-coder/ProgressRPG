@@ -56,6 +56,8 @@ export interface GameContextValue {
   buildNumber: string | boolean;
   freeTimerLimitSeconds: number;
   gameSettings: GameSettings | null;
+  onlinePlayerCount: number;
+  setOnlinePlayerCount: Dispatch<SetStateAction<number>>;
 }
 
 interface ProviderProps {
@@ -123,6 +125,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
   const [characterActivities, setCharacterActivities] = useState<CharacterActivity[]>([]);
   const [characterCurrentActivity, setCharacterCurrentActivity] = useState<CharacterActivity | null>(null);
   const [populationCentre, setPopulationCentre] = useState<PopulationCentre | null>(populationCentreInfo);
+  const [onlinePlayerCount, setOnlinePlayerCount] = useState<number>(0);
 
   const activityTimer = useActivityTimer();
   const { loadFromServer } = activityTimer;
@@ -235,6 +238,8 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       buildNumber,
       freeTimerLimitSeconds,
       gameSettings,
+      onlinePlayerCount,
+      setOnlinePlayerCount,
     }),
     [
       player,
@@ -251,6 +256,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       buildNumber,
       freeTimerLimitSeconds,
       gameSettings,
+      onlinePlayerCount,
       populationCentre,
       fetchPopulationCentre,
       loginState,

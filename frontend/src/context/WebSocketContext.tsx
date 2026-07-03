@@ -24,7 +24,7 @@ interface ProviderProps {
 // ---------------------------------------------------------------------------
 
 export const WebSocketProvider = ({ children }: ProviderProps): ReactElement => {
-  const { player } = useGame();
+  const { player, setOnlinePlayerCount } = useGame();
   const { isAuthenticated, loading: authLoading } = useAuth();
   const { showToast } = useToast();
   const { refetch: maintenanceRefetch } = useMaintenanceStatus();
@@ -34,10 +34,13 @@ export const WebSocketProvider = ({ children }: ProviderProps): ReactElement => 
   const wsEnabled = Boolean(!authLoading && isAuthenticated && player?.id);
 
   const onMessage = useCallback((data: IncomingWebSocketMessage) => {
+    if (data.type === 'online_count') {
+      setOnlinePlayerCount(data.count);
+    }
     //console.log("[WS Provider] showToast:", showToast);
     handleGlobalWebSocketEvent(data, { showToast, maintenanceRefetch, setMaintenance });
     eventHandlersRef.current.forEach((handler) => handler(data));
-  }, [showToast, maintenanceRefetch, setMaintenance]);
+  }, [showToast, maintenanceRefetch, setMaintenance, setOnlinePlayerCount]);
 
   const onError = useCallback(() => {
     console.error('WebSocket connection error');
