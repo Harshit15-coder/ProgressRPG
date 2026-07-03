@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useLocation, Link } from "react-router-dom";
 import * as DropdownMenu from "@radix-ui/react-dropdown-menu";
 import * as Popover from "@radix-ui/react-popover";
+import * as Accordion from "@radix-ui/react-accordion";
 import styles from "./Navbar.module.scss";
 import Button from "../../components/Button/Button";
 import { useAuth } from "../../context/AuthContext";
@@ -160,20 +161,31 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                     )}
 
                     {!announcementsLoading && announcements.length > 0 && (
-                      <ul className={styles.announcementsList}>
+                      <Accordion.Root type="multiple" className={styles.announcementsList}>
                         {announcements.map((announcement) => (
-                          <li key={announcement.id} className={styles.announcementItem}>
-                            <div className={styles.announcementTitleRow}>
-                              <span>{announcement.title}</span>
-                              {!announcement.is_read && <span className={styles.unreadDot} aria-hidden="true" />}
-                            </div>
-                            {announcement.summary && (
-                              <p className={styles.announcementSummary}>{announcement.summary}</p>
-                            )}
-                            <details className={styles.announcementDetails}>
-                              <summary>View full</summary>
+                          <Accordion.Item
+                            key={announcement.id}
+                            className={styles.announcementItem}
+                            value={`announcement-${announcement.id}`}
+                          >
+                            <Accordion.Header>
+                              <Accordion.Trigger className={styles.announcementAccordionTrigger}>
+                                <div className={styles.announcementTitleRow}>
+                                  <span>{announcement.title}</span>
+                                  <span className={styles.announcementMetaRight}>
+                                    {!announcement.is_read && (
+                                      <span className={styles.unreadDot} aria-hidden="true" />
+                                    )}
+                                  </span>
+                                </div>
+                                {announcement.summary && (
+                                  <p className={styles.announcementSummary}>{announcement.summary}</p>
+                                )}
+                              </Accordion.Trigger>
+                            </Accordion.Header>
+                            <Accordion.Content className={styles.announcementAccordionContent}>
                               <p className={styles.announcementBody}>{announcement.body}</p>
-                            </details>
+                            </Accordion.Content>
                             {!announcement.is_read && (
                               <button
                                 className={styles.popoverActionButton}
@@ -186,9 +198,9 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                                 Mark read
                               </button>
                             )}
-                          </li>
+                          </Accordion.Item>
                         ))}
-                      </ul>
+                      </Accordion.Root>
                     )}
                   </Popover.Content>
                 </Popover.Portal>
@@ -325,22 +337,31 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                           )}
 
                           {!announcementsLoading && announcements.length > 0 && (
-                            <ul className={styles.announcementsList}>
+                            <Accordion.Root type="multiple" className={styles.announcementsList}>
                               {announcements.map((announcement) => (
-                                <li key={announcement.id} className={styles.announcementItem}>
-                                  <div className={styles.announcementTitleRow}>
-                                    <span>{announcement.title}</span>
-                                    {!announcement.is_read && (
-                                      <span className={styles.unreadDot} aria-hidden="true" />
-                                    )}
-                                  </div>
-                                  {announcement.summary && (
-                                    <p className={styles.announcementSummary}>{announcement.summary}</p>
-                                  )}
-                                  <details className={styles.announcementDetails}>
-                                    <summary>View full</summary>
+                                <Accordion.Item
+                                  key={announcement.id}
+                                  className={styles.announcementItem}
+                                  value={`mobile-announcement-${announcement.id}`}
+                                >
+                                  <Accordion.Header>
+                                    <Accordion.Trigger className={styles.announcementAccordionTrigger}>
+                                      <div className={styles.announcementTitleRow}>
+                                        <span>{announcement.title}</span>
+                                        <span className={styles.announcementMetaRight}>
+                                          {!announcement.is_read && (
+                                            <span className={styles.unreadDot} aria-hidden="true" />
+                                          )}
+                                        </span>
+                                      </div>
+                                      {announcement.summary && (
+                                        <p className={styles.announcementSummary}>{announcement.summary}</p>
+                                      )}
+                                    </Accordion.Trigger>
+                                  </Accordion.Header>
+                                  <Accordion.Content className={styles.announcementAccordionContent}>
                                     <p className={styles.announcementBody}>{announcement.body}</p>
-                                  </details>
+                                  </Accordion.Content>
                                   {!announcement.is_read && (
                                     <button
                                       className={styles.popoverActionButton}
@@ -353,9 +374,9 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                                       Mark read
                                     </button>
                                   )}
-                                </li>
+                                </Accordion.Item>
                               ))}
-                            </ul>
+                            </Accordion.Root>
                           )}
                         </div>
                       )}

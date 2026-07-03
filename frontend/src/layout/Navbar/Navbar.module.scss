@@ -138,14 +138,31 @@
   opacity: 0.9;
 }
 
-.announcementDetails {
-  margin: 0 0 v.$spacing-xs;
+.announcementAccordionTrigger {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: 0;
+  text-align: left;
+  cursor: pointer;
+  color: inherit;
 
-  summary {
-    cursor: pointer;
-    font-size: 0.85rem;
-    text-decoration: underline;
+  &:focus-visible {
+    outline: 2px solid rgba(c.$color-border-primary, 0.5);
+    outline-offset: 2px;
+    border-radius: v.$border-radius;
   }
+}
+
+.announcementAccordionContent {
+  overflow: hidden;
+}
+
+.announcementMetaRight {
+  display: inline-flex;
+  align-items: center;
+  gap: v.$spacing-xs;
 }
 
 .announcementBody {
