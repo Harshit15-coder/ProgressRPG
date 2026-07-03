@@ -9,6 +9,7 @@ import styles from './LoginPage.module.scss';
 export default function LoginPage(): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [rememberMe, setRememberMe] = useState(false);
   const [error, setError] = useState('');
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,12 +22,12 @@ export default function LoginPage(): React.ReactElement {
     setSubmitting(true);
     setError('');
 
-    const result1 = await loginWithJwt(email, password);
+    const result1 = await loginWithJwt(email, password, rememberMe);
     //console.log('LoginPage login result1:', result1);
 
     if (result1.success) {
       try {
-        await login(result1.tokens.access_token, result1.tokens.refresh_token);
+        await login(result1.tokens.access_token, result1.tokens.refresh_token, { rememberMe });
         navigate('/');
 
       } catch (err) {
@@ -68,6 +69,15 @@ export default function LoginPage(): React.ReactElement {
           value={password}
           onChange={(v) => setPassword(v as string)}
           required
+        />
+        <Input
+          id="remember-me"
+          type="checkbox"
+          label="Remember me"
+          checked={rememberMe}
+          onChange={(v) => setRememberMe(v as boolean)}
+          className={styles.rememberMeField}
+          inputClassName={styles.rememberMeInput}
         />
         <p className={styles.footer}>
           New here? <Link to="/register">Create an account</Link>

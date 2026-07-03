@@ -23,6 +23,17 @@
   width: 100%;
 }
 
+.rememberMeField {
+  flex-direction: row;
+  align-items: center;
+  gap: v.$spacing-sm;
+}
+
+.rememberMeInput {
+  width: auto !important;
+  max-width: none !important;
+}
+
 .error {
   @include c.apply-text-tone(map.get(c.$text-tone, error));
   margin-bottom: v.$spacing-sm;

@@ -1,6 +1,7 @@
 import { useEffect, useRef } from 'react';
 import { useGame } from '../context/GameContext';
 import { API_BASE_URL } from '../config';
+import { getStoredAccessToken } from '../utils/authStorage';
 import type { IncomingWebSocketMessage } from '../types';
 
 interface PlayerSocketListenerProps {
@@ -22,7 +23,7 @@ export default function PlayerSocketListener({ onEvent }: PlayerSocketListenerPr
     const connectSocket = async () => {
       try {
         // Step 1: Get JWT from storage
-        const token = localStorage.getItem('accessToken');
+        const token = getStoredAccessToken();
         if (!token) {
             console.warn('[WS] Token missing — not attempting connection');
             return;
