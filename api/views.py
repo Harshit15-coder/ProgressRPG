@@ -7,6 +7,7 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
 from django.db import transaction, models
 from django.http import Http404
+from django.shortcuts import get_object_or_404
 
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -40,6 +41,9 @@ from rest_framework_simplejwt.views import TokenObtainPairView, TokenRefreshView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from api.serializers import (
+    AnnouncementListResponseSerializer,
+    AnnouncementSerializer,
+    AnnouncementUnreadCountSerializer,
     UserSerializer,
     UserSettingsSerializer,
     Step1Serializer,
@@ -54,6 +58,9 @@ from api.serializers import (
     CustomRegisterSerializer,
     CustomTokenObtainPairSerializer,
     CustomTokenRefreshSerializer,
+    MarkAnnouncementReadRequestSerializer,
+    MarkAnnouncementReadResponseSerializer,
+    MarkAllAnnouncementsReadResponseSerializer,
 )
 from api.mailchimp import (
     MailchimpConfigurationError,
@@ -63,7 +70,7 @@ from api.mailchimp import (
 
 from character.models import Character, PlayerCharacterLink
 from character.serializers import CharacterSerializer
-from core.models import GameSettings
+from core.models import Announcement, GameSettings, PlayerAnnouncementState
 
 from gameplay.models import XpModifier
 from gameplay.serializers import ActivityTimerSerializer, XpModifierSerializer
@@ -315,6 +322,105 @@ class MeViewSet(viewsets.ViewSet):
         steps = TutorialStep.objects.filter(id__in=step_ids)
         player.tutorial_steps_seen.add(*steps)
         return Response({"marked": steps.count()})
+
+    @extend_schema(responses=AnnouncementListResponseSerializer)
+    @action(detail=False, methods=["get"])
+    def announcements(self, request):
+        player = request.user.player
+
+        published_announcements = list(Announcement.objects.published())
+        read_ids = set(
+            PlayerAnnouncementState.objects.filter(
+                player=player,
+                read_at__isnull=False,
+                announcement__is_published=True,
+            ).values_list("announcement_id", flat=True)
+        )
+
+        serialized = AnnouncementSerializer(
+            published_announcements,
+            many=True,
+            context={"read_ids": read_ids},
+        ).data
+
+        return Response(
+            {
+                "unread_count": PlayerAnnouncementState.unread_count_for_player(player),
+                "results": serialized,
+            }
+        )
+
+    @extend_schema(responses=AnnouncementUnreadCountSerializer)
+    @action(detail=False, methods=["get"])
+    def announcements_unread_count(self, request):
+        player = request.user.player
+        return Response(
+            {"unread_count": PlayerAnnouncementState.unread_count_for_player(player)}
+        )
+
+    @extend_schema(
+        request=MarkAnnouncementReadRequestSerializer,
+        responses=MarkAnnouncementReadResponseSerializer,
+    )
+    @action(detail=False, methods=["post"])
+    def mark_announcement_read(self, request):
+        serializer = MarkAnnouncementReadRequestSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        player = request.user.player
+        announcement = get_object_or_404(
+            Announcement.objects.published(),
+            id=serializer.validated_data["announcement_id"],
+        )
+
+        state, _ = PlayerAnnouncementState.objects.get_or_create(
+            player=player,
+            announcement=announcement,
+        )
+        if state.read_at is None:
+            state.read_at = timezone.now()
+            state.save(update_fields=["read_at", "updated_at"])
+
+        return Response(
+            {
+                "success": True,
+                "unread_count": PlayerAnnouncementState.unread_count_for_player(player),
+            }
+        )
+
+    @extend_schema(responses=MarkAllAnnouncementsReadResponseSerializer)
+    @action(detail=False, methods=["post"])
+    def mark_all_announcements_read(self, request):
+        player = request.user.player
+        now = timezone.now()
+
+        published = Announcement.objects.published()
+        existing_states = PlayerAnnouncementState.objects.filter(
+            player=player,
+            announcement__in=published,
+        )
+        existing_states.filter(read_at__isnull=True).update(read_at=now)
+
+        existing_ids = existing_states.values_list("announcement_id", flat=True)
+        missing = published.exclude(id__in=existing_ids)
+        PlayerAnnouncementState.objects.bulk_create(
+            [
+                PlayerAnnouncementState(
+                    player=player,
+                    announcement=announcement,
+                    read_at=now,
+                )
+                for announcement in missing
+            ],
+            ignore_conflicts=True,
+        )
+
+        return Response(
+            {
+                "success": True,
+                "unread_count": PlayerAnnouncementState.unread_count_for_player(player),
+            }
+        )
 
 
 class TutorialStepViewSet(viewsets.ReadOnlyModelViewSet):
@@ -568,6 +674,9 @@ class FetchInfoAPIView(APIView):
                 "login_streak": login_state_data["login_streak"],
                 "login_event_at": login_state_data["login_event_at"],
                 "login_reward_xp": login_state_data["login_reward_xp"],
+                "announcement_unread_count": PlayerAnnouncementState.unread_count_for_player(
+                    player
+                ),
                 "free_timer_limit_seconds": game_settings.free_timer_limit_seconds,
                 "game_settings": GameSettingsSerializer(game_settings).data,
             }

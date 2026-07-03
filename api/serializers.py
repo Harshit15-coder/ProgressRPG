@@ -11,6 +11,7 @@ from rest_framework_simplejwt.serializers import (
     TokenRefreshSerializer,
 )
 
+from core.models import Announcement
 from users.models import Player, InviteCode, UserLogin
 from users.validators import clean_player_name
 
@@ -120,8 +121,52 @@ class FetchInfoResponseSerializer(serializers.Serializer):
     login_streak = serializers.IntegerField()
     login_event_at = serializers.DateTimeField(allow_null=True)
     login_reward_xp = serializers.IntegerField()
+    announcement_unread_count = serializers.IntegerField()
     free_timer_limit_seconds = serializers.IntegerField()
     game_settings = serializers.JSONField()
+
+
+class AnnouncementSerializer(serializers.ModelSerializer):
+    is_read = serializers.SerializerMethodField()
+
+    def get_is_read(self, obj):
+        read_ids = self.context.get("read_ids", set())
+        return obj.id in read_ids
+
+    class Meta:
+        model = Announcement
+        fields = [
+            "id",
+            "title",
+            "summary",
+            "body",
+            "published_at",
+            "created_at",
+            "is_read",
+        ]
+
+
+class AnnouncementListResponseSerializer(serializers.Serializer):
+    unread_count = serializers.IntegerField()
+    results = AnnouncementSerializer(many=True)
+
+
+class AnnouncementUnreadCountSerializer(serializers.Serializer):
+    unread_count = serializers.IntegerField()
+
+
+class MarkAnnouncementReadRequestSerializer(serializers.Serializer):
+    announcement_id = serializers.IntegerField()
+
+
+class MarkAnnouncementReadResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    unread_count = serializers.IntegerField()
+
+
+class MarkAllAnnouncementsReadResponseSerializer(serializers.Serializer):
+    success = serializers.BooleanField()
+    unread_count = serializers.IntegerField()
 
 
 class GameSettingsSerializer(serializers.Serializer):

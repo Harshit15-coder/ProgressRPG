@@ -9,6 +9,7 @@ from unittest import skip
 from unittest.mock import patch, MagicMock
 
 from character.models import Character, PlayerCharacterLink
+from core.models import Announcement, PlayerAnnouncementState
 from gameplay.models import Quest
 from progression.models import CharacterQuest, PlayerActivity
 from server_management.models import FeatureFlag
@@ -60,6 +61,75 @@ class TestMeViewSet(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertIn("achievements", res.data["player"])
         self.assertEqual(len(res.data["player"]["achievements"]), 3)
+
+    def test_fetch_info_includes_announcement_unread_count(self):
+        self.authenticate()
+        Announcement.objects.create(
+            title="Server update",
+            summary="Small update",
+            body="We shipped a fix.",
+            is_published=True,
+        )
+
+        res = self.client.get(self.fetch_info_url)
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["announcement_unread_count"], 1)
+
+    def test_me_announcements_marks_read_per_player(self):
+        self.authenticate()
+        announcement = Announcement.objects.create(
+            title="Patch notes",
+            summary="v1",
+            body="Changes.",
+            is_published=True,
+        )
+
+        res_list = self.client.get(reverse("me-announcements"))
+        self.assertEqual(res_list.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_list.data["unread_count"], 1)
+        self.assertEqual(len(res_list.data["results"]), 1)
+        self.assertFalse(res_list.data["results"][0]["is_read"])
+
+        res_read = self.client.post(
+            reverse("me-mark-announcement-read"),
+            {"announcement_id": announcement.id},
+            format="json",
+        )
+        self.assertEqual(res_read.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_read.data["unread_count"], 0)
+
+        self.user.player.refresh_from_db()
+        self.assertTrue(
+            PlayerAnnouncementState.objects.filter(
+                player=self.user.player,
+                announcement=announcement,
+                read_at__isnull=False,
+            ).exists()
+        )
+
+    def test_me_mark_all_announcements_read(self):
+        self.authenticate()
+        Announcement.objects.create(
+            title="One",
+            summary="",
+            body="A",
+            is_published=True,
+        )
+        Announcement.objects.create(
+            title="Two",
+            summary="",
+            body="B",
+            is_published=True,
+        )
+
+        res_mark_all = self.client.post(reverse("me-mark-all-announcements-read"))
+        self.assertEqual(res_mark_all.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_mark_all.data["unread_count"], 0)
+
+        res_count = self.client.get(reverse("me-announcements-unread-count"))
+        self.assertEqual(res_count.status_code, status.HTTP_200_OK)
+        self.assertEqual(res_count.data["unread_count"], 0)
 
     def test_me_player_patch_updates_name(self):
         self.authenticate()
