@@ -14,6 +14,7 @@ from payments.webhooks import (
     handle_subscription_updated,
     handle_subscription_deleted,
     handle_payment_failed,
+    handle_trial_will_end,
     process_stripe_event,
 )
 
@@ -255,6 +256,131 @@ class HandleSubscriptionEventTests(TestCase):
         subscription.refresh_from_db()
         self.assertTrue(subscription.active)
 
+    @patch("payments.webhooks.send_trial_converted_email")
+    @patch("payments.webhooks.send_trial_ended_email")
+    def test_trial_ended_without_payment_sends_ended_email_only(
+        self, mock_ended_email, mock_converted_email
+    ):
+        UserSubscription.deactivate_all_for_user(self.user)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_trial_canceled",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_trial_canceled_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_trial_canceled",
+                        "customer": "cus_test_123",
+                        "status": "canceled",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {"status": "trialing"},
+                },
+            }
+        )
+
+        handle_subscription_updated(event)
+
+        mock_ended_email.assert_called_once_with(self.user)
+        mock_converted_email.assert_not_called()
+
+    @patch("payments.webhooks.send_trial_converted_email")
+    @patch("payments.webhooks.send_trial_ended_email")
+    def test_trial_converted_to_paid_sends_converted_email_only(
+        self, mock_ended_email, mock_converted_email
+    ):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_trial_converted",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_trial_converted_1",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_trial_converted",
+                        "customer": "cus_test_123",
+                        "status": "active",
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {"status": "trialing"},
+                },
+            }
+        )
+
+        handle_subscription_updated(event)
+
+        mock_converted_email.assert_called_once_with(self.user, subscription)
+        mock_ended_email.assert_not_called()
+
+    @patch("payments.webhooks.send_trial_ending_soon_email")
+    def test_trial_will_end_sends_ending_soon_email_with_trial_end_date(
+        self, mock_email
+    ):
+        UserSubscription.deactivate_all_for_user(self.user)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_trial_will_end",
+        )
+
+        event = make_event(
+            {
+                "id": "evt_trial_will_end_1",
+                "type": "customer.subscription.trial_will_end",
+                "data": {
+                    "object": {
+                        "id": "sub_trial_will_end",
+                        "customer": "cus_test_123",
+                        "status": "trialing",
+                        "trial_end": 1735689600,  # 2025-01-01T00:00:00Z
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                },
+            }
+        )
+
+        handle_trial_will_end(event)
+
+        self.assertEqual(mock_email.call_count, 1)
+        called_user, called_trial_end = mock_email.call_args.args
+        self.assertEqual(called_user, self.user)
+        self.assertEqual(called_trial_end.isoformat(), "2025-01-01T00:00:00+00:00")
+
+    @patch("payments.webhooks.send_trial_ending_soon_email")
+    def test_trial_will_end_no_op_for_unknown_customer(self, mock_email):
+        event = make_event(
+            {
+                "id": "evt_trial_will_end_unknown_1",
+                "type": "customer.subscription.trial_will_end",
+                "data": {
+                    "object": {
+                        "id": "sub_unknown",
+                        "customer": "cus_does_not_exist",
+                        "status": "trialing",
+                        "trial_end": 1735689600,
+                        "items": {"data": []},
+                    },
+                },
+            }
+        )
+
+        handle_trial_will_end(event)
+
+        mock_email.assert_not_called()
+
     def test_incomplete_status_deactivates_subscription(self):
         UserSubscription.deactivate_all_for_user(self.user)
         subscription = UserSubscription.objects.create(
@@ -388,6 +514,14 @@ class ProcessStripeEventRoutingTests(SimpleTestCase):
         process_stripe_event(event)
 
         mock_checkout.assert_called_once_with(event)
+
+    @patch("payments.webhooks.handle_trial_will_end")
+    def test_routes_trial_will_end_events(self, mock_trial_will_end):
+        event = SimpleNamespace(type="customer.subscription.trial_will_end")
+
+        process_stripe_event(event)
+
+        mock_trial_will_end.assert_called_once_with(event)
 
 
 @override_settings(STRIPE_WEBHOOK_SECRET="whsec_test")

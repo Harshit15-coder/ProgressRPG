@@ -339,14 +339,15 @@ class TaskViewSet(viewsets.ModelViewSet):
         from core.models import GameSettings
 
         instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        serializer.is_valid(raise_exception=True)
+
+        is_complete = serializer.validated_data.get("is_complete", instance.is_complete)
         is_newly_completing = (
-            request.data.get("is_complete") is True
+            is_complete is True
             and not instance.is_complete
             and instance.first_completed_at is None
         )
-
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
-        serializer.is_valid(raise_exception=True)
 
         completion_xp_gained = 0
         level_ups = []

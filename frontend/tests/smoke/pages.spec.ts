@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   mockSuccessfulSubscriptionSync,
+  stabilizeAuthenticatedPlayer,
   stabilizeTimerPage,
   visitAuthenticatedPage,
 } from '../utils/authenticatedPage';
@@ -27,7 +28,7 @@ test.describe('Public page smoke tests', () => {
 
   test('Forgot password page loads', async ({ page }) => {
     await page.goto('/forgot-password');
-    await expect(page.getByRole('heading', { name: /forgot password/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /(forgot|reset)( your)? password/i })).toBeVisible();
     await expect(page.getByRole('textbox', { name: /email/i })).toBeVisible();
   });
 
@@ -82,7 +83,7 @@ test.describe('Authenticated page smoke tests', () => {
     await visitAuthenticatedPage(page, '/upgrade');
     await expect(page.getByRole('heading', { name: /upgrade to premium/i })).toBeVisible();
     await expect(
-      page.getByText(/you are already subscribed!|premium membership for focused progress\./i)
+      page.getByText(/you are already subscribed!|focused progress, unlocked\./i)
     ).toBeVisible();
   });
 
@@ -90,8 +91,8 @@ test.describe('Authenticated page smoke tests', () => {
     await mockSuccessfulSubscriptionSync(page);
 
     try {
-      await visitAuthenticatedPage(page, '/payment-success');
-      await expect(page.getByRole('heading', { name: /you're premium/i })).toBeVisible();
+      await visitAuthenticatedPage(page, '/payment-success?session_id=test-session');
+      await expect(page.getByRole('heading', { name: /you.re premium/i })).toBeVisible();
     } finally {
       await page.unrouteAll({ behavior: 'ignoreErrors' });
     }
@@ -103,6 +104,7 @@ test.describe('Authenticated page smoke tests', () => {
   });
 
   test('Tasks page loads', async ({ page }) => {
+    await stabilizeAuthenticatedPlayer(page);
     await visitAuthenticatedPage(page, '/tasks');
     await expect(page.getByRole('heading', { name: 'Tasks', exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: /add task/i })).toBeVisible();

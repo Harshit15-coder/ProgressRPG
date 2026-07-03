@@ -1,3 +1,6 @@
+// For more info, see https://github.com/storybookjs/eslint-plugin-storybook#configuration-flat-config-format
+import storybook from "eslint-plugin-storybook";
+
 import js from '@eslint/js'
 import globals from 'globals'
 import reactHooks from 'eslint-plugin-react-hooks'
@@ -6,7 +9,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 import tseslint from 'typescript-eslint'
 
 export default defineConfig([
-  globalIgnores(['dist', 'tests/', 'src/pages/RegisterPage/RegisterPage.backup.jsx']),
+  globalIgnores(['dist', 'storybook-static', 'tests/', 'src/pages/RegisterPage/RegisterPage.backup.jsx']),
   {
     files: ['**/*.{js,jsx}'],
     extends: [
@@ -41,4 +44,5 @@ export default defineConfig([
       '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^[A-Z_]' }],
     },
   },
+  ...storybook.configs["flat/recommended"]
 ])

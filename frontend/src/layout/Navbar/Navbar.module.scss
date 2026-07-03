@@ -117,10 +117,7 @@
   fill: currentColor;
 }
 
-.accountDropdown {
-  position: absolute;
-  top: calc(100% + #{v.$spacing-xs});
-  right: 0;
+.accountDropdownContent {
   min-width: 160px;
   background: c.$color-bg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
@@ -128,23 +125,26 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   padding: v.$spacing-xs 0;
   z-index: v.$z-indexdropdown;
-  display: flex;
-  flex-direction: column;
-  list-style: none;
-  margin: 0;
+  outline: none;
 }
 
-.accountDropdown a,
-.accountDropdown button {
+.accountDropdownItem {
+  display: block;
   text-decoration: none;
   padding: v.$spacing-sm v.$spacing-md;
   @include t.apply-text-style(t.$text-body);
   @include c.apply-text-tone(map.get(c.$text-tone, default));
   width: 100%;
   text-align: left;
+  cursor: default;
+  outline: none;
+  border: none;
+  background: none;
 
-  &:hover {
+  &:hover,
+  &[data-highlighted] {
     background: rgba(c.$color-border-primary, 0.08);
+    outline: none;
   }
 }
 

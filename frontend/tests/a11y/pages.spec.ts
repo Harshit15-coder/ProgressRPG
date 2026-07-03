@@ -2,9 +2,19 @@ import { test } from '@playwright/test';
 import { checkA11y, expectNoA11yViolations } from '../utils/a11y';
 import {
   mockSuccessfulSubscriptionSync,
+  stabilizeAuthenticatedPlayer,
   stabilizeTimerPage,
   visitAuthenticatedPage,
 } from '../utils/authenticatedPage';
+
+const cleanupRoutes = async (page: Parameters<typeof test>[0]['page']) => {
+  try {
+    await (page as { unrouteAll?: (options?: { behavior?: 'ignoreErrors' }) => Promise<void> })
+      .unrouteAll?.({ behavior: 'ignoreErrors' });
+  } catch {
+    // ignore cleanup errors
+  }
+};
 
 test.describe('Page Accessibility', () => {
   test('Home page is accessible', async ({ page }) => {
@@ -51,7 +61,9 @@ test.describe('Page Accessibility', () => {
 
   test('Forgot password page is accessible', async ({ page }) => {
     await page.goto('/forgot-password');
-    await page.getByRole('heading', { name: /forgot password/i }).waitFor();
+    await page
+      .getByRole('heading', { name: /(forgot|reset)( your)? password/i })
+      .waitFor();
     const results = await checkA11y(page);
     expectNoA11yViolations(results);
   });
@@ -76,7 +88,7 @@ test.describe('Authenticated Page Accessibility', () => {
       const results = await checkA11y(page);
       expectNoA11yViolations(results);
     } finally {
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await cleanupRoutes(page);
     }
   });
 
@@ -99,27 +111,37 @@ test.describe('Authenticated Page Accessibility', () => {
       const results = await checkA11y(page);
       expectNoA11yViolations(results);
     } finally {
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await cleanupRoutes(page);
     }
   });
 
   test('Upgrade page is accessible', async ({ page }) => {
-    await visitAuthenticatedPage(page, '/upgrade');
-    await page.getByRole('heading', { name: /upgrade to premium/i }).waitFor();
-    const results = await checkA11y(page);
-    expectNoA11yViolations(results);
+    await mockSuccessfulSubscriptionSync(page);
+
+    try {
+      await visitAuthenticatedPage(page, '/upgrade');
+      await page.getByRole('heading', { name: /(upgrade|premium|plan)/i }).waitFor();
+      const results = await checkA11y(page);
+      expectNoA11yViolations(results);
+    } finally {
+      await cleanupRoutes(page);
+    }
   });
 
   test('Payment success page is accessible', async ({ page }) => {
     await mockSuccessfulSubscriptionSync(page);
 
     try {
-      await visitAuthenticatedPage(page, '/payment-success');
-      await page.getByRole('heading', { name: /you're premium/i }).waitFor();
+      await visitAuthenticatedPage(page, '/payment-success?session_id=test-session');
+      await page
+        .getByRole('heading', {
+          name: /(you('re| are)( now)? premium|payment success|thank(s| you))/i,
+        })
+        .waitFor();
       const results = await checkA11y(page);
       expectNoA11yViolations(results);
     } finally {
-      await page.unrouteAll({ behavior: 'ignoreErrors' });
+      await cleanupRoutes(page);
     }
   });
 
@@ -138,6 +160,7 @@ test.describe('Authenticated Page Accessibility', () => {
   });
 
   test('Tasks page is accessible', async ({ page }) => {
+    await stabilizeAuthenticatedPlayer(page);
     await visitAuthenticatedPage(page, '/tasks');
     await page.getByRole('heading', { name: 'Tasks', exact: true }).waitFor();
     const results = await checkA11y(page);

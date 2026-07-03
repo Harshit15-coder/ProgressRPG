@@ -1,24 +1,28 @@
-import React, { useState } from "react";
+import React from "react";
+import * as Popover from "@radix-ui/react-popover";
 import styles from "./FeedbackWidget.module.scss";
 import Button from "../Button/Button";
 
 const FeedbackWidget = () => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const toggleModal = () => setIsOpen(!isOpen);
-
   return (
     <div className={styles.feedbackWidget}>
-      <Button className={styles.feedbackButton} onClick={toggleModal}>
-        💬 Feedback
-      </Button>
+      <Popover.Root>
+        <Popover.Trigger asChild>
+          <Button className={styles.feedbackButton}>💬 Feedback</Button>
+        </Popover.Trigger>
 
-      {isOpen && (
-        <div className={styles.feedbackModal}>
-          <div className={styles.modalContent}>
-            <Button className={styles.closeButton} onClick={toggleModal}>
-              ×
-            </Button>
+        <Popover.Portal>
+          <Popover.Content
+            className={styles.feedbackPanel}
+            side="top"
+            align="end"
+            sideOffset={8}
+          >
+            <Popover.Close asChild>
+              <Button className={styles.closeButton} ariaLabel="Close feedback panel">
+                ×
+              </Button>
+            </Popover.Close>
             <h3>Help us improve Progress RPG</h3>
             <p>Spotted a bug? Got an idea? Send us your feedback:</p>
             <div className={styles.buttonGroup}>
@@ -39,9 +43,9 @@ const FeedbackWidget = () => {
                 💡 First impressions (5 minutes)
               </a>
             </div>
-          </div>
-        </div>
-      )}
+          </Popover.Content>
+        </Popover.Portal>
+      </Popover.Root>
     </div>
   );
 };

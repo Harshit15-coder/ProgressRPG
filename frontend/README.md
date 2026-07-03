@@ -68,6 +68,30 @@ describe('MyComponent', () => {
 });
 ```
 
+## Component documentation (Storybook)
+
+Shared UI components are documented with [Storybook](https://storybook.js.org/). Stories live alongside their components as `*.stories.tsx` (e.g. `Button/Button.stories.tsx`) and appear under the `Shared/` section.
+
+```bash
+# Run Storybook locally (port 6006)
+npm run storybook
+
+# Build the static Storybook site (output: storybook-static/)
+npm run build-storybook
+```
+
+Stories double as tests: interaction (`play`) functions and accessibility checks (via `@storybook/addon-a11y`) run through the Vitest browser integration:
+
+```bash
+# Run story tests headlessly in Chromium
+npx vitest run --project=storybook
+
+# Run only unit tests (excludes stories)
+npx vitest run --project=unit
+```
+
+When adding a new shared component, add a story file covering its main variants; use a `play` function to assert interactive/accessibility behaviour (see `Button.stories.tsx` or `Input.stories.tsx` for examples).
+
 ## Expanding the ESLint configuration
 
 If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.

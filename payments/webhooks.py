@@ -1,9 +1,16 @@
 import logging
 import stripe
 
+from datetime import datetime, timezone as dt_timezone
+
 from django.conf import settings
 from django.db import transaction
 
+from .emails import (
+    send_trial_ending_soon_email,
+    send_trial_ended_email,
+    send_trial_converted_email,
+)
 from .models import SubscriptionPlan, UserSubscription
 from .utils import (
     resolve_subscription_payload_and_model,
@@ -22,6 +29,7 @@ def process_stripe_event(event):
         "checkout.session.completed": handle_checkout_session_completed,
         "customer.subscription.updated": handle_subscription_updated,
         "customer.subscription.deleted": handle_subscription_deleted,
+        "customer.subscription.trial_will_end": handle_trial_will_end,
         "invoice.payment_failed": handle_payment_failed,
     }
 
@@ -192,6 +200,30 @@ def handle_subscription_deleted(event):
     )
 
 
+def handle_trial_will_end(event):
+    user, _, subscription_payload, _ = resolve_subscription_payload_and_model(
+        event, "subscription.updated"
+    )
+
+    if not user or not subscription_payload:
+        return
+
+    trial_end_ts = getattr(subscription_payload, "trial_end", None)
+    trial_end = (
+        datetime.fromtimestamp(trial_end_ts, tz=dt_timezone.utc)
+        if trial_end_ts
+        else None
+    )
+
+    send_trial_ending_soon_email(user, trial_end)
+    logger.info(
+        "[PAYMENTS.WEBHOOK] Sent trial-ending-soon email user_id=%s "
+        "stripe_subscription_id=%s",
+        user.id,
+        subscription_payload.id,
+    )
+
+
 def _handle_trial_has_ended(user, subscription, new_status):
     logger.info(
         "[PAYMENTS.WEBHOOK] Trial ended for user_id=%s stripe_subscription_id=%s "
@@ -200,7 +232,14 @@ def _handle_trial_has_ended(user, subscription, new_status):
         subscription.stripe_subscription_id,
         new_status,
     )
-    # TODO: send trial-ended email
+
+    if not user:
+        return
+
+    if new_status == "canceled":
+        send_trial_ended_email(user)
+    elif new_status == "active":
+        send_trial_converted_email(user, subscription)
 
 
 def handle_payment_failed(event):

@@ -9,65 +9,60 @@
   position: fixed;
   bottom: 1rem;
   right: 1rem;
-  z-index: 1000;
+  z-index: v.$z-indexdropdown;
 
   .feedbackButton {
     padding: map.get(sp.$gap, sm) map.get(sp.$gap, md);
   }
+}
 
-  .feedbackModal {
-    position: fixed;
-    bottom: 4.5rem;
-    right: 1rem;
-    width: 90vw;
-    max-width: 320px;
-    background-color: c.$color-bg;
-    @include m.border(c.$color-border-primary);
-    border-radius: v.$border-radius;
-    @include m.box-shadow(md);
-    padding: map.get(sp.$gap, md);
-    z-index: 1001;
-    @include m.slide-up(0.2s);
+.feedbackPanel {
+  width: 90vw;
+  max-width: 320px;
+  background-color: c.$color-bg;
+  @include m.border(c.$color-border-primary);
+  border-radius: v.$border-radius;
+  @include m.box-shadow(md);
+  padding: map.get(sp.$gap, md);
+  z-index: v.$z-indexdropdown;
+  position: relative;
+  @include m.slide-up(0.2s);
 
-    .closeButton {
-      position: absolute;
-      top: 0.5rem;
-      right: 0.75rem;
-    }
+  .closeButton {
+    position: absolute;
+    top: 0.5rem;
+    right: 0.75rem;
+  }
 
-    .modalContent {
+  .buttonGroup {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
 
-      .buttonGroup {
-        display: flex;
-        flex-direction: column;
-        gap: 0.5rem;
+    .modalButton {
+      padding: v.$padding-base;
+      border-radius: v.$border-radius;
+      text-align: center;
+      text-decoration: none;
+      font-weight: 500;
 
-        .modalButton {
-          padding: v.$padding-base;
-          border-radius: v.$border-radius;
-          text-align: center;
-          text-decoration: none;
-          font-weight: 500;
+      @include t.apply-text-style(t.$text-button);
+      @include c.apply-text-tone(map.get(c.$text-tone, inverted));
 
-          @include t.apply-text-style(t.$text-button);
-          @include c.apply-text-tone(map.get(c.$text-tone, inverted));
+      &.github {
+        background-color: c.$color-brand-github;
+      }
 
-          &.github {
-            background-color: c.$color-brand-github;
-          }
+      &.form {
+        background-color: c.$color-brand-google;
+      }
 
-          &.form {
-            background-color: c.$color-brand-google;
-          }
+      &.discord {
+        background-color: c.$color-brand-discord;
+      }
 
-          &.discord {
-            background-color: c.$color-brand-discord;
-          }
-
-          &:hover {
-            opacity: 0.9;
-          }
-        }
+      &:hover {
+        opacity: 0.9;
       }
     }
   }

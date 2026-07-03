@@ -1,0 +1,14 @@
+Your Progress RPG trial is ending soon
+
+Hello {{ email }},
+
+Your Progress RPG premium trial is ending{% if trial_end %} on {{ trial_end|date:"F j, Y" }}{% else %} soon{% endif %}. Add a payment method now to keep your premium features without interruption.
+
+Manage your subscription: {{ account_url }}
+
+If you don't add payment details, your premium access will end automatically and you won't be charged.
+
+Best wishes,
+Duncan (Founder, Progress RPG)
+
+© {{ current_year }} Progress RPG. All rights reserved.

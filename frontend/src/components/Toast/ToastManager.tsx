@@ -1,36 +1,32 @@
-// components/Toast/ToastManager.tsx
+import * as Toast from '@radix-ui/react-toast';
 import styles from './Toast.module.scss';
-import classNames from 'classnames';
-
-export interface ToastMessage {
-  id: string | number;
-  message: string;
-  type?: string;
-  title?: string;
-}
+import type { Toast as ToastMessage } from '../../context/toastContextDef';
 
 interface ToastManagerProps {
   messages: ToastMessage[];
+  onDismiss: (id: string) => void;
 }
 
-export default function ToastManager({ messages }: ToastManagerProps) {
+export default function ToastManager({ messages, onDismiss }: ToastManagerProps) {
   return (
-    <div className={styles.toastContainer} aria-live="assertive" aria-atomic="true">
-      {messages.map(({ id, message, type = 'info', title }) => (
-        <div
+    <>
+      {messages.map(({ id, message }) => (
+        <Toast.Root
           key={id}
-          className={classNames(styles.toast, styles[type])}
-          role="status"
+          open
+          onOpenChange={(open) => { if (!open) onDismiss(id); }}
+          className={styles.toast}
+          type="background"
         >
           <div className={styles.inner}>
             <div className={styles.icon} aria-hidden="true" />
             <div className={styles.content}>
-              {title && <div className={styles.title}>{title}</div>}
-              <div className={styles.message}>{message}</div>
+              <Toast.Description className={styles.message}>{message}</Toast.Description>
             </div>
           </div>
-        </div>
+        </Toast.Root>
       ))}
-    </div>
+      <Toast.Viewport className={styles.toastViewport} />
+    </>
   );
 }
