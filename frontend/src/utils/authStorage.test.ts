@@ -43,6 +43,24 @@ describe('authStorage', () => {
     expect(getStoredAccessToken()).toBe('session-access');
   });
 
+  it('does not clobber an existing remembered session when storing a short session', () => {
+    // Simulates another tab having a remembered (localStorage) session active.
+    localStorage.setItem('accessToken', 'other-tab-access');
+    localStorage.setItem('refreshToken', 'other-tab-refresh');
+
+    storeAuthTokens('this-tab-access', 'this-tab-refresh', false);
+
+    // The other tab's remembered tokens must survive.
+    expect(localStorage.getItem('accessToken')).toBe('other-tab-access');
+    expect(localStorage.getItem('refreshToken')).toBe('other-tab-refresh');
+    // But this tab must read back its own short-session tokens, not the
+    // remembered ones sitting in localStorage.
+    expect(getStoredAuthTokens()).toEqual({
+      accessToken: 'this-tab-access',
+      refreshToken: 'this-tab-refresh',
+    });
+  });
+
   it('updates refreshed access tokens in the active storage', () => {
     storeAuthTokens('old-access', 'refresh-token', false);
 
@@ -50,6 +68,17 @@ describe('authStorage', () => {
 
     expect(sessionStorage.getItem('accessToken')).toBe('new-access');
     expect(localStorage.getItem('accessToken')).toBeNull();
+  });
+
+  it('updates the access token in sessionStorage rather than a stale localStorage bundle', () => {
+    localStorage.setItem('accessToken', 'other-tab-access');
+    localStorage.setItem('refreshToken', 'other-tab-refresh');
+    storeAuthTokens('this-tab-access', 'this-tab-refresh', false);
+
+    updateStoredAccessToken('refreshed-access');
+
+    expect(sessionStorage.getItem('accessToken')).toBe('refreshed-access');
+    expect(localStorage.getItem('accessToken')).toBe('other-tab-access');
   });
 
   it('clears auth tokens from both storages', () => {
