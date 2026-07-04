@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import type { Task } from "../../types";
 import type { SortOption } from "../../components/PlayerItemList/PlayerItemList";
 import { formatRewardDuration } from "../../utils/formatUtils";

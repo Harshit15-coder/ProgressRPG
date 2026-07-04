@@ -20,7 +20,12 @@ from users.achievements import achievement_goals_for_player
 from users.serializers import PlayerSerializer
 from users.models import Player, UserLogin
 from progression.models import PlayerActivity
-from users.tasks import send_email_to_users_task, send_rendered_email_task
+from users.tasks import (
+    perform_account_wipe,
+    reconcile_stale_online_players,
+    send_email_to_users_task,
+    send_rendered_email_task,
+)
 from users.validators import (
     PLAYER_NAME_MAX_LENGTH,
     PLAYER_NAME_MIN_LENGTH,
@@ -281,6 +286,50 @@ class PlayerMethodsTest(TestCase):
 
         self.assertIsNone(player.current_character)
 
+    def test_register_connection_increments_and_sets_online(self):
+        player = self.user.player
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
+        player.register_connection()
+
+        self.assertEqual(player.active_connections, 1)
+        self.assertTrue(player.is_online)
+
+    def test_unregister_connection_stays_online_with_other_connections(self):
+        player = self.user.player
+        player.active_connections = 2
+        player.is_online = True
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 1)
+        self.assertTrue(player.is_online)
+
+    def test_unregister_connection_transitions_offline_at_zero(self):
+        player = self.user.player
+        player.active_connections = 1
+        player.is_online = True
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
+    def test_unregister_connection_is_idempotent_at_zero(self):
+        player = self.user.player
+        player.active_connections = 0
+        player.is_online = False
+        player.save(update_fields=["active_connections", "is_online"])
+
+        player.unregister_connection()
+
+        self.assertEqual(player.active_connections, 0)
+        self.assertFalse(player.is_online)
+
 
 class UserLoginModelTest(TestCase):
     def setUp(self):
@@ -500,6 +549,105 @@ class EmailTaskTest(TestCase):
         alternative = email.alternatives[0]
         alternative_content = getattr(alternative, "content", alternative[0])
         self.assertEqual(alternative_content, "<p>html body</p>")
+
+
+class ReconcileStaleOnlinePlayersTest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="stale@example.com", password="testpassword123"
+        )
+        self.player = self.user.player
+
+    @patch("users.tasks.async_to_sync")
+    @patch("users.tasks.get_channel_layer")
+    def test_resets_and_broadcasts_for_stale_connection(
+        self, mock_get_channel_layer, mock_async_to_sync
+    ):
+        sent = []
+        mock_async_to_sync.side_effect = lambda fn: (
+            lambda *args, **kwargs: sent.append((args, kwargs))
+        )
+
+        self.player.active_connections = 1
+        self.player.is_online = True
+        self.player.last_seen = timezone.now() - timedelta(minutes=20)
+        self.player.save(update_fields=["active_connections", "is_online", "last_seen"])
+
+        reconcile_stale_online_players.apply()
+
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 0)
+        self.assertFalse(self.player.is_online)
+
+        self.assertEqual(len(sent), 1)
+        (group, message), _ = sent[0]
+        self.assertEqual(group, "online_users")
+        self.assertEqual(message["type"], "online_count")
+
+    @patch("users.tasks.async_to_sync")
+    @patch("users.tasks.get_channel_layer")
+    def test_resets_online_player_with_no_heartbeat_yet(
+        self, mock_get_channel_layer, mock_async_to_sync
+    ):
+        mock_async_to_sync.side_effect = lambda fn: (lambda *a, **kw: None)
+
+        self.player.active_connections = 1
+        self.player.is_online = True
+        self.player.last_seen = None
+        self.player.save(update_fields=["active_connections", "is_online", "last_seen"])
+
+        reconcile_stale_online_players.apply()
+
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 0)
+        self.assertFalse(self.player.is_online)
+
+    @patch("users.tasks.async_to_sync")
+    @patch("users.tasks.get_channel_layer")
+    def test_does_not_touch_players_with_recent_heartbeat(
+        self, mock_get_channel_layer, mock_async_to_sync
+    ):
+        sent = []
+        mock_async_to_sync.side_effect = lambda fn: (
+            lambda *args, **kwargs: sent.append((args, kwargs))
+        )
+
+        self.player.active_connections = 1
+        self.player.is_online = True
+        self.player.last_seen = timezone.now()
+        self.player.save(update_fields=["active_connections", "is_online", "last_seen"])
+
+        reconcile_stale_online_players.apply()
+
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 1)
+        self.assertTrue(self.player.is_online)
+        self.assertEqual(len(sent), 0)
+
+
+class PerformAccountWipeTest(TestCase):
+    def setUp(self):
+        User = get_user_model()
+        self.user = User.objects.create_user(
+            email="pending-delete@example.com", password="testpassword123"
+        )
+        self.user.pending_delete = True
+        self.user.delete_at = timezone.now() - timedelta(days=1)
+        self.user.save(update_fields=["pending_delete", "delete_at"])
+
+        self.player = self.user.player
+        self.player.active_connections = 1
+        self.player.is_online = True
+        self.player.save(update_fields=["active_connections", "is_online"])
+
+    def test_wiped_player_is_marked_offline(self):
+        perform_account_wipe.apply()
+
+        self.player.refresh_from_db(fields=["active_connections", "is_online"])
+        self.assertEqual(self.player.active_connections, 0)
+        self.assertFalse(self.player.is_online)
+        self.assertNotIn(self.player, Player.get_online_players())
 
 
 class CustomAccountAdapterTest(TestCase):

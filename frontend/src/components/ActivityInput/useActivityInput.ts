@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { useEntitySearchCache } from "../../hooks/useEntitySearchCache";
 import { useSupportFlow } from "../../hooks/useSupportFlow";
 import type { PlayerActivity } from "../../types";

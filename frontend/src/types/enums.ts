@@ -52,7 +52,8 @@ export type WebSocketMessageType =
   | "action"
   | "response"
   | "error"
-  | "pong";
+  | "pong"
+  | "online_count";
 
 // WebSocket action strings sent from client (handle_client_request)
 export type ClientWebSocketAction =

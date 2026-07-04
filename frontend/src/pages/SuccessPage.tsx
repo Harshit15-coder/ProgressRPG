@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { apiFetch } from "../utils/api";
-import { useGame } from "../context/GameContext";
+import { useGame } from "../hooks/useGame";
 import Button from "../components/Button/Button";
 import styles from "./SuccessPage.module.scss";
 

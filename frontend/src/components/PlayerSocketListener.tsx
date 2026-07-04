@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { useGame } from '../context/GameContext';
+import { useGame } from '../hooks/useGame';
 import { API_BASE_URL } from '../config';
 import type { IncomingWebSocketMessage } from '../types';
 

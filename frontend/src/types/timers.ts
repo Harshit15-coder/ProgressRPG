@@ -175,6 +175,11 @@ export interface WebSocketServerMessage {
   message?: string;
 }
 
+export interface WebSocketOnlineCountMessage {
+  type: "online_count";
+  count: number;
+}
+
 /** Union of all known incoming WebSocket message shapes */
 export type IncomingWebSocketMessage =
   | WebSocketConsoleMessage
@@ -182,7 +187,8 @@ export type IncomingWebSocketMessage =
   | WebSocketNotificationMessage
   | WebSocketErrorMessage
   | WebSocketActionMessage
-  | WebSocketServerMessage;
+  | WebSocketServerMessage
+  | WebSocketOnlineCountMessage;
 
 /** Client-to-server message shape */
 export interface OutgoingWebSocketMessage {

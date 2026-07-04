@@ -1,6 +1,6 @@
 // components/CharacterCurrentActivity/CharacterCurrentActivity.tsx
 import { useEffect, useMemo, useState } from "react";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import styles from "./CharacterCurrentActivity.module.scss";
 
 export default function CharacterCurrentActivity() {

@@ -1,11 +1,14 @@
 # users/tasks.py
 
+from asgiref.sync import async_to_sync
 from celery import shared_task
+from channels.layers import get_channel_layer
 
-# from datetime import timedelta
+from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.mail import EmailMultiAlternatives
+from django.db.models import Q
 from django.template.loader import render_to_string
 from django.utils import timezone
 import logging
@@ -16,6 +19,10 @@ from character.models import PlayerCharacterLink
 User = get_user_model()
 
 logger = logging.getLogger("general")
+
+# A connection is considered abandoned (worker crash, OOM kill, deploy
+# restart) if we haven't seen a heartbeat ping for this long.
+STALE_CONNECTION_THRESHOLD = timedelta(minutes=10)
 
 
 def _send_email_message(
@@ -65,6 +72,7 @@ def perform_account_wipe():
         player.level = 1
         player.last_seen = None
         player.active_connections = 0
+        player.is_online = False
         user.logins.all().delete()
         player.activities.all().delete()
         player.skills.all().delete()
@@ -79,6 +87,34 @@ def perform_account_wipe():
 
         # Log the deletion
         logger.info(f"User {user.username} (ID: {user.id}) was deleted after 14 days.")
+
+
+@shared_task
+def reconcile_stale_online_players():
+    """
+    Clears `is_online`/`active_connections` for players whose websocket
+    connection was never cleanly closed (worker crash, OOM kill, deploy
+    restart bypasses TimerConsumer.disconnect()), so the online-count
+    badge can't drift upward forever. A player is considered stale once
+    their `last_seen` heartbeat (refreshed on every websocket ping) is
+    older than STALE_CONNECTION_THRESHOLD, or was never set.
+    """
+    cutoff = timezone.now() - STALE_CONNECTION_THRESHOLD
+    stale_players = Player.objects.filter(is_online=True).filter(
+        Q(last_seen__isnull=True) | Q(last_seen__lt=cutoff)
+    )
+    updated = stale_players.update(active_connections=0, is_online=False)
+
+    if updated:
+        logger.info(f"[RECONCILE ONLINE PLAYERS] Reset {updated} stale player(s).")
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(
+            "online_users",
+            {
+                "type": "online_count",
+                "count": Player.online_count(),
+            },
+        )
 
 
 @shared_task(bind=True, retry_backoff=True, max_retries=3)

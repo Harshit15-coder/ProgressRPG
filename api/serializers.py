@@ -122,6 +122,7 @@ class FetchInfoResponseSerializer(serializers.Serializer):
     login_reward_xp = serializers.IntegerField()
     free_timer_limit_seconds = serializers.IntegerField()
     game_settings = serializers.JSONField()
+    online_count = serializers.IntegerField()
 
 
 class GameSettingsSerializer(serializers.Serializer):

@@ -6,7 +6,7 @@ import { useFeatureFlag } from "./useFeatureFlag";
 const mockUseGame = vi.fn();
 const mockUseAppConfig = vi.fn();
 
-vi.mock("../context/GameContext", () => ({
+vi.mock("./useGame", () => ({
   useGame: () => mockUseGame(),
 }));
 
