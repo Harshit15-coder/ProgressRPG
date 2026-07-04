@@ -6,6 +6,7 @@ import { useGame } from "../../context/GameContext";
 import type { Task } from "../../types";
 import type { SortOption } from "../../components/PlayerItemList/PlayerItemList";
 import { formatRewardDuration } from "../../utils/formatUtils";
+import { TASKS_HIDE_COMPLETED_KEY } from "../../utils/userPreferences";
 
 export type ItemRecord = Task & { [key: string]: unknown };
 
@@ -93,7 +94,7 @@ export function useTasksPage() {
   const [completionReward, setCompletionReward] = useState<{ taskId: number; xp: number } | null>(null);
   const [hideCompleted, setHideCompleted] = useState(() => {
     try {
-      return localStorage.getItem("tasks.hideCompleted") !== "false";
+      return localStorage.getItem(TASKS_HIDE_COMPLETED_KEY) !== "false";
     } catch {
       return true;
     }
@@ -116,7 +117,7 @@ export function useTasksPage() {
     setHideCompleted((current) => {
       const next = !current;
       try {
-        localStorage.setItem("tasks.hideCompleted", String(next));
+        localStorage.setItem(TASKS_HIDE_COMPLETED_KEY, String(next));
       } catch {
         // Ignore persistence failures.
       }

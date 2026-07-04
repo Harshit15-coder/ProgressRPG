@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react';
 import type { Dispatch, ReactElement, ReactNode, SetStateAction } from 'react';
 import { apiFetch } from "../utils/api";
 import { clearAuthStorage, getStoredAuthTokens, storeAuthTokens } from '../utils/authStorage';
+import { clearUserPreferences } from '../utils/userPreferences';
 import type { User } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -106,6 +107,7 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
 
   const logout = (): void => {
     clearAuthStorage();
+    clearUserPreferences();
     setAccessToken(null);
     setRefreshToken(null);
     setUser(null);
