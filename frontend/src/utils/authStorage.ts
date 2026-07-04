@@ -76,9 +76,16 @@ export function getStoredAccessToken(): string | null {
 }
 
 export function clearAuthStorage(): void {
+  // Only clear the storage this tab is actually using. A session-scoped tab
+  // must never touch localStorage — another tab may hold a valid remembered
+  // session there that this tab's logout/expiry has nothing to do with.
+  if (prefersSessionStorage()) {
+    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+    sessionStorage.removeItem(SESSION_MODE_KEY);
+    return;
+  }
+
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-  sessionStorage.removeItem(SESSION_MODE_KEY);
 }

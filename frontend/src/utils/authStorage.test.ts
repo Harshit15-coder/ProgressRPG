@@ -81,17 +81,27 @@ describe('authStorage', () => {
     expect(localStorage.getItem('accessToken')).toBe('other-tab-access');
   });
 
-  it('clears auth tokens from both storages', () => {
-    localStorage.setItem('accessToken', 'local-access');
-    localStorage.setItem('refreshToken', 'local-refresh');
-    sessionStorage.setItem('accessToken', 'session-access');
-    sessionStorage.setItem('refreshToken', 'session-refresh');
+  it('clears a remembered session from localStorage without touching another tab session', () => {
+    storeAuthTokens('local-access', 'local-refresh', true);
 
     clearAuthStorage();
 
-    expect(getStoredAuthTokens()).toEqual({
-      accessToken: null,
-      refreshToken: null,
-    });
+    expect(localStorage.getItem('accessToken')).toBeNull();
+    expect(localStorage.getItem('refreshToken')).toBeNull();
+  });
+
+  it('clears a session-scoped login from sessionStorage without clobbering another tab\'s remembered session', () => {
+    // Simulates another tab having a remembered (localStorage) session active.
+    localStorage.setItem('accessToken', 'other-tab-access');
+    localStorage.setItem('refreshToken', 'other-tab-refresh');
+    storeAuthTokens('this-tab-access', 'this-tab-refresh', false);
+
+    clearAuthStorage();
+
+    expect(sessionStorage.getItem('accessToken')).toBeNull();
+    expect(sessionStorage.getItem('refreshToken')).toBeNull();
+    // The other tab's remembered tokens must survive a same-tab logout.
+    expect(localStorage.getItem('accessToken')).toBe('other-tab-access');
+    expect(localStorage.getItem('refreshToken')).toBe('other-tab-refresh');
   });
 });
