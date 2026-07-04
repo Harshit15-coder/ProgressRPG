@@ -25,14 +25,22 @@ function prefersSessionStorage(): boolean {
   return sessionStorage.getItem(SESSION_MODE_KEY) === 'session';
 }
 
+// The storage this tab currently reads/writes its own tokens from. The other
+// storage may still hold a different tab's session and must be touched only
+// as an explicit fallback, never treated as this tab's own bundle.
+function getActiveStorage(): Storage {
+  return prefersSessionStorage() ? sessionStorage : localStorage;
+}
+
+function getInactiveStorage(storage: Storage): Storage {
+  return storage === sessionStorage ? localStorage : sessionStorage;
+}
+
 export function getStoredAuthTokens(): TokenBundle {
   const empty = { accessToken: null, refreshToken: null };
+  const active = getActiveStorage();
 
-  if (prefersSessionStorage()) {
-    return getTokenBundle(sessionStorage) || getTokenBundle(localStorage) || empty;
-  }
-
-  return getTokenBundle(localStorage) || getTokenBundle(sessionStorage) || empty;
+  return getTokenBundle(active) || getTokenBundle(getInactiveStorage(active)) || empty;
 }
 
 export function storeAuthTokens(accessToken: string, refreshToken: string, rememberMe = true): void {
@@ -56,18 +64,15 @@ export function storeAuthTokens(accessToken: string, refreshToken: string, remem
 }
 
 export function updateStoredAccessToken(accessToken: string): void {
-  if (prefersSessionStorage() && sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  const active = getActiveStorage();
+  if (active.getItem(REFRESH_TOKEN_KEY)) {
+    active.setItem(ACCESS_TOKEN_KEY, accessToken);
     return;
   }
 
-  if (localStorage.getItem(REFRESH_TOKEN_KEY)) {
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    return;
-  }
-
-  if (sessionStorage.getItem(REFRESH_TOKEN_KEY)) {
-    sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  const inactive = getInactiveStorage(active);
+  if (inactive.getItem(REFRESH_TOKEN_KEY)) {
+    inactive.setItem(ACCESS_TOKEN_KEY, accessToken);
   }
 }
 
@@ -79,13 +84,11 @@ export function clearAuthStorage(): void {
   // Only clear the storage this tab is actually using. A session-scoped tab
   // must never touch localStorage — another tab may hold a valid remembered
   // session there that this tab's logout/expiry has nothing to do with.
-  if (prefersSessionStorage()) {
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    sessionStorage.removeItem(SESSION_MODE_KEY);
-    return;
-  }
+  const active = getActiveStorage();
+  active.removeItem(ACCESS_TOKEN_KEY);
+  active.removeItem(REFRESH_TOKEN_KEY);
 
-  localStorage.removeItem(ACCESS_TOKEN_KEY);
-  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  if (active === sessionStorage) {
+    sessionStorage.removeItem(SESSION_MODE_KEY);
+  }
 }
