@@ -10,6 +10,7 @@ from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
     TokenRefreshSerializer,
 )
+from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import Player, InviteCode, UserLogin
 from users.validators import clean_player_name
@@ -32,6 +33,10 @@ def validate_timezone_name(value: str) -> str:
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember_me = serializers.BooleanField(
+        required=False, default=False, write_only=True
+    )
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -39,9 +44,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        remember_me = attrs.pop("remember_me", False)
         attrs["username"] = attrs.get("email")
+
         data = super().validate(attrs)
         UserLogin.objects.create(user=self.user)
+
+        if remember_me:
+            refresh = RefreshToken(data["refresh"])
+            refresh.set_exp(lifetime=settings.LONG_SESSION_REFRESH_TOKEN_LIFETIME)
+            data["refresh"] = str(refresh)
+            data["access"] = str(refresh.access_token)
 
         return {
             "access_token": data["access"],

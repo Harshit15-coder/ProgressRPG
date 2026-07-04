@@ -1,6 +1,8 @@
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { Dispatch, ReactElement, ReactNode, SetStateAction } from 'react';
 import { apiFetch } from "../utils/api";
+import { clearAuthStorage, getStoredAuthTokens, storeAuthTokens } from '../utils/authStorage';
+import { clearUserPreferences } from '../utils/userPreferences';
 import type { User } from '../types';
 
 // ---------------------------------------------------------------------------
@@ -13,7 +15,7 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   user: User | null;
   setUser: Dispatch<SetStateAction<User | null>>;
-  login: (accessToken: string, refreshToken: string) => Promise<unknown>;
+  login: (accessToken: string, refreshToken: string, options?: { rememberMe?: boolean }) => Promise<unknown>;
   logout: () => void;
   /** Thin wrapper around apiFetch — use apiFetch directly for typed responses. */
   authFetch: <T = unknown>(path: string, options?: Parameters<typeof apiFetch>[1]) => Promise<T>;
@@ -35,8 +37,8 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 // ---------------------------------------------------------------------------
 
 export function AuthProvider({ children }: ProviderProps): ReactElement {
-  const [accessToken, setAccessToken] = useState<string | null>(() => localStorage.getItem('accessToken'));
-  const [refreshToken, setRefreshToken] = useState<string | null>(() => localStorage.getItem('refreshToken'));
+  const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAuthTokens().accessToken);
+  const [refreshToken, setRefreshToken] = useState<string | null>(() => getStoredAuthTokens().refreshToken);
   const [user, setUser] = useState<User | null>(null);
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
@@ -78,9 +80,13 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [accessToken, refreshToken]);
 
-  const login = async (accessToken: string, refreshToken: string): Promise<unknown> => {
-    localStorage.setItem('accessToken', accessToken);
-    localStorage.setItem('refreshToken', refreshToken);
+  const login = async (
+    accessToken: string,
+    refreshToken: string,
+    options: { rememberMe?: boolean } = {}
+  ): Promise<unknown> => {
+    const { rememberMe = false } = options;
+    storeAuthTokens(accessToken, refreshToken, rememberMe);
     setAccessToken(accessToken);
     setRefreshToken(refreshToken);
     setLoading(true);
@@ -100,7 +106,8 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   };
 
   const logout = (): void => {
-    localStorage.clear();
+    clearAuthStorage();
+    clearUserPreferences();
     setAccessToken(null);
     setRefreshToken(null);
     setUser(null);

@@ -74,9 +74,7 @@ export default function useRegister() {
        // fallback: handle unexpected case (tokens returned)
       const { accessToken, refreshToken } = data;
       if (accessToken && refreshToken) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        await login(accessToken, refreshToken);
+        await login(accessToken, refreshToken, { rememberMe: false });
         return { success: true };
       }
 
