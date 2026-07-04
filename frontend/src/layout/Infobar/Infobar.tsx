@@ -1,5 +1,6 @@
 import React from "react";
 import { useGame } from "../../context/GameContext";
+import AchievementBadges from "./AchievementBadges";
 import styles from "./Infobar.module.scss";
 
 export default function Infobar() {
@@ -37,16 +38,15 @@ export default function Infobar() {
             <path d="M4 20c0-4.4 3.6-8 8-8s8 3.6 8 8" />
           </svg>
         </div>
-        <div className={styles.details}>
-          <div className={styles.content}>
-            <span className={styles.value}>{player.name}</span>
-            <span className={styles.level}>Level {player.level}</span>
-          </div>
-          <div className={styles.content}>
-            <span className={styles.xp}>
-              XP: {currentXp} / {nextLevelXp}
-            </span>
-          </div>
+        <span className={styles.value}>{player.name}</span>
+        <div className={styles.achievementsColumn}>
+          <AchievementBadges achievements={player.achievements} />
+        </div>
+        <div className={styles.statsColumn}>
+          <span className={styles.level}>Level {player.level}</span>
+          <span className={styles.xp}>
+            XP: {currentXp} / {nextLevelXp}
+          </span>
         </div>
       </div>
     </div>

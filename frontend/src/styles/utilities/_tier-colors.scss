@@ -1,0 +1,24 @@
+@use '../semantic/colors' as c;
+
+// Single source of truth for achievement tier colors, shared between the
+// full Achievements component and the compact Infobar badges.
+@mixin tier-vars($tier) {
+  @if $tier == grey {
+    --achievement-color: #{c.$color-text-muted};
+    --achievement-bg: #{rgba(c.$color-text-muted, 0.12)};
+  } @else if $tier == green {
+    --achievement-color: #{c.$color-border-primary};
+    --achievement-bg: #{rgba(c.$color-border-primary, 0.12)};
+  } @else if $tier == blue {
+    // No blue in the design system — intentional palette extension for tier 3
+    --achievement-color: #1565c0;
+    --achievement-bg: rgba(21, 101, 192, 0.12);
+  } @else if $tier == purple {
+    // No purple in the design system — intentional palette extension for tier 4
+    --achievement-color: #6a1b9a;
+    --achievement-bg: rgba(106, 27, 154, 0.12);
+  } @else if $tier == gold {
+    --achievement-color: #{c.$color-warning-dark};
+    --achievement-bg: #{rgba(c.$color-warning-dark, 0.14)};
+  }
+}

@@ -30,34 +30,6 @@
     gap: v.$spacing-sm;
   }
 
-  .label {
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.05em;
-    white-space: nowrap;
-
-    @include m.respond-to(sm) {
-      order: 0;
-    }
-  }
-
-  .content {
-    display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: v.$spacing-xs;
-    flex: 1;
-    min-width: 0;
-    width: 100%;
-
-    @include m.respond-to(sm) {
-      gap: v.$spacing-sm;
-      width: auto;
-      order: 1;
-    }
-  }
-
   .value {
     font-size: 0.875rem;
     font-weight: 500;
@@ -72,7 +44,6 @@
     font-size: 0.75rem;
     font-weight: 400;
     white-space: nowrap;
-    margin-left: auto;
     text-align: right;
   }
 
@@ -80,15 +51,10 @@
     font-size: 0.75rem;
     font-weight: 500;
     white-space: nowrap;
-    margin-left: auto;
     text-align: right;
   }
 
   @include m.respond-to(sm, down) {
-    .label {
-      font-size: 0.6875rem;
-    }
-
     .value {
       font-size: 0.8125rem;
     }
@@ -98,6 +64,21 @@
       font-size: 0.6875rem;
     }
   }
+}
+
+.achievementsColumn {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.statsColumn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: v.$spacing-xs;
+  flex-shrink: 0;
+  margin-left: auto;
 }
 
 .player {
@@ -134,16 +115,4 @@
 .accountIconPremium {
   background: rgba(c.$color-character, 0.18);
   box-shadow: 0 0 0 2px rgba(c.$color-character, 0.55);
-}
-
-.details {
-  display: flex;
-  flex-direction: column;
-  gap: v.$spacing-xs;
-  flex: 1;
-  min-width: 0;
-
-  .content {
-    width: 100%;
-  }
 }
