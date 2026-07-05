@@ -294,7 +294,12 @@ class UserLoginModelTest(TestCase):
         )
 
     def _create_login(self, days_ago):
-        login = UserLogin.objects.create(user=self.user)
+        # bulk_create so no post_save signal fires: the login-reward signal
+        # reads and caches login stats onto self.user, and since these
+        # fixture rows are created with a "now" timestamp before being
+        # back-dated below, that cache would go stale for the rest of the
+        # test.
+        (login,) = UserLogin.objects.bulk_create([UserLogin(user=self.user)])
         timestamp = timezone.now() - timedelta(days=days_ago)
         UserLogin.objects.filter(pk=login.pk).update(timestamp=timestamp)
         return UserLogin.objects.get(pk=login.pk)
@@ -344,7 +349,10 @@ class UserLoginModelTest(TestCase):
         def make_login(ts):
             login = UserLogin.objects.create(user=self.user)
             UserLogin.objects.filter(pk=login.pk).update(timestamp=ts)
-            return UserLogin.objects.get(pk=login.pk)
+            # select_related("user") to match real callers (eg. the admin
+            # inline formset) - without it, annotate_first_of_day's access
+            # of logins[0].user below would issue its own query.
+            return UserLogin.objects.select_related("user").get(pk=login.pk)
 
         day1 = (timezone.now() - timedelta(days=1)).replace(
             hour=8, minute=0, second=0, microsecond=0
@@ -713,9 +721,12 @@ class CustomUserAdminChangelistQueryTest(TestCase):
         )
         self.client = Client()
         self.client.force_login(self.admin_user)
+        self._user_count = 0
 
     def _make_users(self, count):
-        for i in range(count):
+        for _ in range(count):
+            i = self._user_count
+            self._user_count += 1
             user = get_user_model().objects.create_user(
                 email=f"admin-list-user-{i}@example.com", password="testpassword123"
             )
@@ -780,7 +791,9 @@ class CustomUserAdminChangeViewQueryTest(TestCase):
         self.assertEqual(response.status_code, 200)
 
         userlogin_queries = [
-            q["sql"] for q in ctx.captured_queries if "users_userlogin" in q["sql"]
+            q["sql"]
+            for q in ctx.captured_queries
+            if 'FROM "users_userlogin"' in q["sql"]
         ]
 
         # The "most recent 5 logins" fetch (ORDER BY ... DESC ... LIMIT 5)
@@ -810,7 +823,8 @@ class CustomUserAdminChangeViewQueryTest(TestCase):
         standalone_customuser_queries = [
             q["sql"]
             for q in ctx.captured_queries
-            if "users_customuser" in q["sql"] and "users_userlogin" not in q["sql"]
+            if 'FROM "users_customuser"' in q["sql"]
+            and 'FROM "users_userlogin"' not in q["sql"]
         ]
         self.assertLessEqual(
             len(standalone_customuser_queries),
