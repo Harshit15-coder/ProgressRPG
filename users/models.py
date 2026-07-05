@@ -160,29 +160,50 @@ class UserLogin(models.Model):
         return not previous_logins_today.exists()
 
     @classmethod
+    def _ordered_logins(cls, user):
+        """
+        Return the user's logins, newest first.
+
+        Uses `user.prefetched_logins` when present (set via
+        Prefetch("logins", ..., to_attr="prefetched_logins")) so that bulk
+        callers like the admin changelist pay for one query total instead
+        of one per user. Also caches the result on the user instance so
+        that days_logged_in/current_login_streak/max_login_streak/
+        last_recorded_login share a single query when none of that is set.
+        """
+        cached = getattr(user, "_ordered_logins_cache", None)
+        if cached is not None:
+            return cached
+
+        logins = getattr(user, "prefetched_logins", None)
+        if logins is None:
+            logins = list(
+                cls.objects.filter(user=user).only("timestamp").order_by("-timestamp")
+            )
+        user._ordered_logins_cache = logins
+        return logins
+
+    @classmethod
     def total_login_events(cls, user):
+        logins = getattr(user, "prefetched_logins", None)
+        if logins is not None:
+            return len(logins)
         return cls.objects.filter(user=user).count()
 
     @classmethod
     def days_logged_in(cls, user):
-        login_dates = {
-            login.local_date()
-            for login in cls.objects.filter(user=user).only("timestamp")
-        }
+        login_dates = {login.local_date() for login in cls._ordered_logins(user)}
         return len(login_dates)
 
     @classmethod
     def last_recorded_login(cls, user):
-        last = cls.objects.filter(user=user).order_by("-timestamp").first()
-        return last.timestamp if last else None
+        logins = cls._ordered_logins(user)
+        return logins[0].timestamp if logins else None
 
     @classmethod
     def current_login_streak(cls, user):
         login_dates = sorted(
-            {
-                login.local_date()
-                for login in cls.objects.filter(user=user).only("timestamp")
-            },
+            {login.local_date() for login in cls._ordered_logins(user)},
             reverse=True,
         )
         if not login_dates:
@@ -199,10 +220,7 @@ class UserLogin(models.Model):
     @classmethod
     def max_login_streak(cls, user):
         login_dates = sorted(
-            {
-                login.local_date()
-                for login in cls.objects.filter(user=user).only("timestamp")
-            }
+            {login.local_date() for login in cls._ordered_logins(user)}
         )
         if not login_dates:
             return 0

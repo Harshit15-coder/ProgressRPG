@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.db import connection
 from django.http import HttpResponse
 from django.test import TestCase, Client, override_settings, tag
 from django.test.client import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from datetime import date, timedelta
 from django.utils import timezone
 from unittest.mock import patch
@@ -28,6 +30,7 @@ from users.validators import (
 )
 
 from character.models import Character, PlayerCharacterLink
+from payments.models import SubscriptionPlan, UserSubscription
 
 logging.getLogger("general").setLevel(logging.CRITICAL)
 
@@ -306,6 +309,32 @@ class UserLoginModelTest(TestCase):
         self.assertEqual(self.user.max_login_streak, 2)
         self.assertEqual(self.user.total_login_events, 3)
         self.assertIsNotNone(self.user.last_recorded_login)
+
+    def test_login_metrics_share_a_single_query_per_user(self):
+        """Reading all four login metrics for one user should only hit the
+        db once, since they all derive from the same cached login list."""
+        self._create_login(3)
+        self._create_login(1)
+        self._create_login(0)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(self.user.days_logged_in, 3)
+            self.assertEqual(self.user.current_login_streak, 2)
+            self.assertEqual(self.user.max_login_streak, 2)
+            self.assertIsNotNone(self.user.last_recorded_login)
+
+    def test_login_metrics_use_prefetched_logins_without_a_query(self):
+        """When a caller (eg. the admin changelist) has already prefetched
+        logins onto the user instance, no further queries should run."""
+        login_a = self._create_login(3)
+        login_b = self._create_login(0)
+        self.user.prefetched_logins = [login_b, login_a]
+
+        with self.assertNumQueries(0):
+            self.assertEqual(self.user.days_logged_in, 2)
+            self.assertEqual(self.user.current_login_streak, 1)
+            self.assertEqual(self.user.total_login_events, 2)
+            self.assertEqual(self.user.last_recorded_login, login_b.timestamp)
 
 
 class JwtLoginTrackingTest(TestCase):
@@ -630,3 +659,57 @@ class AssignCharacterTest(TestCase):
 
         # Should return None - no available characters
         self.assertIsNone(character)
+
+
+class CustomUserAdminChangelistQueryTest(TestCase):
+    """Guards against the N+1 pattern in /admin/users/customuser/ (Sentry
+    issue 113875738), where per-row property access on the changelist
+    (player, subscription, login stats) each fired their own query.
+
+    Rather than pin an exact query count (fragile, and not something we
+    can verify without a running Django install in this environment), we
+    assert the query count is the same for a small and a large number of
+    users - if it scaled per row, the larger fixture would issue more
+    queries.
+    """
+
+    def setUp(self):
+        Character.objects.create(first_name="Jane", can_link=True)
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium", price="9.99", interval="monthly"
+        )
+        self.admin_user = get_user_model().objects.create_superuser(
+            email="superadmin@example.com", password="testpassword123"
+        )
+        self.client = Client()
+        self.client.force_login(self.admin_user)
+
+    def _make_users(self, count):
+        for i in range(count):
+            user = get_user_model().objects.create_user(
+                email=f"admin-list-user-{i}@example.com", password="testpassword123"
+            )
+            UserLogin.objects.create(user=user)
+            UserLogin.objects.create(user=user)
+            if i % 2 == 0:
+                UserSubscription.objects.create(user=user, plan=self.plan, active=True)
+
+    def _changelist_query_count(self):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get("/admin/users/customuser/")
+        self.assertEqual(response.status_code, 200)
+        return len(ctx.captured_queries)
+
+    def test_changelist_query_count_does_not_scale_with_user_count(self):
+        self._make_users(3)
+        small_count = self._changelist_query_count()
+
+        self._make_users(20)
+        large_count = self._changelist_query_count()
+
+        self.assertEqual(
+            small_count,
+            large_count,
+            "admin changelist query count should not grow with the number "
+            "of users displayed",
+        )

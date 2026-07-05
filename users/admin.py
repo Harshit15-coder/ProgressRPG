@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.admin import SimpleListFilter
-from django.db.models import Max
+from django.db.models import Max, Prefetch
 from django.forms.models import BaseInlineFormSet
 from adminsortable2.admin import SortableAdminMixin
 
@@ -170,7 +170,25 @@ class CustomUserAdmin(UserAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        return queryset.annotate(last_recorded_login_sort=Max("logins__timestamp"))
+        return (
+            queryset.select_related("player")
+            .prefetch_related(
+                Prefetch(
+                    "logins",
+                    queryset=UserLogin.objects.only("id", "user_id", "timestamp")
+                    .order_by("-timestamp"),
+                    to_attr="prefetched_logins",
+                ),
+                Prefetch(
+                    "subscriptions",
+                    queryset=UserSubscription.objects.filter(active=True)
+                    .select_related("plan")
+                    .order_by("-start_date", "-id"),
+                    to_attr="prefetched_active_subscriptions",
+                ),
+            )
+            .annotate(last_recorded_login_sort=Max("logins__timestamp"))
+        )
 
     def save_model(self, request, obj, form, change):
         if not change:

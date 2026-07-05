@@ -64,6 +64,10 @@ class UserSubscription(models.Model):
 
     @classmethod
     def active_for_user(cls, user):
+        prefetched = getattr(user, "prefetched_active_subscriptions", None)
+        if prefetched is not None:
+            return prefetched[0] if prefetched else None
+
         return (
             cls.objects.select_related("plan")
             .filter(user=user, active=True)
