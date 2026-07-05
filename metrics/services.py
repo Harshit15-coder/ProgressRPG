@@ -1,5 +1,6 @@
 # metrics/services.py
 
+from collections import defaultdict
 from django.db.models import Sum, Count, Q
 from django.utils import timezone
 from datetime import timedelta, date, datetime
@@ -123,6 +124,95 @@ class MetricsCalculator:
         )
         
         return snapshot
+
+    @staticmethod
+    def calculate_daily_snapshots_bulk(player_ids, target_date):
+        """
+        Calculate daily snapshots for many players in one pass.
+
+        Fetches every completed activity for target_date across all
+        given players in a single query, aggregates per player in
+        Python, then upserts all snapshots in a single bulk query -
+        avoiding the per-player queries that calculate_daily_snapshot
+        issues when called in a loop over many players.
+
+        Args:
+            player_ids: iterable of Player ids to calculate snapshots for
+            target_date: the date to calculate
+
+        Returns:
+            int: number of snapshots processed
+        """
+        player_ids = list(player_ids)
+        if not player_ids:
+            return 0
+
+        start_of_day = timezone.make_aware(
+            datetime.combine(target_date, datetime.min.time())
+        )
+        end_of_day = timezone.make_aware(
+            datetime.combine(target_date + timedelta(days=1), datetime.min.time())
+        )
+
+        activities = (
+            PlayerActivity.objects.filter(
+                player_id__in=player_ids,
+                is_complete=True,
+                completed_at__gte=start_of_day,
+                completed_at__lt=end_of_day,
+            )
+            .order_by("player_id", "completed_at")
+            .values_list("player_id", "completed_at", "duration")
+        )
+
+        activities_by_player = defaultdict(list)
+        for player_id, completed_at, duration in activities:
+            activities_by_player[player_id].append((completed_at, duration))
+
+        snapshots = []
+        for player_id in player_ids:
+            rows = activities_by_player.get(player_id, [])
+            activities_count = len(rows)
+            minutes_active = sum(duration or 0 for _, duration in rows) // 60
+
+            sessions = 0
+            prev_time = None
+            for completed_at, _ in rows:
+                if prev_time is None:
+                    sessions = 1
+                elif (completed_at - prev_time).total_seconds() > SESSION_TIMEOUT:
+                    sessions += 1
+                prev_time = completed_at
+
+            snapshots.append(
+                DailyEngagementSnapshot(
+                    player_id=player_id,
+                    date=target_date,
+                    had_activity=activities_count > 0,
+                    session_count=sessions,
+                    activities_count=activities_count,
+                    minutes_active=minutes_active,
+                )
+            )
+
+        DailyEngagementSnapshot.objects.bulk_create(
+            snapshots,
+            update_conflicts=True,
+            unique_fields=["player", "date"],
+            update_fields=[
+                "had_activity",
+                "session_count",
+                "activities_count",
+                "minutes_active",
+            ],
+        )
+
+        logger.info(
+            f"Bulk daily snapshots processed for {len(player_ids)} players "
+            f"on {target_date}"
+        )
+
+        return len(player_ids)
 
     @staticmethod
     def calculate_weekly_metrics(player, week_start=None):

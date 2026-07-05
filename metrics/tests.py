@@ -95,6 +95,62 @@ class DailySnapshotTests(BaseMetricsTestCase):
         self.assertEqual(snapshot.minutes_active, 60)
 
 
+class DailySnapshotsBulkTests(BaseMetricsTestCase):
+    def test_calculate_daily_snapshots_bulk_matches_per_player(self):
+        """Bulk calculation should match per-player calculation for the same data."""
+        today = timezone.now().date()
+        start_of_day = timezone.make_aware(datetime.combine(today, datetime.min.time()))
+
+        other_user = User.objects.create_user(email="other@test.com", password="pass")
+        other_player, _ = Player.objects.get_or_create(user=other_user)
+
+        PlayerActivity.objects.create(
+            player=self.player,
+            name="Activity 1",
+            duration=1800,
+            is_complete=True,
+            completed_at=start_of_day + timedelta(hours=1),
+        )
+        PlayerActivity.objects.create(
+            player=self.player,
+            name="Activity 2",
+            duration=600,
+            is_complete=True,
+            completed_at=start_of_day + timedelta(hours=3),
+        )
+        PlayerActivity.objects.create(
+            player=other_player,
+            name="Other Activity",
+            duration=900,
+            is_complete=True,
+            completed_at=start_of_day + timedelta(hours=2),
+        )
+
+        processed = MetricsCalculator.calculate_daily_snapshots_bulk(
+            [self.player.id, other_player.id], today
+        )
+
+        self.assertEqual(processed, 2)
+
+        snapshot = DailyEngagementSnapshot.objects.get(player=self.player, date=today)
+        self.assertTrue(snapshot.had_activity)
+        self.assertEqual(snapshot.activities_count, 2)
+        self.assertEqual(snapshot.minutes_active, 40)
+
+        other_snapshot = DailyEngagementSnapshot.objects.get(
+            player=other_player, date=today
+        )
+        self.assertTrue(other_snapshot.had_activity)
+        self.assertEqual(other_snapshot.activities_count, 1)
+        self.assertEqual(other_snapshot.minutes_active, 15)
+
+    def test_calculate_daily_snapshots_bulk_empty_player_list(self):
+        """Bulk calculation with no players should be a no-op."""
+        today = timezone.now().date()
+        processed = MetricsCalculator.calculate_daily_snapshots_bulk([], today)
+        self.assertEqual(processed, 0)
+
+
 class WeeklyMetricsTests(BaseMetricsTestCase):
     def test_calculate_weekly_metrics(self):
         """Test calculating weekly metrics."""
