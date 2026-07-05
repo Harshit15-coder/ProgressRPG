@@ -8,10 +8,11 @@ The registration-cap + waitlist feature (previous issue) added the `Waitlist` mo
 2. **`invite_token` is a sibling of `invite_code` on `CustomRegisterSerializer`**, not a bridge to `InviteCode`. Exactly one of the two must be supplied. This matches the issue's ask ("Waitlist entry becomes redeemed after successful registration") without introducing a second model to keep in sync.
 3. **No dedicated redemption/status endpoint.** The frontend carries the token straight from the URL into the registration POST; `CustomRegisterSerializer.validate()`/`custom_signup` is the single place that ever looks up the token (existence, `INVITED` status, email match) and the single place that flips it to `redeemed`. Considered and rejected a separate GET status-check view (modeled on `ConfirmEmailView`): it would only ever be a pre-flight UX nicety — final validation still has to happen at registration time regardless (turnstile/terms/password can't be front-loaded) — and would duplicate the token-lookup query in two places that must stay in sync. Cost of skipping it: no early "this link is dead" warning before the user fills the form, and no server-side email pre-fill; both are minor and can be added later if it proves to matter.
 4. **Frontend is in scope**: RegisterPage needs to read a token from the URL and thread it through registration, with the invalid/already-used case surfacing as a normal form-submission error (same as any other registration validation error) rather than a pre-flight check.
+5. **Invitation is event-driven, not scheduled.** Raising `GameSettings.registration_cap` is itself the admin's explicit decision to admit more people, so invites fire immediately (asynchronously, via Celery) when the cap increases, rather than waiting for a weekly job. The check lives in `GameSettings.save()` (compares against the previously-persisted cap) rather than in `core/admin.py`, so it fires regardless of write path (admin, shell, future API) — consistent with keeping business logic in models/services and views/admin thin.
 
 ## Backend
 
-### `users/tasks.py` — new weekly task
+### `users/tasks.py` — new task
 ```python
 @shared_task
 def invite_waitlist_entries():
@@ -20,16 +21,7 @@ def invite_waitlist_entries():
     logger.info(f"[WAITLIST INVITE TASK] Invited {count} waitlist entrant(s).")
     return count
 ```
-No `bind`/retries needed — mirrors `calculate_weekly_metrics` (plain `@shared_task`, no locking at the Celery level; correctness comes from the DB-level locking below).
-
-### `progress_rpg/celery.py` — new Beat entry
-Add alongside `calculate-weekly-metrics`:
-```python
-"invite_waitlist_weekly": {
-    "task": "users.tasks.invite_waitlist_entries",
-    "schedule": crontab(hour=3, minute=0, day_of_week=1),  # Mondays 3am, staggered after weekly metrics (2am)
-},
-```
+No `bind`/retries needed — plain `@shared_task`, no locking at the Celery level; correctness comes from the DB-level locking below. Enqueued from `GameSettings.save()` (see below) instead of a Beat schedule.
 
 ### `users/services/waitlist_service.py` — new `invite_up_to_headroom()`
 Core new logic. Compute headroom, lock exactly the FIFO slice of `WAITING` rows needed, flip them to `INVITED`, then send emails **after** the DB transaction commits (see risk below):
@@ -66,12 +58,34 @@ def invite_up_to_headroom() -> int:
 - `skip_locked=True` means if the task somehow overlaps itself (retry, manual + scheduled run colliding), the second run simply skips rows the first one already has locked — no duplicate invites, no deadlock wait.
 - Re-filtering on `status=WAITING` after acquiring the lock is what makes this safe against a run that raced past the initial candidate-ID query.
 
-**Why locking here instead of a plain conditional `UPDATE ... WHERE status='waiting'`** (the idiom already used in `WaitlistJoinAPIView` and the redemption transition): those call sites do the check-and-mutate in one atomic SQL statement, so Postgres's own row lock during that single `UPDATE` is enough. This code can't do that, because it reuses `invite_entry()` unmodified, which generates a fresh per-row token in Python and then calls an unconditioned `entry.save(...)` — a bulk SQL update can't express "set a different random token per row." That forces a SELECT-then-save split, which is a TOCTOU window: without locking, two overlapping runs could both read the same `WAITING` row, both generate a token, and the later `.save()` would silently clobber the earlier one (row invited twice, two emails, one dead link). `select_for_update` closes that window by making the read itself take the lock; `skip_locked=True` means an overlapping run skips already-claimed rows instead of blocking a worker/connection on them. This project runs Postgres in dev/test/staging/prod (per CLAUDE.md), so `skip_locked`'s lack of SQLite support isn't a portability concern here.
+**Why locking here instead of a plain conditional `UPDATE ... WHERE status='waiting'`** (the idiom already used in `WaitlistJoinAPIView` and the redemption transition): those call sites do the check-and-mutate in one atomic SQL statement, so Postgres's own row lock during that single `UPDATE` is enough. This code can't do that, because it reuses `invite_entry()` unmodified, which generates a fresh per-row token in Python and then calls an unconditioned `entry.save(...)` — a bulk SQL update can't express "set a different random token per row." That forces a SELECT-then-save split, which is a TOCTOU window: without locking, overlapping runs (e.g. two admins editing the cap concurrently, or a double form-submit) could both read the same `WAITING` row, both generate a token, and the later `.save()` would silently clobber the earlier one (row invited twice, two emails, one dead link). `select_for_update` closes that window by making the read itself take the lock; `skip_locked=True` means an overlapping run skips already-claimed rows instead of blocking a worker/connection on them. This safety net matters even more now that the trigger is event-driven rather than a bounded periodic cadence. This project runs Postgres in dev/test/staging/prod (per CLAUDE.md), so `skip_locked`'s lack of SQLite support isn't a portability concern here.
 
 **Risk to fix while doing this — email-before-commit race:** `invite_entry()` currently calls `send_invite_email()` synchronously (which calls `.delay()`), same as the existing admin action. Called from *inside* `@transaction.atomic` here, the Celery worker could pick up the send task and query the `Waitlist` row before this transaction commits its `INVITED` status. Fix: change `send_invite_email()`'s call site(s) to schedule via `transaction.on_commit(...)` instead of calling directly. `transaction.on_commit` runs immediately if there's no open transaction (per Django docs), so this is a no-op behavior change for the existing admin action (which isn't wrapped in atomic) and closes the race for the new task. One-line change in `waitlist_service.py`.
 
-### `core/models.py` / `users/models.py`
-No changes. `registration_cap` already exists; `Waitlist.Status.REDEEMED`, `invite_token` (unique), and the `["status", "signup_timestamp"]` index already support this query — **no new migration needed.**
+### `core/models.py` — cap-increase trigger
+`GameSettings.save()` already calls `full_clean()` before persisting; extend it to detect a cap increase and enqueue the invite task after commit:
+```python
+def save(self, *args, **kwargs):
+    self.full_clean()
+    previous_cap = None
+    if self.pk:
+        previous_cap = (
+            GameSettings.objects.filter(pk=self.pk)
+            .values_list("registration_cap", flat=True)
+            .first()
+        )
+    super().save(*args, **kwargs)
+    if previous_cap is not None and self.registration_cap > previous_cap:
+        from django.db import transaction
+        from users.tasks import invite_waitlist_entries
+
+        transaction.on_commit(lambda: invite_waitlist_entries.delay())
+```
+- Local imports avoid a `core` → `users` import cycle at module load time.
+- `transaction.on_commit` (not a direct `.delay()`) so a rolled-back save (e.g. `full_clean()` raising, or an outer transaction aborting) never enqueues a spurious invite round; same pattern as the invite-email fix above.
+- `previous_cap is None` on first-ever creation (via `GameSettings.current()`'s `get_or_create`) correctly skips triggering.
+- Equal or lower cap on save also skips triggering.
+- `users/models.py`: no changes — `Waitlist.Status.REDEEMED`, `invite_token` (unique), and the `["status", "signup_timestamp"]` index already support the FIFO query — **no new migration needed.**
 
 ### `api/serializers.py` — registration changes
 ```python
@@ -146,6 +160,9 @@ Extend the existing POST payload to optionally include `invite_token` alongside 
 
 ## Tests
 
+### `core/tests.py` additions
+- `GameSettingsCapIncreaseTriggerTest` (alongside existing `GameSettingsSingletonTest`/`GameSettingsValidationTest`): increasing `registration_cap` on an existing `GameSettings` row enqueues `invite_waitlist_entries` (assert via `CELERY_TASK_ALWAYS_EAGER=True` + checking `Waitlist` entries flip to `INVITED`, or by mocking `invite_waitlist_entries.delay` and asserting call count); decreasing or leaving the cap unchanged does not enqueue it; the very first save via `GameSettings.current()` (no prior row) does not enqueue it; a save that raises in `full_clean()` (e.g. negative cap) does not enqueue it either.
+
 ### `users/tests/test_waitlist.py` additions
 - `WaitlistInviteTaskTest` (new class): headroom > queue size invites everyone waiting; headroom < queue size invites only the oldest N by `signup_timestamp`; headroom ≤ 0 invites nobody; already-`invited`/`redeemed`/`removed` entries are never touched; calling `waitlist_service.invite_up_to_headroom()` twice back-to-back the second time invites 0 (idempotency — first run already consumed the headroom). Follow existing `@override_settings(CELERY_TASK_ALWAYS_EAGER=True, EMAIL_BACKEND=...)` pattern and assert on `mail.outbox`, matching `WaitlistServiceEmailTest`.
 - `WaitlistRegistrationRedemptionTest` (in `users/tests/test_waitlist.py` or alongside existing registration tests — check where `CustomRegisterSerializer` is currently tested and colocate):
@@ -157,7 +174,7 @@ Extend the existing POST payload to optionally include `invite_token` alongside 
   - concurrent-redemption race: simulate by flipping status to `REDEEMED` between the two writes a test can control (e.g. mid-request via a mocked `.update()` or two sequential requests against the same token), confirm the second register POST 400s and **no orphaned `CustomUser` row exists** (proves the `transaction.atomic` wrap in `perform_create` works).
 
 ## Edge cases / risks (recap of key decisions above)
-- **Double-run of the weekly task**: closed via `select_for_update(skip_locked=True)` + re-checking `status=WAITING` post-lock.
+- **Overlapping cap-increase saves** (e.g. two admins editing concurrently, or a double form-submit): closed via `select_for_update(skip_locked=True)` + re-checking `status=WAITING` post-lock.
 - **Email sent before transaction commit**: closed via switching `send_invite_email` call sites to `transaction.on_commit(...)`.
 - **Headroom ≤ 0**: early return, no query.
 - **Queue shorter than headroom**: slice naturally returns fewer rows; no special-casing needed.
@@ -167,28 +184,13 @@ Extend the existing POST payload to optionally include `invite_token` alongside 
 - **No new indexes/migrations needed**: `invite_token` is already `unique=True` (indexed); `["status", "signup_timestamp"]` composite index already covers the FIFO query.
 
 ## Recommended commit order
-1. **Backend task + service**: `waitlist_service.invite_up_to_headroom()`, the `transaction.on_commit` email fix, `users/tasks.py::invite_waitlist_entries`, Beat schedule entry. Tests: `WaitlistInviteTaskTest`.
-2. **Backend redemption**: `CustomRegisterSerializer`/`custom_signup` token-path changes; `perform_create` atomic wrap. Tests: `WaitlistRegistrationRedemptionTest`.
-3. **Frontend**: `useRegister` token support, `RegisterPage` token handling, new route. Manual browser verification of both the invalid-token and valid-token→successful-registration paths.
-4. *(Optional)* `invite_waitlist` management command, if time allows.
+1. **Backend task + service**: `waitlist_service.invite_up_to_headroom()`, the `transaction.on_commit` email fix, `users/tasks.py::invite_waitlist_entries` (no Beat entry). Tests: `WaitlistInviteTaskTest`.
+2. **Cap-increase trigger**: `GameSettings.save()` change above. Tests: `GameSettingsCapIncreaseTriggerTest`.
+3. **Backend redemption**: `CustomRegisterSerializer`/`custom_signup` token-path changes; `perform_create` atomic wrap. Tests: `WaitlistRegistrationRedemptionTest`.
+4. **Frontend**: `useRegister` token support, `RegisterPage` token handling, new route. Manual browser verification of both the invalid-token and valid-token→successful-registration paths.
+5. *(Optional)* `invite_waitlist` management command — still worth keeping for manual/support use even though the trigger is now automatic.
 
 ## Verification
-- `docker compose run --rm web python manage.py test users.tests.test_waitlist` for the new backend tests.
-- Manually trigger `invite_up_to_headroom()` via Django shell (`make ps`) against a seeded `Waitlist` + adjusted `registration_cap` to sanity-check FIFO ordering and headroom math before trusting the Beat schedule.
+- `docker compose run --rm web python manage.py test users.tests.test_waitlist core.tests` for the new backend tests.
+- Manually raise `registration_cap` via Django admin against a seeded `Waitlist` (seeded via `make ps`) to sanity-check that the Celery task fires and invites the correct FIFO/headroom slice; also confirm lowering the cap, or re-saving with the same value, does **not** enqueue anything.
 - For the frontend: `npm run dev`, visit `/waitlist/redeem/<token>` with a real `INVITED` entry's token (seeded via shell), complete registration, confirm the entry flips to `redeemed` in admin; then revisit the same link and re-register with a different email to confirm the inline "invalid/used token" error renders correctly.
-
-
-## TODO / Design review
-
-The current plan assumes invitations are triggered by a weekly Celery Beat task, following the original issue description.
-
-I have since decided that this behaviour should be changed.
-
-Instead, invitations should be sent immediately whenever an administrator increases `GameSettings.registration_cap`. Increasing the cap is an explicit decision to admit more players, so there should be no delay waiting for a scheduled task.
-
-Before implementation:
-
-- Remove the weekly Celery Beat approach.
-- Determine the best place to trigger the invitation process when the registration cap increases (model, admin, service, or another appropriate location).
-- Continue to execute the invitation process asynchronously via Celery so the admin UI remains responsive.
-- Simplify the implementation where possible now that invitations are event-driven rather than scheduled.
