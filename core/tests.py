@@ -41,6 +41,7 @@ class GameSettingsSingletonTest(TestCase):
         self.assertEqual(s.daily_login_max_xp, 20)
         self.assertEqual(s.premium_activity_xp_multiplier, Decimal("2.00"))
         self.assertEqual(s.default_activity_xp_per_second, Decimal("1.0000"))
+        self.assertEqual(s.registration_cap, 1_000_000_000)
 
 
 class GameSettingsValidationTest(TestCase):
@@ -71,6 +72,11 @@ class GameSettingsValidationTest(TestCase):
 
     def test_negative_xp_per_second_rejected(self):
         self.settings.default_activity_xp_per_second = Decimal("-0.5")
+        with self.assertRaises(ValidationError):
+            self.settings.save()
+
+    def test_negative_registration_cap_rejected(self):
+        self.settings.registration_cap = -1
         with self.assertRaises(ValidationError):
             self.settings.save()
 

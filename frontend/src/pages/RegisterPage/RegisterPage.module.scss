@@ -48,3 +48,20 @@
 .footer {
   text-align: center;
 }
+
+.agreeToTerms {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: v.$spacing-sm;
+  @include t.apply-text-style(t.$text-body);
+
+  a:hover {
+    text-decoration: underline;
+  }
+}
+
+.error {
+  color: c.$color-danger;
+  text-align: center;
+}

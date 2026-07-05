@@ -5,7 +5,7 @@ from django.conf import settings
 from django.contrib.auth import login, logout, get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
-from django.db import transaction, models
+from django.db import transaction, models, IntegrityError
 from django.http import Http404
 
 from django.utils import timezone
@@ -51,6 +51,9 @@ from api.serializers import (
     GameSettingsSerializer,
     WaitlistSignupRequestSerializer,
     WaitlistSignupResponseSerializer,
+    RegistrationStatusResponseSerializer,
+    WaitlistJoinRequestSerializer,
+    WaitlistJoinResponseSerializer,
     CustomRegisterSerializer,
     CustomTokenObtainPairSerializer,
     CustomTokenRefreshSerializer,
@@ -75,7 +78,7 @@ from locations.serializers import PopulationCentreSerializer
 
 from progression.serializers import PlayerActivitySerializer
 
-from users.models import Player, TutorialStep
+from users.models import Player, TutorialStep, Waitlist
 from users.serializers import PlayerSerializer, TutorialStepSerializer
 from users.utils import send_email_to_users
 
@@ -143,6 +146,43 @@ class WaitlistSignupAPIView(APIView):
             )
 
         return Response(response_data, status=status.HTTP_200_OK)
+
+
+class RegistrationStatusAPIView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = RegistrationStatusResponseSerializer
+
+    def get(self, request):
+        game_settings = GameSettings.current()
+        registration_open = (
+            get_user_model().objects.count() < game_settings.registration_cap
+        )
+        return Response({"registration_open": registration_open})
+
+
+class WaitlistJoinAPIView(APIView):
+    permission_classes = [AllowAny]
+    serializer_class = WaitlistJoinResponseSerializer
+    request_serializer_class = WaitlistJoinRequestSerializer
+
+    @method_decorator(ratelimit(key="ip", rate="10/h", method="POST", block=True))
+    def post(self, request):
+        serializer = self.request_serializer_class(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data["email"].strip().lower()
+
+        already_waiting = Waitlist.objects.filter(
+            email=email, status__in=[Waitlist.Status.WAITING, Waitlist.Status.INVITED]
+        ).exists()
+        if not already_waiting:
+            try:
+                Waitlist.objects.create(email=email, status=Waitlist.Status.WAITING)
+            except IntegrityError:
+                pass  # race with a concurrent signup — treat as already-waiting
+
+        return Response(
+            {"detail": "You're on the waitlist."}, status=status.HTTP_200_OK
+        )
 
 
 class GameSettingsAPIView(APIView):

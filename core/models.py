@@ -92,6 +92,7 @@ class GameSettings(models.Model):
     task_completion_xp = models.IntegerField(default=100)
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
+    registration_cap = models.IntegerField(default=1_000_000_000)
 
     class Meta:
         verbose_name = "Game settings"
@@ -130,6 +131,8 @@ class GameSettings(models.Model):
             errors["task_completion_xp"] = "Must be non-negative."
         if self.trial_period_days < 0:
             errors["trial_period_days"] = "Must be non-negative."
+        if self.registration_cap < 0:
+            errors["registration_cap"] = "Must be non-negative."
         if errors:
             raise ValidationError(errors)
 

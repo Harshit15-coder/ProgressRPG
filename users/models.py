@@ -494,6 +494,40 @@ class InviteCode(models.Model):
         return self.code
 
 
+class Waitlist(models.Model):
+    class Status(models.TextChoices):
+        WAITING = "waiting", "Waiting"
+        INVITED = "invited", "Invited"
+        REDEEMED = "redeemed", "Redeemed"
+        REMOVED = "removed", "Removed"
+
+    email = models.EmailField()
+    signup_timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.WAITING, db_index=True
+    )
+    invite_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    invited_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["signup_timestamp"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(status__in=["waiting", "invited"]),
+                name="unique_active_waitlist_email",
+            )
+        ]
+        indexes = [models.Index(fields=["status", "signup_timestamp"])]
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.email} ({self.status})"
+
+
 class PlayerCurrency(CurrencyAccountBase):
     player = models.ForeignKey(
         Player,

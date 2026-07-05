@@ -190,6 +190,18 @@ class WaitlistSignupResponseSerializer(serializers.Serializer):
     state = serializers.ChoiceField(choices=["pending", "subscribed"])
 
 
+class RegistrationStatusResponseSerializer(serializers.Serializer):
+    registration_open = serializers.BooleanField()
+
+
+class WaitlistJoinRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+
+class WaitlistJoinResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
+
+
 def _frontend_password_reset_url(request, user, temp_key):
     from allauth.account.utils import user_pk_to_url_str
 
