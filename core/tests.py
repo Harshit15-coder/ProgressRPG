@@ -85,6 +85,49 @@ class GameSettingsValidationTest(TestCase):
             GameSettings.objects.create()
 
 
+class GameSettingsCapIncreaseTriggerTest(TestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+        self.settings.registration_cap = 10
+        self.settings.save()
+
+    @patch("users.tasks.invite_waitlist_entries.delay")
+    def test_increasing_cap_enqueues_invite_task(self, mock_delay):
+        self.settings.registration_cap = 20
+        with self.captureOnCommitCallbacks(execute=True):
+            self.settings.save()
+        mock_delay.assert_called_once()
+
+    @patch("users.tasks.invite_waitlist_entries.delay")
+    def test_decreasing_cap_does_not_enqueue(self, mock_delay):
+        self.settings.registration_cap = 5
+        with self.captureOnCommitCallbacks(execute=True):
+            self.settings.save()
+        mock_delay.assert_not_called()
+
+    @patch("users.tasks.invite_waitlist_entries.delay")
+    def test_unchanged_cap_does_not_enqueue(self, mock_delay):
+        with self.captureOnCommitCallbacks(execute=True):
+            self.settings.save()
+        mock_delay.assert_not_called()
+
+    @patch("users.tasks.invite_waitlist_entries.delay")
+    def test_first_creation_does_not_enqueue(self, mock_delay):
+        GameSettings.objects.all().delete()
+        with self.captureOnCommitCallbacks(execute=True):
+            GameSettings.current()
+        mock_delay.assert_not_called()
+
+    @patch("users.tasks.invite_waitlist_entries.delay")
+    def test_failed_validation_does_not_enqueue(self, mock_delay):
+        self.settings.registration_cap = -1
+        with self.assertRaises(ValidationError):
+            with self.captureOnCommitCallbacks(execute=True):
+                self.settings.save()
+        mock_delay.assert_not_called()
+
+
 class LoginRewardFromSettingsTest(TestCase):
     def setUp(self):
         GameSettings.objects.all().delete()

@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
 from django.core import mail
@@ -10,7 +10,7 @@ from rest_framework.test import APITestCase
 
 from api.serializers import CustomRegisterSerializer
 from core.models import GameSettings
-from users.models import Waitlist
+from users.models import InviteCode, Waitlist
 from users.services import waitlist_service
 
 User = get_user_model()
@@ -127,7 +127,8 @@ class WaitlistServiceEmailTest(TestCase):
         self.entry = Waitlist.objects.create(email="waiter@example.com")
 
     def test_invite_entry_sends_email_and_sets_fields(self):
-        waitlist_service.invite_entry(self.entry)
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.invite_entry(self.entry)
 
         self.entry.refresh_from_db()
         self.assertEqual(self.entry.status, Waitlist.Status.INVITED)
@@ -143,19 +144,22 @@ class WaitlistServiceEmailTest(TestCase):
         self.entry.status = Waitlist.Status.INVITED
         self.entry.save()
 
-        waitlist_service.invite_entry(self.entry)
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.invite_entry(self.entry)
 
         self.entry.refresh_from_db()
         self.assertEqual(self.entry.invite_token, "existing-token")
         self.assertEqual(len(mail.outbox), 1)
 
     def test_resend_invite_email_does_not_change_token_or_timestamp(self):
-        waitlist_service.invite_entry(self.entry)
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.invite_entry(self.entry)
         mail.outbox.clear()
         original_token = self.entry.invite_token
         original_invited_at = self.entry.invited_at
 
-        waitlist_service.resend_invite_email(self.entry)
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.resend_invite_email(self.entry)
 
         self.entry.refresh_from_db()
         self.assertEqual(self.entry.invite_token, original_token)
@@ -187,12 +191,13 @@ class WaitlistAdminActionsTest(TestCase):
             email="i1@example.com", status=Waitlist.Status.INVITED
         )
 
-        self.admin.invite_selected_now(
-            self.factory_request,
-            Waitlist.objects.filter(
-                pk__in=[waiting1.pk, waiting2.pk, already_invited.pk]
-            ),
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            self.admin.invite_selected_now(
+                self.factory_request,
+                Waitlist.objects.filter(
+                    pk__in=[waiting1.pk, waiting2.pk, already_invited.pk]
+                ),
+            )
 
         waiting1.refresh_from_db()
         waiting2.refresh_from_db()
@@ -210,10 +215,11 @@ class WaitlistAdminActionsTest(TestCase):
         )
         waiting = Waitlist.objects.create(email="w1@example.com")
 
-        self.admin.resend_invite_email_action(
-            self.factory_request,
-            Waitlist.objects.filter(pk__in=[invited.pk, waiting.pk]),
-        )
+        with self.captureOnCommitCallbacks(execute=True):
+            self.admin.resend_invite_email_action(
+                self.factory_request,
+                Waitlist.objects.filter(pk__in=[invited.pk, waiting.pk]),
+            )
 
         self.assertEqual(len(mail.outbox), 1)
         self.assertEqual(mail.outbox[0].to, ["i1@example.com"])
@@ -233,6 +239,199 @@ class WaitlistAdminActionsTest(TestCase):
         )
         self.assertEqual(response["Content-Type"], "text/csv")
         self.assertIn(b"w1@example.com", response.content)
+
+
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class WaitlistInviteTaskTest(TestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+
+    def _create_waiting(self, n, prefix="w"):
+        return [
+            Waitlist.objects.create(email=f"{prefix}{i}@example.com") for i in range(n)
+        ]
+
+    def test_headroom_greater_than_queue_invites_everyone(self):
+        entries = self._create_waiting(3)
+        self.settings.registration_cap = 100
+        self.settings.save()
+
+        count = waitlist_service.invite_up_to_headroom()
+
+        self.assertEqual(count, 3)
+        for entry in entries:
+            entry.refresh_from_db()
+            self.assertEqual(entry.status, Waitlist.Status.INVITED)
+
+    def test_headroom_less_than_queue_invites_oldest_n(self):
+        entries = self._create_waiting(5)
+        self.settings.registration_cap = User.objects.count() + 2
+        self.settings.save()
+
+        count = waitlist_service.invite_up_to_headroom()
+
+        self.assertEqual(count, 2)
+        invited = [
+            e
+            for e in entries
+            if Waitlist.objects.get(pk=e.pk).status == Waitlist.Status.INVITED
+        ]
+        self.assertEqual({e.pk for e in invited}, {entries[0].pk, entries[1].pk})
+
+    def test_headroom_zero_or_negative_invites_nobody(self):
+        self._create_waiting(2)
+        self.settings.registration_cap = 0
+        self.settings.save()
+
+        count = waitlist_service.invite_up_to_headroom()
+
+        self.assertEqual(count, 0)
+        self.assertFalse(
+            Waitlist.objects.filter(status=Waitlist.Status.INVITED).exists()
+        )
+
+    def test_non_waiting_entries_are_never_touched(self):
+        invited = Waitlist.objects.create(
+            email="already-invited@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok",
+        )
+        redeemed = Waitlist.objects.create(
+            email="redeemed@example.com", status=Waitlist.Status.REDEEMED
+        )
+        removed = Waitlist.objects.create(
+            email="removed@example.com", status=Waitlist.Status.REMOVED
+        )
+        self.settings.registration_cap = 100
+        self.settings.save()
+
+        waitlist_service.invite_up_to_headroom()
+
+        invited.refresh_from_db()
+        redeemed.refresh_from_db()
+        removed.refresh_from_db()
+        self.assertEqual(invited.invite_token, "tok")
+        self.assertEqual(redeemed.status, Waitlist.Status.REDEEMED)
+        self.assertEqual(removed.status, Waitlist.Status.REMOVED)
+
+    def test_calling_twice_back_to_back_second_run_invites_zero(self):
+        self._create_waiting(2)
+        self.settings.registration_cap = User.objects.count() + 2
+        self.settings.save()
+
+        first = waitlist_service.invite_up_to_headroom()
+        second = waitlist_service.invite_up_to_headroom()
+
+        self.assertEqual(first, 2)
+        self.assertEqual(second, 0)
+
+
+class WaitlistRegistrationRedemptionTest(APITestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        GameSettings.current()
+
+    def _register_payload(self, email, invite_token):
+        return {
+            "email": email,
+            "password1": "SuperSecret123!",
+            "password2": "SuperSecret123!",
+            "invite_token": invite_token,
+            "agree_to_terms": True,
+            "turnstile_token": "test-token",
+        }
+
+    def _post_register(self, payload):
+        username_field = CustomRegisterSerializer._declared_fields["username"]
+        with patch("api.serializers._verify_turnstile", return_value=True):
+            with patch.dict(username_field._kwargs, {"required": False}):
+                return self.client.post("/api/v1/auth/registration/", payload)
+
+    def test_valid_token_and_matching_email_succeeds_and_redeems(self):
+        entry = Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-valid",
+        )
+        res = self._post_register(
+            self._register_payload("invitee@example.com", "tok-valid")
+        )
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="invitee@example.com").exists())
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, Waitlist.Status.REDEEMED)
+
+    def test_valid_token_mismatched_email_rejected(self):
+        entry = Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-mismatch",
+        )
+        res = self._post_register(
+            self._register_payload("someone-else@example.com", "tok-mismatch")
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, Waitlist.Status.INVITED)
+        self.assertFalse(User.objects.filter(email="someone-else@example.com").exists())
+
+    def test_already_redeemed_token_rejected(self):
+        Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.REDEEMED,
+            invite_token="tok-used",
+        )
+        res = self._post_register(
+            self._register_payload("invitee@example.com", "tok-used")
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="invitee@example.com").exists())
+
+    def test_both_invite_code_and_invite_token_rejected(self):
+        Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-both",
+        )
+        InviteCode.objects.create(code="SOMECODE")
+        payload = self._register_payload("invitee@example.com", "tok-both")
+        payload["invite_code"] = "SOMECODE"
+        res = self._post_register(payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="invitee@example.com").exists())
+
+    def test_neither_invite_code_nor_invite_token_rejected(self):
+        payload = self._register_payload("invitee@example.com", "")
+        del payload["invite_token"]
+        res = self._post_register(payload)
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="invitee@example.com").exists())
+
+    def test_concurrent_redemption_race_leaves_no_orphaned_user(self):
+        Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-race",
+        )
+
+        # Simulate another request winning the race: the conditional UPDATE
+        # in custom_signup() matches zero rows, as if a concurrent request
+        # already flipped this entry to REDEEMED first.
+        mock_queryset = MagicMock()
+        mock_queryset.update.return_value = 0
+        with patch(
+            "api.serializers.Waitlist.objects.filter", return_value=mock_queryset
+        ):
+            res = self._post_register(
+                self._register_payload("invitee@example.com", "tok-race")
+            )
+
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="invitee@example.com").exists())
 
 
 class WaitlistModelConstraintTest(TestCase):

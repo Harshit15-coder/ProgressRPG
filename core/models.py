@@ -138,4 +138,16 @@ class GameSettings(models.Model):
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        previous_cap = None
+        if self.pk:
+            previous_cap = (
+                GameSettings.objects.filter(pk=self.pk)
+                .values_list("registration_cap", flat=True)
+                .first()
+            )
         super().save(*args, **kwargs)
+        if previous_cap is not None and self.registration_cap > previous_cap:
+            from django.db import transaction
+            from users.tasks import invite_waitlist_entries
+
+            transaction.on_commit(lambda: invite_waitlist_entries.delay())

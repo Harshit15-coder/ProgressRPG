@@ -117,6 +117,15 @@ def reconcile_stale_online_players():
         )
 
 
+@shared_task
+def invite_waitlist_entries():
+    from users.services import waitlist_service
+
+    count = waitlist_service.invite_up_to_headroom()
+    logger.info(f"[WAITLIST INVITE TASK] Invited {count} waitlist entrant(s).")
+    return count
+
+
 @shared_task(bind=True, retry_backoff=True, max_retries=3)
 def send_email_to_users_task(self, emails, subject, template_base, context, cc_admin):
     """

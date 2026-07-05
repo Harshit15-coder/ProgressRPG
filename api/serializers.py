@@ -12,7 +12,7 @@ from rest_framework_simplejwt.serializers import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 
-from users.models import Player, InviteCode, UserLogin
+from users.models import Player, InviteCode, UserLogin, Waitlist
 from users.validators import clean_player_name
 
 from django.contrib.auth import get_user_model
@@ -232,7 +232,12 @@ def _verify_turnstile(token: str) -> bool:
 
 
 class CustomRegisterSerializer(RegisterSerializer):
-    invite_code = serializers.CharField(write_only=True, required=True)
+    invite_code = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
+    invite_token = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
     agree_to_terms = serializers.BooleanField(write_only=True, required=True)
     turnstile_token = serializers.CharField(write_only=True, required=True)
     email = serializers.EmailField(required=True)
@@ -245,6 +250,7 @@ class CustomRegisterSerializer(RegisterSerializer):
             "password1",
             "password2",
             "invite_code",
+            "invite_token",
             "agree_to_terms",
             "turnstile_token",
             "timezone",
@@ -288,16 +294,52 @@ class CustomRegisterSerializer(RegisterSerializer):
     def validate_timezone(self, value):
         return validate_timezone_name(value)
 
+    def validate(self, data):
+        data = super().validate(data)
+        invite_code = data.get("invite_code")
+        invite_token = data.get("invite_token")
+        if bool(invite_code) == bool(invite_token):  # neither or both
+            raise serializers.ValidationError(
+                "Provide exactly one of invite_code or invite_token."
+            )
+        if invite_token:
+            try:
+                entry = Waitlist.objects.get(
+                    invite_token=invite_token, status=Waitlist.Status.INVITED
+                )
+            except Waitlist.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"invite_token": "Invalid or already used invite token."}
+                )
+            if entry.email != data.get("email", "").strip().lower():
+                raise serializers.ValidationError(
+                    {
+                        "invite_token": "This invite token is for a different email address."
+                    }
+                )
+            self._waitlist_entry = entry
+        return data
+
     def custom_signup(self, request, user):
-        code = self.validated_data.get("invite_code")
-        try:
-            invite = InviteCode.objects.get(code=code, is_active=True)
-            invite.use()
-            user.player.invited_by_code = code
-            user.player.save()
-        except InviteCode.DoesNotExist:
-            # Should not happen due to earlier validation, but fail safe
-            pass
+        invite_code = self.validated_data.get("invite_code")
+        if invite_code:
+            try:
+                invite = InviteCode.objects.get(code=invite_code, is_active=True)
+                invite.use()
+                user.player.invited_by_code = invite_code
+                user.player.save()
+            except InviteCode.DoesNotExist:
+                # Should not happen due to earlier validation, but fail safe
+                pass
+        else:
+            entry = self._waitlist_entry
+            updated = Waitlist.objects.filter(
+                pk=entry.pk, status=Waitlist.Status.INVITED
+            ).update(status=Waitlist.Status.REDEEMED)
+            if not updated:
+                raise serializers.ValidationError(
+                    {"invite_token": "This invite token has already been redeemed."}
+                )
 
     def save(self, request):
         user = super().save(request)
