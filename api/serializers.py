@@ -13,6 +13,7 @@ from rest_framework_simplejwt.serializers import (
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import Player, InviteCode, UserLogin
+from users.services.registration_services import ensure_player_setup_for_user
 from users.validators import clean_player_name
 
 from django.contrib.auth import get_user_model
@@ -250,6 +251,13 @@ class CustomRegisterSerializer(RegisterSerializer):
             "timezone",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The inherited RegisterSerializer may expose a username field even
+        # when the project has no username field, yielding impossible
+        # validation constraints (required with max_length=0).
+        self.fields.pop("username", None)
+
     def get_email_context(self):
         context = super().get_email_context()
         request = self.context.get("request")
@@ -289,15 +297,16 @@ class CustomRegisterSerializer(RegisterSerializer):
         return validate_timezone_name(value)
 
     def custom_signup(self, request, user):
+        player = ensure_player_setup_for_user(user)
         code = self.validated_data.get("invite_code")
         try:
-            invite = InviteCode.objects.get(code=code, is_active=True)
-            invite.use()
-            user.player.invited_by_code = code
-            user.player.save()
+            invite = InviteCode.objects.get(code=code)
+            if not invite.use():
+                raise serializers.ValidationError("Invalid or expired invite code.")
+            player.invited_by_code = code
         except InviteCode.DoesNotExist:
             # Should not happen due to earlier validation, but fail safe
-            pass
+            raise serializers.ValidationError("Invalid or expired invite code.")
 
     def save(self, request):
         user = super().save(request)

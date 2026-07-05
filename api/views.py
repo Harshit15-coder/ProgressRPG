@@ -15,6 +15,7 @@ from django_ratelimit.decorators import ratelimit
 from urllib.parse import quote, unquote
 
 from allauth.account import app_settings as allauth_settings
+from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmation, EmailAddress
 
 # from allauth.account.utils import complete_signup, send_email_confirmation
@@ -381,13 +382,13 @@ class CustomRegisterView(RegisterView):
             defaults={"verified": False, "primary": True},
         )
 
-        email_address.save()
-
         logger.debug(f"[REGISTER] EmailAddress: {email_address} (created={created})")
 
-        confirmation = EmailConfirmation.create(email_address)
-        confirmation.sent = timezone.now()
-        confirmation.save()
+        confirmation = EmailConfirmation.objects.create(
+            email_address=email_address,
+            key=get_adapter().generate_emailconfirmation_key(email_address.email),
+            sent=timezone.now(),
+        )
 
         quoted_key = quote(confirmation.key)
         activate_url = f"{settings.FRONTEND_URL}/confirm_email/{quoted_key}"

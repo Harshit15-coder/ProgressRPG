@@ -154,7 +154,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 #     DATABASE_URL = f"postgres://{DB_USER}:{quote(DB_PASSWORD, safe='')}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 if DATABASE_URL:
-    db = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
+    db = dj_database_url.parse(DATABASE_URL, conn_max_age=0)
     db["ENGINE"] = "django.contrib.gis.db.backends.postgis"
     DATABASES = {"default": db}
 else:

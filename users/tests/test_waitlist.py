@@ -8,7 +8,6 @@ from django.test import TestCase, override_settings
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from api.serializers import CustomRegisterSerializer
 from core.models import GameSettings
 from users.models import Waitlist
 from users.services import waitlist_service
@@ -96,24 +95,18 @@ class SignupIgnoresCapTest(APITestCase):
         settings_obj.save()
         InviteCode.objects.create(code="TESTCODE")
 
-        # `username` is required=True on the inherited RegisterSerializer field
-        # despite the project having no username field (ACCOUNT_USER_MODEL_USERNAME_FIELD
-        # is None, so max_length=0) — an unrelated allauth/dj-rest-auth version quirk.
-        # Patch it out here so this test can exercise the real registration endpoint.
-        username_field = CustomRegisterSerializer._declared_fields["username"]
         with patch("api.serializers._verify_turnstile", return_value=True):
-            with patch.dict(username_field._kwargs, {"required": False}):
-                res = self.client.post(
-                    "/api/v1/auth/registration/",
-                    {
-                        "email": "newuser@example.com",
-                        "password1": "SuperSecret123!",
-                        "password2": "SuperSecret123!",
-                        "invite_code": "TESTCODE",
-                        "agree_to_terms": True,
-                        "turnstile_token": "test-token",
-                    },
-                )
+            res = self.client.post(
+                "/api/v1/auth/registration/",
+                {
+                    "email": "newuser@example.com",
+                    "password1": "SuperSecret123!",
+                    "password2": "SuperSecret123!",
+                    "invite_code": "TESTCODE",
+                    "agree_to_terms": True,
+                    "turnstile_token": "test-token",
+                },
+            )
         self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
         self.assertTrue(User.objects.filter(email="newuser@example.com").exists())
 
