@@ -26,7 +26,7 @@ user_data.json
 playwright-report/
 playwright/.auth/
 media/
-/site
+site/
 # design-sync (converter scripts + generated output — durable set in .design-sync/ IS committed)
 .ds-sync/
 ds-bundle/
