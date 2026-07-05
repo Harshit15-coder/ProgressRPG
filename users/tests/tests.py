@@ -713,3 +713,45 @@ class CustomUserAdminChangelistQueryTest(TestCase):
             "admin changelist query count should not grow with the number "
             "of users displayed",
         )
+
+
+class CustomUserAdminChangeViewQueryTest(TestCase):
+    """Guards against the N+1 pattern in
+    /admin/users/customuser/{id}/change/ (Sentry issue 132052308), where
+    UserLoginInlineFormSet.get_queryset() rebuilt an un-memoized sliced
+    queryset on every call, so Django's formset machinery re-ran the same
+    "most recent 5 logins" query repeatedly instead of reusing one result.
+    """
+
+    def setUp(self):
+        Character.objects.create(first_name="Jane", can_link=True)
+        self.admin_user = get_user_model().objects.create_superuser(
+            email="superadmin@example.com", password="testpassword123"
+        )
+        self.target_user = get_user_model().objects.create_user(
+            email="change-view-user@example.com", password="testpassword123"
+        )
+        for _ in range(5):
+            UserLogin.objects.create(user=self.target_user)
+
+        self.client = Client()
+        self.client.force_login(self.admin_user)
+
+    def test_change_view_queries_recent_logins_only_once(self):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(
+                f"/admin/users/customuser/{self.target_user.pk}/change/"
+            )
+        self.assertEqual(response.status_code, 200)
+
+        recent_logins_queries = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if "users_userlogin" in q["sql"] and "ORDER BY" in q["sql"]
+        ]
+        self.assertEqual(
+            len(recent_logins_queries),
+            1,
+            "the recent-logins inline queryset should be fetched once and "
+            f"reused, not re-queried per call: {recent_logins_queries}",
+        )

@@ -69,7 +69,18 @@ class PlayerInline(admin.TabularInline):
 class UserLoginInlineFormSet(BaseInlineFormSet):
     def get_queryset(self):
         # Show only the most recent login events in the admin inline.
-        return super().get_queryset().order_by("-timestamp")[:5]
+        #
+        # Cache the sliced queryset on self: BaseInlineFormSet.get_queryset()
+        # already caches the unsliced queryset, but re-slicing it here on
+        # every call builds a new QuerySet object each time, so Django's
+        # formset machinery (initial_form_count, _construct_form, template
+        # rendering, ...) re-runs this query on every call instead of
+        # reusing one result.
+        if not hasattr(self, "_recent_logins_queryset"):
+            self._recent_logins_queryset = (
+                super().get_queryset().order_by("-timestamp")[:5]
+            )
+        return self._recent_logins_queryset
 
 
 class UserLoginInline(admin.TabularInline):
