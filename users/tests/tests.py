@@ -1,8 +1,10 @@
 from django.contrib.auth import get_user_model
 from django.core import mail
+from django.db import connection
 from django.http import HttpResponse
 from django.test import TestCase, Client, override_settings, tag
 from django.test.client import RequestFactory
+from django.test.utils import CaptureQueriesContext
 from datetime import date, timedelta
 from django.utils import timezone
 from unittest.mock import patch
@@ -33,6 +35,7 @@ from users.validators import (
 )
 
 from character.models import Character, PlayerCharacterLink
+from payments.models import SubscriptionPlan, UserSubscription
 
 logging.getLogger("general").setLevel(logging.CRITICAL)
 
@@ -340,7 +343,12 @@ class UserLoginModelTest(TestCase):
         )
 
     def _create_login(self, days_ago):
-        login = UserLogin.objects.create(user=self.user)
+        # bulk_create so no post_save signal fires: the login-reward signal
+        # reads and caches login stats onto self.user, and since these
+        # fixture rows are created with a "now" timestamp before being
+        # back-dated below, that cache would go stale for the rest of the
+        # test.
+        (login,) = UserLogin.objects.bulk_create([UserLogin(user=self.user)])
         timestamp = timezone.now() - timedelta(days=days_ago)
         UserLogin.objects.filter(pk=login.pk).update(timestamp=timestamp)
         return UserLogin.objects.get(pk=login.pk)
@@ -355,6 +363,65 @@ class UserLoginModelTest(TestCase):
         self.assertEqual(self.user.max_login_streak, 2)
         self.assertEqual(self.user.total_login_events, 3)
         self.assertIsNotNone(self.user.last_recorded_login)
+
+    def test_login_metrics_share_a_single_query_per_user(self):
+        """Reading all four login metrics for one user should only hit the
+        db once, since they all derive from the same cached login list."""
+        self._create_login(3)
+        self._create_login(1)
+        self._create_login(0)
+
+        with self.assertNumQueries(1):
+            self.assertEqual(self.user.days_logged_in, 3)
+            self.assertEqual(self.user.current_login_streak, 2)
+            self.assertEqual(self.user.max_login_streak, 2)
+            self.assertIsNotNone(self.user.last_recorded_login)
+
+    def test_login_metrics_use_prefetched_logins_without_a_query(self):
+        """When a caller (eg. the admin changelist) has already prefetched
+        logins onto the user instance, no further queries should run."""
+        login_a = self._create_login(3)
+        login_b = self._create_login(0)
+        self.user.prefetched_logins = [login_b, login_a]
+
+        with self.assertNumQueries(0):
+            self.assertEqual(self.user.days_logged_in, 2)
+            self.assertEqual(self.user.current_login_streak, 1)
+            self.assertEqual(self.user.total_login_events, 2)
+            self.assertEqual(self.user.last_recorded_login, login_b.timestamp)
+
+    def test_annotate_first_of_day_batches_into_one_query(self):
+        """annotate_first_of_day should determine, for a batch of logins,
+        which was the first of its local day using one query total - not
+        one query per login (Sentry issue 118909761)."""
+
+        def make_login(ts):
+            login = UserLogin.objects.create(user=self.user)
+            UserLogin.objects.filter(pk=login.pk).update(timestamp=ts)
+            # select_related("user") to match real callers (eg. the admin
+            # inline formset) - without it, annotate_first_of_day's access
+            # of logins[0].user below would issue its own query.
+            return UserLogin.objects.select_related("user").get(pk=login.pk)
+
+        day1 = (timezone.now() - timedelta(days=1)).replace(
+            hour=8, minute=0, second=0, microsecond=0
+        )
+        day1_early = make_login(day1)
+        day1_late = make_login(day1.replace(hour=20))
+        day2_only = make_login(day1 + timedelta(days=1))
+
+        logins = [day2_only, day1_late, day1_early]
+
+        with self.assertNumQueries(1):
+            UserLogin.annotate_first_of_day(logins)
+
+        with self.assertNumQueries(0):
+            self.assertTrue(day1_early.is_first_login_of_day())
+            self.assertFalse(day1_late.is_first_login_of_day())
+            self.assertTrue(day2_only.is_first_login_of_day())
+
+    def test_annotate_first_of_day_empty_list_is_a_noop(self):
+        self.assertEqual(UserLogin.annotate_first_of_day([]), [])
 
 
 class JwtLoginTrackingTest(TestCase):
@@ -778,3 +845,138 @@ class AssignCharacterTest(TestCase):
 
         # Should return None - no available characters
         self.assertIsNone(character)
+
+
+class CustomUserAdminChangelistQueryTest(TestCase):
+    """Guards against the N+1 pattern in /admin/users/customuser/ (Sentry
+    issue 113875738), where per-row property access on the changelist
+    (player, subscription, login stats) each fired their own query.
+
+    Rather than pin an exact query count (fragile, and not something we
+    can verify without a running Django install in this environment), we
+    assert the query count is the same for a small and a large number of
+    users - if it scaled per row, the larger fixture would issue more
+    queries.
+    """
+
+    def setUp(self):
+        Character.objects.create(first_name="Jane", can_link=True)
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium", price="9.99", interval="monthly"
+        )
+        self.admin_user = get_user_model().objects.create_superuser(
+            email="superadmin@example.com", password="testpassword123"
+        )
+        self.client = Client()
+        self.client.force_login(self.admin_user)
+        self._user_count = 0
+
+    def _make_users(self, count):
+        for _ in range(count):
+            i = self._user_count
+            self._user_count += 1
+            user = get_user_model().objects.create_user(
+                email=f"admin-list-user-{i}@example.com", password="testpassword123"
+            )
+            UserLogin.objects.create(user=user)
+            UserLogin.objects.create(user=user)
+            if i % 2 == 0:
+                UserSubscription.objects.create(user=user, plan=self.plan, active=True)
+
+    def _changelist_query_count(self):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get("/admin/users/customuser/")
+        self.assertEqual(response.status_code, 200)
+        return len(ctx.captured_queries)
+
+    def test_changelist_query_count_does_not_scale_with_user_count(self):
+        self._make_users(3)
+        small_count = self._changelist_query_count()
+
+        self._make_users(20)
+        large_count = self._changelist_query_count()
+
+        self.assertEqual(
+            small_count,
+            large_count,
+            "admin changelist query count should not grow with the number "
+            "of users displayed",
+        )
+
+
+class CustomUserAdminChangeViewQueryTest(TestCase):
+    """Guards against two N+1 patterns in
+    /admin/users/customuser/{id}/change/:
+
+    - Sentry issue 132052308: UserLoginInlineFormSet.get_queryset() rebuilt
+      an un-memoized sliced queryset on every call, so Django's formset
+      machinery re-ran the same "most recent 5 logins" query repeatedly
+      instead of reusing one result.
+    - Sentry issue 118909761: is_first_login_of_day() re-fetched the parent
+      CustomUser and ran its own existence query for each of the 5
+      displayed login rows.
+    """
+
+    def setUp(self):
+        Character.objects.create(first_name="Jane", can_link=True)
+        self.admin_user = get_user_model().objects.create_superuser(
+            email="superadmin@example.com", password="testpassword123"
+        )
+        self.target_user = get_user_model().objects.create_user(
+            email="change-view-user@example.com", password="testpassword123"
+        )
+        for _ in range(5):
+            UserLogin.objects.create(user=self.target_user)
+
+        self.client = Client()
+        self.client.force_login(self.admin_user)
+
+    def test_change_view_queries_recent_logins_only_once(self):
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(
+                f"/admin/users/customuser/{self.target_user.pk}/change/"
+            )
+        self.assertEqual(response.status_code, 200)
+
+        userlogin_queries = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if 'FROM "users_userlogin"' in q["sql"]
+        ]
+
+        # The "most recent 5 logins" fetch (ORDER BY ... DESC ... LIMIT 5)
+        # should run exactly once and be reused, not re-queried per call.
+        recent_logins_queries = [q for q in userlogin_queries if "DESC" in q]
+        self.assertEqual(
+            len(recent_logins_queries),
+            1,
+            "the recent-logins inline queryset should be fetched once and "
+            f"reused, not re-queried per call: {recent_logins_queries}",
+        )
+
+        # is_first_login_of_day should be computed for all displayed rows in
+        # one batched query, not one query per row (Sentry issue 118909761).
+        first_of_day_queries = [
+            q for q in userlogin_queries if q not in recent_logins_queries
+        ]
+        self.assertLessEqual(
+            len(first_of_day_queries),
+            1,
+            "is_first_login_of_day should be batched into a single query "
+            f"instead of one per displayed login row: {first_of_day_queries}",
+        )
+
+        # The parent CustomUser (self.user on each login row) should be
+        # select_related, not re-fetched once per displayed login row.
+        standalone_customuser_queries = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if 'FROM "users_customuser"' in q["sql"]
+            and 'FROM "users_userlogin"' not in q["sql"]
+        ]
+        self.assertLessEqual(
+            len(standalone_customuser_queries),
+            2,
+            "the parent CustomUser should not be re-fetched once per "
+            f"displayed login row: {standalone_customuser_queries}",
+        )
