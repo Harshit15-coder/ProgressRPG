@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Form from '../../components/Form/Form';
 import Input from '../../components/Input/Input';
 import WaitlistForm from '../../components/WaitlistForm/WaitlistForm';
@@ -15,7 +15,7 @@ declare global {
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
-function RegistrationForm(): React.ReactElement {
+function RegistrationForm({ inviteToken }: { inviteToken?: string }): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -58,7 +58,7 @@ function RegistrationForm(): React.ReactElement {
       email,
       password,
       confirmPassword,
-      inviteCode,
+      inviteToken ? { token: inviteToken } : { code: inviteCode },
       agreeToTerms,
       turnstileToken,
       browserTimezone
@@ -140,15 +140,17 @@ function RegistrationForm(): React.ReactElement {
           onChange={(v) => setConfirmPassword(v as string)}
           required
         />
-        <Input
-          id="invite_code"
-          label="Invite Code:"
-          type="text"
-          placeholder="e.g. TESTER"
-          value={inviteCode}
-          onChange={(v) => setInviteCode(v as string)}
-          required
-        />
+        {!inviteToken && (
+          <Input
+            id="invite_code"
+            label="Invite Code:"
+            type="text"
+            placeholder="e.g. TESTER"
+            value={inviteCode}
+            onChange={(v) => setInviteCode(v as string)}
+            required
+          />
+        )}
         <div className={styles.agreeToTerms}>
           <input
             id="agree_to_terms"
@@ -187,6 +189,7 @@ function RegistrationForm(): React.ReactElement {
 export default function RegisterPage(): React.ReactElement {
   const { data, isLoading } = useRegistrationStatus();
   const location = useLocation();
+  const { token: inviteToken } = useParams<{ token?: string }>();
 
   if (isLoading) {
     return (
@@ -198,7 +201,9 @@ export default function RegisterPage(): React.ReactElement {
     );
   }
 
-  if (data && !data.registration_open) {
+  // Invited users always get the registration form, even if the cap has
+  // since been reached again — their invite is proof of a slot at invite time.
+  if (!inviteToken && data && !data.registration_open) {
     return (
       <div className={styles.page}>
         <div className={styles.formFrame}>
@@ -221,7 +226,7 @@ export default function RegisterPage(): React.ReactElement {
   return (
     <div className={styles.page}>
       <div className={styles.formFrame}>
-        <RegistrationForm key={location.key} />
+        <RegistrationForm key={location.key} inviteToken={inviteToken} />
       </div>
     </div>
   );
