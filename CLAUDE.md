@@ -67,6 +67,10 @@ Pre-commit hooks run Black, trailing-whitespace, and YAML checks on commit.
 pre-commit install   # one-time setup
 ```
 
+## Planning
+
+When producing an implementation plan (plan mode, or any "planning only, don't implement" request), follow `.claude/plans/planning-template.md` — it defines the required sections, planning principles (reuse over new abstractions, justify concurrency controls, keep plans concise), and output format. Write finished plans into `.claude/plans/`.
+
 ## Architecture
 
 ### Backend Apps
