@@ -151,6 +151,10 @@ class UserLogin(models.Model):
         return timezone.localtime(self.timestamp).date()
 
     def is_first_login_of_day(self):
+        cached = getattr(self, "_is_first_of_day", None)
+        if cached is not None:
+            return cached
+
         today = self.local_date()
         previous_logins_today = UserLogin.objects.filter(
             user=self.user,
@@ -158,6 +162,36 @@ class UserLogin(models.Model):
             timestamp__lt=self.timestamp,
         )
         return not previous_logins_today.exists()
+
+    @classmethod
+    def annotate_first_of_day(cls, logins):
+        """
+        Given already-fetched UserLogin instances for a single user, work
+        out (in one query) which of them was the first login of its local
+        day, and cache the answer on each instance so is_first_login_of_day
+        doesn't issue its own query when called on them - avoids a query
+        per row when rendering these in the admin inline.
+        """
+        logins = list(logins)
+        if not logins:
+            return logins
+
+        user = logins[0].user
+        dates = {login.local_date() for login in logins}
+        first_by_date = {}
+        for ts in (
+            cls.objects.filter(user=user, timestamp__date__in=dates)
+            .order_by("timestamp")
+            .values_list("timestamp", flat=True)
+        ):
+            day = timezone.localtime(ts).date()
+            first_by_date.setdefault(day, ts)
+
+        for login in logins:
+            login._is_first_of_day = (
+                first_by_date.get(login.local_date()) == login.timestamp
+            )
+        return logins
 
     @classmethod
     def _ordered_logins(cls, user):

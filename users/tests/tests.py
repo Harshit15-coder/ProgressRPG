@@ -336,6 +336,36 @@ class UserLoginModelTest(TestCase):
             self.assertEqual(self.user.total_login_events, 2)
             self.assertEqual(self.user.last_recorded_login, login_b.timestamp)
 
+    def test_annotate_first_of_day_batches_into_one_query(self):
+        """annotate_first_of_day should determine, for a batch of logins,
+        which was the first of its local day using one query total - not
+        one query per login (Sentry issue 118909761)."""
+
+        def make_login(ts):
+            login = UserLogin.objects.create(user=self.user)
+            UserLogin.objects.filter(pk=login.pk).update(timestamp=ts)
+            return UserLogin.objects.get(pk=login.pk)
+
+        day1 = (timezone.now() - timedelta(days=1)).replace(
+            hour=8, minute=0, second=0, microsecond=0
+        )
+        day1_early = make_login(day1)
+        day1_late = make_login(day1.replace(hour=20))
+        day2_only = make_login(day1 + timedelta(days=1))
+
+        logins = [day2_only, day1_late, day1_early]
+
+        with self.assertNumQueries(1):
+            UserLogin.annotate_first_of_day(logins)
+
+        with self.assertNumQueries(0):
+            self.assertTrue(day1_early.is_first_login_of_day())
+            self.assertFalse(day1_late.is_first_login_of_day())
+            self.assertTrue(day2_only.is_first_login_of_day())
+
+    def test_annotate_first_of_day_empty_list_is_a_noop(self):
+        self.assertEqual(UserLogin.annotate_first_of_day([]), [])
+
 
 class JwtLoginTrackingTest(TestCase):
     def setUp(self):
@@ -716,11 +746,16 @@ class CustomUserAdminChangelistQueryTest(TestCase):
 
 
 class CustomUserAdminChangeViewQueryTest(TestCase):
-    """Guards against the N+1 pattern in
-    /admin/users/customuser/{id}/change/ (Sentry issue 132052308), where
-    UserLoginInlineFormSet.get_queryset() rebuilt an un-memoized sliced
-    queryset on every call, so Django's formset machinery re-ran the same
-    "most recent 5 logins" query repeatedly instead of reusing one result.
+    """Guards against two N+1 patterns in
+    /admin/users/customuser/{id}/change/:
+
+    - Sentry issue 132052308: UserLoginInlineFormSet.get_queryset() rebuilt
+      an un-memoized sliced queryset on every call, so Django's formset
+      machinery re-ran the same "most recent 5 logins" query repeatedly
+      instead of reusing one result.
+    - Sentry issue 118909761: is_first_login_of_day() re-fetched the parent
+      CustomUser and ran its own existence query for each of the 5
+      displayed login rows.
     """
 
     def setUp(self):
@@ -744,14 +779,42 @@ class CustomUserAdminChangeViewQueryTest(TestCase):
             )
         self.assertEqual(response.status_code, 200)
 
-        recent_logins_queries = [
-            q["sql"]
-            for q in ctx.captured_queries
-            if "users_userlogin" in q["sql"] and "ORDER BY" in q["sql"]
+        userlogin_queries = [
+            q["sql"] for q in ctx.captured_queries if "users_userlogin" in q["sql"]
         ]
+
+        # The "most recent 5 logins" fetch (ORDER BY ... DESC ... LIMIT 5)
+        # should run exactly once and be reused, not re-queried per call.
+        recent_logins_queries = [q for q in userlogin_queries if "DESC" in q]
         self.assertEqual(
             len(recent_logins_queries),
             1,
             "the recent-logins inline queryset should be fetched once and "
             f"reused, not re-queried per call: {recent_logins_queries}",
+        )
+
+        # is_first_login_of_day should be computed for all displayed rows in
+        # one batched query, not one query per row (Sentry issue 118909761).
+        first_of_day_queries = [
+            q for q in userlogin_queries if q not in recent_logins_queries
+        ]
+        self.assertLessEqual(
+            len(first_of_day_queries),
+            1,
+            "is_first_login_of_day should be batched into a single query "
+            f"instead of one per displayed login row: {first_of_day_queries}",
+        )
+
+        # The parent CustomUser (self.user on each login row) should be
+        # select_related, not re-fetched once per displayed login row.
+        standalone_customuser_queries = [
+            q["sql"]
+            for q in ctx.captured_queries
+            if "users_customuser" in q["sql"] and "users_userlogin" not in q["sql"]
+        ]
+        self.assertLessEqual(
+            len(standalone_customuser_queries),
+            2,
+            "the parent CustomUser should not be re-fetched once per "
+            f"displayed login row: {standalone_customuser_queries}",
         )

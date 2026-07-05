@@ -77,9 +77,17 @@ class UserLoginInlineFormSet(BaseInlineFormSet):
         # rendering, ...) re-runs this query on every call instead of
         # reusing one result.
         if not hasattr(self, "_recent_logins_queryset"):
-            self._recent_logins_queryset = (
-                super().get_queryset().order_by("-timestamp")[:5]
+            # select_related("user") so is_first_login_of_day/
+            # annotate_first_of_day don't each re-fetch the parent
+            # CustomUser that's already loaded for this change view.
+            queryset = (
+                super()
+                .get_queryset()
+                .select_related("user")
+                .order_by("-timestamp")[:5]
             )
+            UserLogin.annotate_first_of_day(queryset)
+            self._recent_logins_queryset = queryset
         return self._recent_logins_queryset
 
 
