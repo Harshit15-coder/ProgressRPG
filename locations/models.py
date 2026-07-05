@@ -1,9 +1,12 @@
+from collections import defaultdict
+
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 from django.db import models, transaction
 from django.db.models import Q
 from django.utils import timezone
+from django.utils.functional import cached_property
 from .services import movement as movement_service
 from .utils import relative_distance_direction
 
@@ -482,16 +485,31 @@ class PopulationCentre(models.Model):
     def resident_count(self):
         return self.residents.count()
 
-    @property
+    @cached_property
     def village_points(self):
+        # cached_property: progress and state below each read this too, so
+        # without caching every serialization of a population centre
+        # recomputes it 3x over.
         from character.models import PlayerCharacterLink
 
-        points = 0
+        residents = list(self.residents.all())
 
-        for resident in self.residents.all():
-            points += PlayerCharacterLink.total_link_points(resident.links.all())
+        # Batch-fetch every resident's links in one query instead of
+        # issuing one query per resident (this used to be an N+1).
+        links_by_character = defaultdict(list)
+        for link in PlayerCharacterLink.objects.filter(
+            character__in=residents
+        ).select_related("player__user"):
+            links_by_character[link.character_id].append(link)
 
-        village_multiplier = 2 / (1 + self.residents.count())
+        points = sum(
+            PlayerCharacterLink.total_link_points(
+                links_by_character.get(resident.id, [])
+            )
+            for resident in residents
+        )
+
+        village_multiplier = 2 / (1 + len(residents))
         scaled_points = points * village_multiplier
         return int(scaled_points)
 
