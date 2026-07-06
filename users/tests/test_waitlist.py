@@ -1,3 +1,4 @@
+from datetime import timedelta
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth import get_user_model
@@ -5,6 +6,7 @@ from django.core import mail
 from django.core.cache import cache
 from django.db import IntegrityError
 from django.test import TestCase, override_settings
+from django.utils import timezone
 from rest_framework import status
 from rest_framework.test import APITestCase
 
@@ -446,3 +448,234 @@ class WaitlistModelConstraintTest(TestCase):
         Waitlist.objects.create(email="dup@example.com", status=Waitlist.Status.REMOVED)
         Waitlist.objects.create(email="dup@example.com", status=Waitlist.Status.WAITING)
         self.assertEqual(Waitlist.objects.filter(email="dup@example.com").count(), 2)
+
+
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class WaitlistNudgeTest(TestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+        self.settings.waitlist_nudges_enabled_from = timezone.now() - timedelta(
+            days=365
+        )
+        self.settings.save()
+
+    def _create_invited(self, email, days_ago, **extra):
+        return Waitlist.objects.create(
+            email=email,
+            status=Waitlist.Status.INVITED,
+            invite_token=f"tok-{email}",
+            invited_at=timezone.now() - timedelta(days=days_ago),
+            **extra,
+        )
+
+    def test_sends_3day_nudge_and_marks_sent(self):
+        entry = self._create_invited("three@example.com", 3)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertEqual(count, 1)
+        self.assertIsNotNone(entry.nudge_3day_sent_at)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ["three@example.com"])
+
+    def test_sends_7day_nudge_independently(self):
+        # Simulate the 3-day milestone already having been handled by an
+        # earlier scan, so this run only newly crosses the 7-day mark.
+        entry = self._create_invited(
+            "seven@example.com", 7, nudge_3day_sent_at=timezone.now()
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertIsNotNone(entry.nudge_7day_sent_at)
+
+    def test_sends_30day_nudge_independently(self):
+        # Simulate the 3/7-day milestones already having been handled by
+        # earlier scans, so this run only newly crosses the 30-day mark.
+        entry = self._create_invited(
+            "thirty@example.com",
+            30,
+            nudge_3day_sent_at=timezone.now(),
+            nudge_7day_sent_at=timezone.now(),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertIsNotNone(entry.nudge_30day_sent_at)
+
+    def test_no_send_before_next_milestone(self):
+        entry = self._create_invited("early@example.com", 1)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertEqual(count, 0)
+        self.assertIsNone(entry.nudge_3day_sent_at)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_does_not_resend_milestone_already_sent(self):
+        entry = self._create_invited(
+            "already@example.com", 3, nudge_3day_sent_at=timezone.now()
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        self.assertEqual(count, 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_skips_redeemed_and_removed_entries(self):
+        redeemed = self._create_invited("redeemed@example.com", 10)
+        redeemed.status = Waitlist.Status.REDEEMED
+        redeemed.save()
+        removed = self._create_invited("removed@example.com", 10)
+        removed.status = Waitlist.Status.REMOVED
+        removed.save()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        self.assertEqual(count, 0)
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_terminal_milestone_sends_removal_email_and_flips_status(self):
+        # Simulate the earlier milestones already having been handled by
+        # earlier scans, so this run only newly crosses the 60-day mark.
+        entry = self._create_invited(
+            "stale@example.com",
+            60,
+            nudge_3day_sent_at=timezone.now(),
+            nudge_7day_sent_at=timezone.now(),
+            nudge_30day_sent_at=timezone.now(),
+        )
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertEqual(count, 1)
+        self.assertIsNotNone(entry.nudge_removal_sent_at)
+        self.assertEqual(entry.status, Waitlist.Status.REMOVED)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_terminal_race_with_redemption_leaves_entry_redeemed(self):
+        entry = self._create_invited("racer@example.com", 60)
+        # Simulate a redemption winning the race between the scan's read
+        # and its guarded update.
+        Waitlist.objects.filter(pk=entry.pk).update(status=Waitlist.Status.REDEEMED)
+
+        waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertEqual(entry.status, Waitlist.Status.REDEEMED)
+        self.assertIsNone(entry.nudge_removal_sent_at)
+
+    def test_entries_before_cutoff_are_excluded(self):
+        entry = self._create_invited("old@example.com", 60)
+        self.settings.waitlist_nudges_enabled_from = timezone.now()
+        self.settings.save()
+
+        with self.captureOnCommitCallbacks(execute=True):
+            count = waitlist_service.send_due_nudges()
+
+        entry.refresh_from_db()
+        self.assertEqual(count, 0)
+        self.assertEqual(entry.status, Waitlist.Status.INVITED)
+        self.assertIsNone(entry.nudge_removal_sent_at)
+
+    def test_no_cutoff_set_sends_nothing(self):
+        self.settings.waitlist_nudges_enabled_from = None
+        self.settings.save()
+        self._create_invited("uncut@example.com", 60)
+
+        count = waitlist_service.send_due_nudges()
+
+        self.assertEqual(count, 0)
+
+    def test_send_waitlist_nudges_task_delegates_and_returns_count(self):
+        from users.tasks import send_waitlist_nudges
+
+        self._create_invited("task@example.com", 3)
+
+        with self.captureOnCommitCallbacks(execute=True):
+            result = send_waitlist_nudges.delay()
+
+        self.assertEqual(result.get(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+
+@override_settings(
+    CELERY_TASK_ALWAYS_EAGER=True,
+    EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend",
+)
+class WaitlistRemovalAcceptanceCriteriaTest(TestCase):
+    """
+    Regression coverage for #500's stated acceptance criteria, which are
+    already satisfied by existing code with no changes: a REMOVED entry
+    is excluded from invite headroom, and its email can be reused.
+    """
+
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+
+    def test_removed_entry_excluded_from_invite_headroom(self):
+        Waitlist.objects.create(
+            email="removed@example.com", status=Waitlist.Status.REMOVED
+        )
+        self.settings.registration_cap = 100
+        self.settings.save()
+
+        count = waitlist_service.invite_up_to_headroom()
+
+        self.assertEqual(count, 0)
+
+    def test_removed_entrys_email_can_rejoin_waitlist(self):
+        Waitlist.objects.create(
+            email="removed@example.com", status=Waitlist.Status.REMOVED
+        )
+        res = self.client.post(
+            "/api/v1/waitlist_join/", {"email": "removed@example.com"}
+        )
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(
+            Waitlist.objects.filter(
+                email="removed@example.com", status=Waitlist.Status.WAITING
+            ).exists()
+        )
+
+    def test_removed_entrys_old_invite_token_cannot_be_redeemed(self):
+        from api.serializers import CustomRegisterSerializer
+
+        Waitlist.objects.create(
+            email="removed@example.com",
+            status=Waitlist.Status.REMOVED,
+            invite_token="tok-removed",
+        )
+        username_field = CustomRegisterSerializer._declared_fields["username"]
+        with patch("api.serializers._verify_turnstile", return_value=True):
+            with patch.dict(username_field._kwargs, {"required": False}):
+                res = self.client.post(
+                    "/api/v1/auth/registration/",
+                    {
+                        "email": "removed@example.com",
+                        "password1": "SuperSecret123!",
+                        "password2": "SuperSecret123!",
+                        "invite_token": "tok-removed",
+                        "agree_to_terms": True,
+                        "turnstile_token": "test-token",
+                    },
+                )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="removed@example.com").exists())
