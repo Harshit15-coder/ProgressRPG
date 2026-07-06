@@ -327,8 +327,6 @@ class CustomRegisterSerializer(RegisterSerializer):
             try:
                 invite = InviteCode.objects.get(code=invite_code, is_active=True)
                 invite.use()
-                user.player.invited_by_code = invite_code
-                user.player.save()
             except InviteCode.DoesNotExist:
                 # Should not happen due to earlier validation, but fail safe
                 pass
