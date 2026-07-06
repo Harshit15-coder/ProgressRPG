@@ -2,9 +2,11 @@ import os
 import random
 import string
 import logging
+import time
 
 from locust import HttpUser, between, task
 from locust.exception import StopUser
+import websocket
 
 
 # -----------------------
@@ -17,6 +19,11 @@ LOGIN_EMAIL = os.getenv("DJANGO_SUPERUSER_EMAIL", "")
 LOGIN_PASSWORD = os.getenv("DJANGO_SUPERUSER_PASSWORD", "")
 SCENARIO = os.getenv("LOCUST_SCENARIO", "all").strip().lower()
 
+WS_HOST = os.getenv("LOCUST_WS_HOST", "ws://localhost:8000")
+WS_PING_INTERVAL_SECONDS = float(os.getenv("LOCUST_WS_PING_INTERVAL_SECONDS", "5"))
+WS_CONNECTION_SECONDS = float(os.getenv("LOCUST_WS_CONNECTION_SECONDS", "30"))
+WS_TIMEOUT_SECONDS = float(os.getenv("LOCUST_WS_TIMEOUT_SECONDS", "5"))
+
 LOG_LEVEL = os.getenv("LOCUST_LOG_LEVEL", "INFO").upper()
 
 logging.basicConfig(
@@ -27,6 +34,7 @@ logger = logging.getLogger("locust")
 
 RUN_SIGNUP = SCENARIO in ("all", "signup")
 RUN_BOOTSTRAP = SCENARIO in ("all", "bootstrap")
+RUN_TIMER = SCENARIO in ("all", "timer")
 
 
 # -----------------------
@@ -91,8 +99,25 @@ class BaseUser(HttpUser):
                 return False
 
             self.client.headers.update({"Authorization": f"Bearer {token}"})
+            self.access_token = token
             response.success()
             return True
+
+    def fetch_player_id(self):
+        """Fetch the authenticated player's id via fetch_info, for use in WS routes."""
+        with self.client.get(
+            "/api/v1/fetch_info/", catch_response=True, name="fetch_info (for ws setup)"
+        ) as response:
+            if response.status_code != 200:
+                response.failure(
+                    f"fetch_info failed: {response.status_code} {response.text}"
+                )
+                return None
+            try:
+                return response.json()["player"]["id"]
+            except (ValueError, KeyError, TypeError):
+                response.failure("missing player.id in fetch_info response")
+                return None
 
 
 # -----------------------
@@ -166,3 +191,81 @@ class BootstrapUser(BaseUser):
     @task
     def fetch_info(self):
         self.client.get("/api/v1/fetch_info/", name="fetch_info")
+
+
+# -----------------------
+# 3. TIMER WEBSOCKET LOAD TEST
+# -----------------------
+class TimerUser(BaseUser):
+    """
+    Exercises the gameplay timer WebSocket (gameplay/consumers.py TimerConsumer):
+    connect, hold the connection open sending periodic pings (which also drive
+    the per-ping `record_heartbeat` DB write), then disconnect.
+    """
+
+    abstract = not RUN_TIMER
+    tags = ["timer"]
+    wait_time = between(1, 3)
+
+    def on_start(self):
+        if not self.authenticate_with_jwt():
+            raise StopUser(
+                "Set LOCUST_LOGIN_EMAIL and LOCUST_LOGIN_PASSWORD to run timer tasks"
+            )
+        self.player_id = self.fetch_player_id()
+        if not self.player_id:
+            raise StopUser("Could not resolve player id for timer websocket")
+
+    @task
+    def timer_session(self):
+        url = f"{WS_HOST}/ws/profile_{self.player_id}/?token={self.access_token}"
+
+        start = time.time()
+        try:
+            ws = websocket.create_connection(url, timeout=WS_TIMEOUT_SECONDS)
+        except Exception as exc:
+            self.environment.events.request.fire(
+                request_type="WS",
+                name="timer_connect",
+                response_time=(time.time() - start) * 1000,
+                response_length=0,
+                exception=exc,
+            )
+            return
+
+        self.environment.events.request.fire(
+            request_type="WS",
+            name="timer_connect",
+            response_time=(time.time() - start) * 1000,
+            response_length=0,
+        )
+
+        session_end = time.time() + WS_CONNECTION_SECONDS
+        try:
+            while time.time() < session_end:
+                ping_start = time.time()
+                try:
+                    ws.send('{"type": "ping"}')
+                    ws.recv()
+                except Exception as exc:
+                    self.environment.events.request.fire(
+                        request_type="WS",
+                        name="timer_ping",
+                        response_time=(time.time() - ping_start) * 1000,
+                        response_length=0,
+                        exception=exc,
+                    )
+                    break
+                else:
+                    self.environment.events.request.fire(
+                        request_type="WS",
+                        name="timer_ping",
+                        response_time=(time.time() - ping_start) * 1000,
+                        response_length=0,
+                    )
+                time.sleep(WS_PING_INTERVAL_SECONDS)
+        finally:
+            try:
+                ws.close()
+            except Exception:
+                pass

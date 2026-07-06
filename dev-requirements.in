@@ -11,4 +11,5 @@ pip-tools
 pipdeptree
 pre_commit
 types-PyYAML
+websocket-client
 wheel
