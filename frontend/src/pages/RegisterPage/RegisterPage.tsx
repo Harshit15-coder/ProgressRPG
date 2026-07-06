@@ -15,7 +15,13 @@ declare global {
 
 const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
-function RegistrationForm({ inviteToken }: { inviteToken?: string }): React.ReactElement {
+function RegistrationForm({
+  inviteToken,
+  selfServe,
+}: {
+  inviteToken?: string;
+  selfServe?: boolean;
+}): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -143,12 +149,12 @@ function RegistrationForm({ inviteToken }: { inviteToken?: string }): React.Reac
         {!inviteToken && (
           <Input
             id="invite_code"
-            label="Invite Code:"
+            label={selfServe ? 'Invite Code (optional):' : 'Invite Code:'}
             type="text"
             placeholder="e.g. TESTER"
             value={inviteCode}
             onChange={(v) => setInviteCode(v as string)}
-            required
+            required={!selfServe}
           />
         )}
         <div className={styles.agreeToTerms}>
@@ -244,7 +250,11 @@ export default function RegisterPage(): React.ReactElement {
   return (
     <div className={styles.page}>
       <div className={styles.formFrame}>
-        <RegistrationForm key={location.key} inviteToken={inviteToken} />
+        <RegistrationForm
+          key={location.key}
+          inviteToken={inviteToken}
+          selfServe={data?.self_serve_registration}
+        />
       </div>
     </div>
   );

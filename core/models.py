@@ -94,6 +94,7 @@ class GameSettings(models.Model):
     trial_period_days = models.IntegerField(default=14)
     registration_cap = models.IntegerField(default=1_000_000_000)
     registration_enabled = models.BooleanField(default=True)
+    self_serve_registration = models.BooleanField(default=False)
     waitlist_nudges_enabled_from = models.DateTimeField(null=True, blank=True)
 
     class Meta:

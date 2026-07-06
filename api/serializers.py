@@ -12,6 +12,7 @@ from rest_framework_simplejwt.serializers import (
 )
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from core.models import GameSettings
 from users.models import Player, InviteCode, UserLogin, Waitlist
 from users.services.registration_services import ensure_player_setup_for_user
 from users.validators import clean_player_name
@@ -194,6 +195,7 @@ class WaitlistSignupResponseSerializer(serializers.Serializer):
 class RegistrationStatusResponseSerializer(serializers.Serializer):
     registration_open = serializers.BooleanField()
     registration_enabled = serializers.BooleanField()
+    self_serve_registration = serializers.BooleanField()
 
 
 class WaitlistJoinRequestSerializer(serializers.Serializer):
@@ -275,6 +277,8 @@ class CustomRegisterSerializer(RegisterSerializer):
         return context
 
     def validate_invite_code(self, value):
+        if not value:
+            return value
         try:
             invite = InviteCode.objects.get(code=value, is_active=True)
         except InviteCode.DoesNotExist:
@@ -307,10 +311,22 @@ class CustomRegisterSerializer(RegisterSerializer):
         data = super().validate(data)
         invite_code = data.get("invite_code")
         invite_token = data.get("invite_token")
-        if bool(invite_code) == bool(invite_token):  # neither or both
+        if invite_code and invite_token:
             raise serializers.ValidationError(
-                "Provide exactly one of invite_code or invite_token."
+                "Provide at most one of invite_code or invite_token."
             )
+        if not invite_code and not invite_token:
+            game_settings = GameSettings.current()
+            if not game_settings.self_serve_registration:
+                raise serializers.ValidationError(
+                    "Provide exactly one of invite_code or invite_token."
+                )
+            # Self-serve signups must respect the cap; invite holders bypass
+            # it because their invite is proof of a slot at invite time.
+            if User.objects.count() >= game_settings.registration_cap:
+                raise serializers.ValidationError(
+                    "Registration is currently full. Please join the waitlist."
+                )
         if invite_token:
             try:
                 entry = Waitlist.objects.get(
@@ -340,7 +356,7 @@ class CustomRegisterSerializer(RegisterSerializer):
             except InviteCode.DoesNotExist:
                 # Should not happen due to earlier validation, but fail safe
                 raise serializers.ValidationError("Invalid or expired invite code.")
-        else:
+        elif self.validated_data.get("invite_token"):
             entry = self._waitlist_entry
             updated = Waitlist.objects.filter(
                 pk=entry.pk, status=Waitlist.Status.INVITED

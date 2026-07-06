@@ -53,6 +53,18 @@ class RegistrationStatusAPITest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertFalse(res.json()["registration_enabled"])
 
+    def test_self_serve_registration_reported_false_by_default(self):
+        res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.json()["self_serve_registration"])
+
+    def test_self_serve_registration_reported_true_when_enabled(self):
+        self.settings.self_serve_registration = True
+        self.settings.save()
+        res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.json()["self_serve_registration"])
+
 
 class RegistrationKillSwitchTest(APITestCase):
     def setUp(self):
@@ -750,3 +762,108 @@ class WaitlistRemovalAcceptanceCriteriaTest(TestCase):
                 )
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
         self.assertFalse(User.objects.filter(email="removed@example.com").exists())
+
+
+class SelfServeRegistrationTest(APITestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+
+    def _register_payload(self, email, **extra):
+        return {
+            "email": email,
+            "password1": "SuperSecret123!",
+            "password2": "SuperSecret123!",
+            "agree_to_terms": True,
+            "turnstile_token": "test-token",
+            **extra,
+        }
+
+    def _post_register(self, payload):
+        with patch("api.serializers._verify_turnstile", return_value=True):
+            return self.client.post("/api/v1/auth/registration/", payload)
+
+    def _enable_self_serve(self):
+        self.settings.self_serve_registration = True
+        self.settings.save()
+
+    def test_no_invite_rejected_when_self_serve_disabled(self):
+        res = self._post_register(self._register_payload("solo@example.com"))
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="solo@example.com").exists())
+
+    def test_no_invite_succeeds_when_self_serve_enabled(self):
+        self._enable_self_serve()
+        res = self._post_register(self._register_payload("solo@example.com"))
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="solo@example.com").exists())
+
+    def test_blank_invite_code_treated_as_self_serve(self):
+        self._enable_self_serve()
+        res = self._post_register(
+            self._register_payload("solo@example.com", invite_code="")
+        )
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="solo@example.com").exists())
+
+    def test_self_serve_respects_registration_cap(self):
+        self._enable_self_serve()
+        User.objects.create_user(email="a@example.com", password="testpassword123")
+        self.settings.registration_cap = User.objects.count()
+        self.settings.save()
+        res = self._post_register(self._register_payload("solo@example.com"))
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="solo@example.com").exists())
+
+    def test_invite_token_still_bypasses_cap_when_self_serve_enabled(self):
+        self._enable_self_serve()
+        User.objects.create_user(email="a@example.com", password="testpassword123")
+        self.settings.registration_cap = User.objects.count()
+        self.settings.save()
+        Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-selfserve",
+        )
+        res = self._post_register(
+            self._register_payload("invitee@example.com", invite_token="tok-selfserve")
+        )
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="invitee@example.com").exists())
+
+    def test_invite_code_still_works_when_self_serve_enabled(self):
+        self._enable_self_serve()
+        invite = InviteCode.objects.create(code="SELFSERVE")
+        res = self._post_register(
+            self._register_payload("coded@example.com", invite_code="SELFSERVE")
+        )
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="coded@example.com").exists())
+        invite.refresh_from_db()
+        self.assertEqual(invite.uses, 1)
+
+    def test_both_invite_code_and_token_still_rejected(self):
+        self._enable_self_serve()
+        InviteCode.objects.create(code="SOMECODE")
+        Waitlist.objects.create(
+            email="invitee@example.com",
+            status=Waitlist.Status.INVITED,
+            invite_token="tok-both-ss",
+        )
+        res = self._post_register(
+            self._register_payload(
+                "invitee@example.com",
+                invite_code="SOMECODE",
+                invite_token="tok-both-ss",
+            )
+        )
+        self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
+        self.assertFalse(User.objects.filter(email="invitee@example.com").exists())
+
+    def test_kill_switch_blocks_self_serve_signups(self):
+        self._enable_self_serve()
+        self.settings.registration_enabled = False
+        self.settings.save()
+        res = self._post_register(self._register_payload("solo@example.com"))
+        self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(email="solo@example.com").exists())

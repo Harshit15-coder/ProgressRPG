@@ -157,6 +157,7 @@ class RegistrationStatusAPIView(APIView):
             {
                 "registration_open": registration_open,
                 "registration_enabled": game_settings.registration_enabled,
+                "self_serve_registration": game_settings.self_serve_registration,
             }
         )
 
