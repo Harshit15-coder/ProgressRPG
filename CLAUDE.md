@@ -119,6 +119,10 @@ React SPA served separately (port 5173 in dev, built via Vite for prod).
 
 **State:** TanStack Query manages server state. React Context handles global UI state (auth, game, websocket, toasts).
 
+## Conventions
+
+- Use `503 Service Unavailable` for endpoints intentionally disabled/gated by a settings flag (kill switches, maintenance mode) — signals "temporarily down, safe to retry," consistent with `AsyncMaintenanceModeMiddleware` and `WaitlistSignupAPIView`. Reserve `403` for actual authorization failures.
+
 ### Branch/Deploy Strategy
 
 - `development` → active dev branch; base for feature-branch PRs
