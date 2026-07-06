@@ -126,6 +126,15 @@ def invite_waitlist_entries():
     return count
 
 
+@shared_task
+def send_waitlist_nudges():
+    from users.services import waitlist_service
+
+    count = waitlist_service.send_due_nudges()
+    logger.info(f"[WAITLIST NUDGE TASK] Sent {count} waitlist nudge/removal email(s).")
+    return count
+
+
 @shared_task(bind=True, retry_backoff=True, max_retries=3)
 def send_email_to_users_task(self, emails, subject, template_base, context, cc_admin):
     """
