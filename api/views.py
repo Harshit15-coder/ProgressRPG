@@ -1,11 +1,10 @@
 # api/views.py
 from asgiref.sync import async_to_sync
-from datetime import timedelta
 from django.conf import settings
 from django.contrib.auth import login, logout, get_user_model
 from django.core.exceptions import ObjectDoesNotExist
 from django.core.mail import send_mail
-from django.db import transaction, models, IntegrityError
+from django.db import transaction, IntegrityError
 from django.http import Http404
 
 from django.utils import timezone
@@ -15,6 +14,7 @@ from django_ratelimit.decorators import ratelimit
 from urllib.parse import quote, unquote
 
 from allauth.account import app_settings as allauth_settings
+from allauth.account.adapter import get_adapter
 from allauth.account.models import EmailConfirmation, EmailAddress
 
 # from allauth.account.utils import complete_signup, send_email_confirmation
@@ -68,13 +68,9 @@ from character.models import Character, PlayerCharacterLink
 from character.serializers import CharacterSerializer
 from core.models import GameSettings
 
-from gameplay.models import XpModifier
-from gameplay.serializers import ActivityTimerSerializer, XpModifierSerializer
 from gameplay.serializers import ActivityTimerSerializer
 from gameplay.services.xp_modifiers import handle_online_login
 from users.services.login_services import get_login_state
-
-from locations.serializers import PopulationCentreSerializer
 
 from progression.serializers import PlayerActivitySerializer
 
@@ -395,13 +391,13 @@ class CustomRegisterView(RegisterView):
             defaults={"verified": False, "primary": True},
         )
 
-        email_address.save()
-
         logger.debug(f"[REGISTER] EmailAddress: {email_address} (created={created})")
 
-        confirmation = EmailConfirmation.create(email_address)
-        confirmation.sent = timezone.now()
-        confirmation.save()
+        confirmation = EmailConfirmation.objects.create(
+            email_address=email_address,
+            key=get_adapter().generate_emailconfirmation_key(email_address.email),
+            sent=timezone.now(),
+        )
 
         quoted_key = quote(confirmation.key)
         activate_url = f"{settings.FRONTEND_URL}/confirm_email/{quoted_key}"
@@ -544,17 +540,7 @@ class FetchInfoAPIView(APIView):
         player = request.user.player
         build_number = get_build_number()
 
-        active_link = player.active_link
-        character = active_link.character if active_link else None
-
-        population_centre = None
-        if character and character.population_centre:
-            population_centre = character.population_centre
-
-        logger.info(
-            f"[FETCH INFO] Fetching data for player {player.id}, "
-            f"character {character.id if character else None}"
-        )
+        logger.info(f"[FETCH INFO] Fetching data for player {player.id}")
 
         # --- Track user session ---
         track_user_session(player)
@@ -562,39 +548,12 @@ class FetchInfoAPIView(APIView):
         # --- Ensure activity timer is in a valid state ---
         self._ensure_activity_timer_consistency(player)
 
-        # --- Online sync if >30 minutes since last fetch ---
-        now = timezone.now()
-        last = player.last_seen
-        player.last_seen = now
+        player.last_seen = timezone.now()
         player.save(update_fields=["last_seen"])
-        if character and (not last or (now - last) > timedelta(minutes=30)):
-            logger.info(
-                f"[FETCH INFO] Online sync for player {player.id}, character {character.id}"
-            )
-            character.behaviour.sync_to_now()
 
         handle_online_login(player)
 
         login_state_data = get_login_state(request.user)
-
-        # --- Get active link xp modifiers ---
-        xp_mods = []
-        if active_link:
-            now = timezone.now()
-            xp_mods = (
-                XpModifier.objects.filter(
-                    is_active=True,
-                    starts_at__lte=now,
-                )
-                .filter(models.Q(ends_at__isnull=True) | models.Q(ends_at__gt=now))
-                .filter(
-                    models.Q(
-                        scope=XpModifier.Scope.CHARACTER,
-                        character=active_link.character,
-                    )
-                    | models.Q(scope=XpModifier.Scope.PLAYER, player=player)
-                )
-            )
 
         # --- Serialize everything ---
         game_settings = GameSettings.current()
@@ -604,20 +563,12 @@ class FetchInfoAPIView(APIView):
                 "message": "Player and character fetched",
                 "build_number": build_number,
                 "player": PlayerSerializer(player, context={"request": request}).data,
-                "character": (
-                    CharacterSerializer(character, context={"request": request}).data
-                    if character
-                    else None
-                ),
+                "character": None,
                 "activity_timer": ActivityTimerSerializer(
                     player.activity_timer, context={"request": request}
                 ).data,
-                "population_centre": PopulationCentreSerializer(
-                    population_centre, context={"request": request}
-                ).data,
-                "xp_mods": XpModifierSerializer(
-                    xp_mods, many=True, context={"request": request}
-                ).data,
+                "population_centre": None,
+                "xp_mods": [],
                 "login_state": login_state_data["login_state"],
                 "login_streak": login_state_data["login_streak"],
                 "login_event_at": login_state_data["login_event_at"],

@@ -13,6 +13,7 @@ from rest_framework_simplejwt.serializers import (
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from users.models import Player, InviteCode, UserLogin, Waitlist
+from users.services.registration_services import ensure_player_setup_for_user
 from users.validators import clean_player_name
 
 from django.contrib.auth import get_user_model
@@ -257,6 +258,13 @@ class CustomRegisterSerializer(RegisterSerializer):
             "timezone",
         )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The inherited RegisterSerializer may expose a username field even
+        # when the project has no username field, yielding impossible
+        # validation constraints (required with max_length=0).
+        self.fields.pop("username", None)
+
     def get_email_context(self):
         context = super().get_email_context()
         request = self.context.get("request")
@@ -322,14 +330,16 @@ class CustomRegisterSerializer(RegisterSerializer):
         return data
 
     def custom_signup(self, request, user):
+        ensure_player_setup_for_user(user)
         invite_code = self.validated_data.get("invite_code")
         if invite_code:
             try:
-                invite = InviteCode.objects.get(code=invite_code, is_active=True)
-                invite.use()
+                invite = InviteCode.objects.get(code=invite_code)
+                if not invite.use():
+                    raise serializers.ValidationError("Invalid or expired invite code.")
             except InviteCode.DoesNotExist:
                 # Should not happen due to earlier validation, but fail safe
-                pass
+                raise serializers.ValidationError("Invalid or expired invite code.")
         else:
             entry = self._waitlist_entry
             updated = Waitlist.objects.filter(

@@ -6,8 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 import logging
 
-from .models import Player, UserLogin
-from .validators import generate_default_player_name
+from .models import UserLogin
 
 logger = logging.getLogger("general")
 
@@ -18,18 +17,6 @@ User = get_user_model()
 def set_user_confirmed(sender, request, email_address, **kwargs):
     user = email_address.user
     User.objects.filter(pk=user.pk).update(is_confirmed=True)
-
-
-@receiver(post_save, sender=User)
-def create_player(sender, instance, created, raw=False, **kwargs):
-    """Create a player for the user when a new user is created"""
-    if raw:
-        return
-    if created:
-        player, _ = Player.objects.get_or_create(user=instance)
-        if not player.name:
-            player.name = generate_default_player_name(player.id)
-            player.save(update_fields=["name"])
 
 
 @receiver(user_logged_in)
