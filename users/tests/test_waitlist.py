@@ -42,6 +42,90 @@ class RegistrationStatusAPITest(APITestCase):
         res = self.client.get("/api/v1/registration_status/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
 
+    def test_registration_enabled_reported_true_by_default(self):
+        res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertTrue(res.json()["registration_enabled"])
+
+    def test_registration_enabled_reported_false_when_killed(self):
+        self.settings.registration_enabled = False
+        self.settings.save()
+        res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertFalse(res.json()["registration_enabled"])
+
+
+class RegistrationKillSwitchTest(APITestCase):
+    def setUp(self):
+        GameSettings.objects.all().delete()
+        self.settings = GameSettings.current()
+        InviteCode.objects.create(code="TESTCODE")
+        mail.outbox.clear()
+
+    def _post_registration(self):
+        username_field = CustomRegisterSerializer._declared_fields["username"]
+        with patch("api.serializers._verify_turnstile", return_value=True):
+            with patch.dict(username_field._kwargs, {"required": False}):
+                return self.client.post(
+                    "/api/v1/auth/registration/",
+                    {
+                        "email": "newuser@example.com",
+                        "password1": "SuperSecret123!",
+                        "password2": "SuperSecret123!",
+                        "invite_code": "TESTCODE",
+                        "agree_to_terms": True,
+                        "turnstile_token": "test-token",
+                    },
+                )
+
+    def test_signup_blocked_when_registration_disabled(self):
+        self.settings.registration_enabled = False
+        self.settings.save()
+
+        res = self._post_registration()
+
+        self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(email="newuser@example.com").exists())
+        self.assertFalse(any(m.to == ["newuser@example.com"] for m in mail.outbox))
+
+    def test_signup_blocked_even_with_valid_invite_token(self):
+        from users.models import Waitlist as WaitlistModel
+
+        entry = WaitlistModel.objects.create(
+            email="invitee@example.com",
+            status=WaitlistModel.Status.INVITED,
+            invite_token="invite-tok",
+        )
+        self.settings.registration_enabled = False
+        self.settings.save()
+
+        username_field = CustomRegisterSerializer._declared_fields["username"]
+        with patch("api.serializers._verify_turnstile", return_value=True):
+            with patch.dict(username_field._kwargs, {"required": False}):
+                res = self.client.post(
+                    "/api/v1/auth/registration/",
+                    {
+                        "email": entry.email,
+                        "password1": "SuperSecret123!",
+                        "password2": "SuperSecret123!",
+                        "invite_token": entry.invite_token,
+                        "agree_to_terms": True,
+                        "turnstile_token": "test-token",
+                    },
+                )
+
+        self.assertEqual(res.status_code, status.HTTP_503_SERVICE_UNAVAILABLE)
+        self.assertFalse(User.objects.filter(email=entry.email).exists())
+
+    def test_signup_succeeds_when_registration_enabled(self):
+        self.settings.registration_enabled = True
+        self.settings.save()
+
+        res = self._post_registration()
+
+        self.assertIn(res.status_code, [status.HTTP_200_OK, status.HTTP_201_CREATED])
+        self.assertTrue(User.objects.filter(email="newuser@example.com").exists())
+
 
 class WaitlistJoinAPITest(APITestCase):
     def setUp(self):

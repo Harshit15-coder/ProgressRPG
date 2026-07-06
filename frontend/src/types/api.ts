@@ -44,6 +44,7 @@ export interface AppConfig {
 /** Registration status (public, unauthenticated) */
 export interface RegistrationStatus {
   registration_open: boolean;
+  registration_enabled: boolean;
 }
 
 /** Game settings returned in fetch_info and /game_settings/ */

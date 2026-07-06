@@ -201,6 +201,24 @@ export default function RegisterPage(): React.ReactElement {
     );
   }
 
+  // The kill switch is an emergency stop and applies unconditionally, even to
+  // invited users — unlike the cap check below, which they bypass.
+  if (data && !data.registration_enabled) {
+    return (
+      <div className={styles.page}>
+        <div className={styles.formFrame}>
+          <h1 className={styles.title}>Registration is currently unavailable</h1>
+          <div className={styles.content}>
+            <p>We&apos;ve temporarily paused new registrations. Please check back later.</p>
+            <p className={styles.footer}>
+              Already have an account? <a href="/login">Log in here</a>.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Invited users always get the registration form, even if the cap has
   // since been reached again — their invite is proof of a slot at invite time.
   if (!inviteToken && data && !data.registration_open) {

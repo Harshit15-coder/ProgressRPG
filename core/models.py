@@ -93,6 +93,7 @@ class GameSettings(models.Model):
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
     registration_cap = models.IntegerField(default=1_000_000_000)
+    registration_enabled = models.BooleanField(default=True)
     waitlist_nudges_enabled_from = models.DateTimeField(null=True, blank=True)
 
     class Meta:

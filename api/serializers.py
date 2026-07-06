@@ -192,6 +192,7 @@ class WaitlistSignupResponseSerializer(serializers.Serializer):
 
 class RegistrationStatusResponseSerializer(serializers.Serializer):
     registration_open = serializers.BooleanField()
+    registration_enabled = serializers.BooleanField()
 
 
 class WaitlistJoinRequestSerializer(serializers.Serializer):

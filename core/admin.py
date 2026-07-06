@@ -19,6 +19,7 @@ class GameSettingsAdmin(admin.ModelAdmin):
         "premium_activity_xp_multiplier",
         "trial_period_days",
         "registration_cap",
+        "registration_enabled",
     )
     fieldsets = (
         ("Timer", {"fields": ("free_timer_limit_seconds",)}),
@@ -44,7 +45,7 @@ class GameSettingsAdmin(admin.ModelAdmin):
             },
         ),
         ("Stripe", {"fields": ("trial_period_days",)}),
-        ("Registration", {"fields": ("registration_cap",)}),
+        ("Registration", {"fields": ("registration_cap", "registration_enabled")}),
     )
 
     def has_add_permission(self, request):

@@ -157,7 +157,12 @@ class RegistrationStatusAPIView(APIView):
         registration_open = (
             get_user_model().objects.count() < game_settings.registration_cap
         )
-        return Response({"registration_open": registration_open})
+        return Response(
+            {
+                "registration_open": registration_open,
+                "registration_enabled": game_settings.registration_enabled,
+            }
+        )
 
 
 class WaitlistJoinAPIView(APIView):
@@ -368,6 +373,14 @@ class TutorialStepViewSet(viewsets.ReadOnlyModelViewSet):
 
 class CustomRegisterView(RegisterView):
     serializer_class = CustomRegisterSerializer
+
+    def create(self, request, *args, **kwargs):
+        if not GameSettings.current().registration_enabled:
+            return Response(
+                {"detail": "Registration is temporarily unavailable."},
+                status=status.HTTP_503_SERVICE_UNAVAILABLE,
+            )
+        return super().create(request, *args, **kwargs)
 
     def perform_create(self, serializer):
         with transaction.atomic():
