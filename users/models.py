@@ -508,6 +508,10 @@ class Waitlist(models.Model):
     )
     invite_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
     invited_at = models.DateTimeField(null=True, blank=True)
+    nudge_3day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_7day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_30day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_removal_sent_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         ordering = ["signup_timestamp"]
