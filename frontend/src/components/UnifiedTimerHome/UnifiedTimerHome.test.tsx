@@ -46,19 +46,32 @@ vi.mock('../../utils/sounds', () => ({
 // Strip animation-only props so React doesn't warn about unknown DOM attrs,
 // and render children synchronously so tests don't need to await exit/enter
 // transitions.
+function stripMotionProps(props: Record<string, unknown>) {
+  const { layout, initial, animate, exit, transition, children, ...rest } = props;
+  void layout;
+  void initial;
+  void animate;
+  void exit;
+  void transition;
+  return { rest, children: children as React.ReactNode };
+}
+
 vi.mock('framer-motion', () => ({
   motion: {
     div: React.forwardRef<HTMLDivElement, Record<string, unknown>>((props, ref) => {
-      const { layout, initial, animate, exit, transition, children, ...rest } = props;
-      void layout;
-      void initial;
-      void animate;
-      void exit;
-      void transition;
+      const { rest, children } = stripMotionProps(props);
       return (
         <div ref={ref} {...rest}>
-          {children as React.ReactNode}
+          {children}
         </div>
+      );
+    }),
+    button: React.forwardRef<HTMLButtonElement, Record<string, unknown>>((props, ref) => {
+      const { rest, children } = stripMotionProps(props);
+      return (
+        <button ref={ref} {...rest}>
+          {children}
+        </button>
       );
     }),
   },
@@ -130,21 +143,21 @@ describe('UnifiedTimerHome', () => {
     mockGame();
   });
 
-  it('renders the input state by default with a Blank Start option', () => {
+  it('renders the input state by default with a single, always-enabled Start button', () => {
     render(<UnifiedTimerHome />);
 
     expect(screen.getByRole('combobox', { name: 'Activity name' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start blank' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Start blank' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
   });
 
-  it('Blank Start starts a timer and moves to the running-unlabelled state', async () => {
+  it('Start with an empty input starts a blank timer and moves to the running-unlabelled state', async () => {
     const user = userEvent.setup();
     startActivity.mockResolvedValue(null);
 
     const { rerender } = render(<UnifiedTimerHome />);
 
-    await user.click(screen.getByRole('button', { name: 'Start blank' }));
+    await user.click(screen.getByRole('button', { name: 'Start' }));
 
     expect(startActivity).toHaveBeenCalledWith({ text: '', allowBlank: true, limitSeconds: 15 });
 
@@ -154,6 +167,32 @@ describe('UnifiedTimerHome', () => {
 
     expect(screen.getByRole('combobox', { name: 'Activity name' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+  });
+
+  it('Start/Stop is the same persistent button element, not a swap', async () => {
+    const user = userEvent.setup();
+    startActivity.mockResolvedValue(null);
+
+    const { rerender } = render(<UnifiedTimerHome />);
+    const startButton = screen.getByRole('button', { name: 'Start' });
+
+    await user.click(startButton);
+    mockGame({ status: 'active', currentActivity: { name: '' } });
+    rerender(<UnifiedTimerHome />);
+
+    expect(screen.getByRole('button', { name: 'Stop' })).toBe(startButton);
+  });
+
+  it('Start with typed text starts a named timer instead of a blank one', async () => {
+    const user = userEvent.setup();
+    startActivity.mockResolvedValue(null);
+
+    render(<UnifiedTimerHome />);
+
+    await user.type(screen.getByRole('combobox', { name: 'Activity name' }), 'Deep work');
+    await user.click(screen.getByRole('button', { name: 'Start' }));
+
+    expect(startActivity).toHaveBeenCalledWith({ text: 'Deep work', limitSeconds: 15 });
   });
 
   it('selecting a suggestion while unlabelled-running labels the timer in place', async () => {

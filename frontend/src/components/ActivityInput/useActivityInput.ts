@@ -216,7 +216,14 @@ export function useActivityInput() {
   });
 
   const isActive = status === "active";
-  const inputValue = isActive ? name || currentActivity?.name || "" : name;
+  // While actively editing (click-to-edit), `name` is the single source of
+  // truth — including when the user has deleted it down to "". Falling back
+  // to `currentActivity?.name` unconditionally here meant selecting all text
+  // in the input and pressing Backspace/Delete would visibly "undo" itself:
+  // `name` became "", so this fell back to the still-uncommitted old name.
+  // Outside of active editing, the fallback is still needed (e.g. showing
+  // the labelled activity's name before edit mode's own state has caught up).
+  const inputValue = isActive ? (isEditingLabel ? name : name || currentActivity?.name || "") : name;
   const isUnlabelled = isActive && !(currentActivity?.name ?? currentActivity?.text ?? "").trim();
 
   useWelcomeMessageEffect({

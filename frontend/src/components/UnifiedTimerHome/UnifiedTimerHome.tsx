@@ -10,6 +10,14 @@ import { useActivityInput } from "../ActivityInput/useActivityInput";
 import { useDefaultActivityEntries } from "../../hooks/useDefaultActivityEntries";
 import styles from "./UnifiedTimerHome.module.scss";
 
+const fadeTransition = { duration: 0.18 };
+const fadeProps = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: fadeTransition,
+};
+
 export default function UnifiedTimerHome() {
   const {
     name,
@@ -38,7 +46,7 @@ export default function UnifiedTimerHome() {
 
   const defaultResults = useDefaultActivityEntries();
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
-  const listWrapperRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
 
   // Label display (clickable name) only shows for a labelled, non-editing
   // running timer; every other case shows the list/input (no timer running,
@@ -55,12 +63,20 @@ export default function UnifiedTimerHome() {
   // name is ready to be replaced/confirmed without an extra click.
   useEffect(() => {
     if (!isEditingLabel) return;
-    listWrapperRef.current?.querySelector("input")?.focus();
+    containerRef.current?.querySelector("input")?.focus();
   }, [isEditingLabel]);
 
-  const handleBlankStartClick = async () => {
+  // Single Start button: starts blank if the input is empty, otherwise
+  // starts (or labels) with whatever's typed — same distinction as before,
+  // just collapsed into one action instead of two buttons.
+  const handleStartClick = async () => {
+    if (name.trim()) {
+      await handleToggle();
+      return;
+    }
+
     await handleBlankStart();
-    listWrapperRef.current?.querySelector("input")?.focus();
+    containerRef.current?.querySelector("input")?.focus();
   };
 
   // The blur fired by `.blur()` below happens synchronously, before the
@@ -84,7 +100,7 @@ export default function UnifiedTimerHome() {
       return;
     }
     if (!isEditingLabel) return;
-    if (listWrapperRef.current?.contains(event.relatedTarget as Node)) return;
+    if (containerRef.current?.contains(event.relatedTarget as Node)) return;
     handleLabelBlur();
   };
 
@@ -96,92 +112,88 @@ export default function UnifiedTimerHome() {
           {statusMessage}
         </p>
 
-        <AnimatePresence mode="wait" initial={false}>
-          {showLabelDisplay ? (
-            <motion.div
-              key="labelled"
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className={styles.runningRow}
-            >
-              <button
-                type="button"
-                className={styles.activityLabel}
-                onClick={startEditingLabel}
-                aria-label={`Editing label: ${inputValue || "Untitled activity"}. Click to change.`}
+        <motion.div
+          className={styles.container}
+          ref={containerRef}
+          onKeyDown={handleWrapperKeyDown}
+          onBlur={handleWrapperBlur}
+        >
+          {/* Row 1, fixed at the top regardless of state: the toggle button
+              is a single persistent element (same key, never unmounted) so
+              Start -> Stop is purely a label change the user perceives as
+              "the same button", not a swap. Centered while idle (alone);
+              once the timer fades in, the pair sits together at the right
+              — `layout` on the row and on the button's wrapper animates
+              that shift smoothly instead of jumping. Row 2 below is
+              unaffected either way. */}
+          <motion.div
+            layout
+            className={styles.controlsRow}
+            style={{ justifyContent: isActive ? "flex-end" : "center" }}
+          >
+            <motion.div layout>
+              <Button
+                onClick={isActive ? handleToggle : handleStartClick}
+                variant="primary"
+                className={styles.ctaButton}
               >
-                {inputValue || "Untitled activity"}
-              </button>
-
-              <div className={styles.timerPill}>
-                {minutes}:{seconds.toString().padStart(2, "0")}
-              </div>
-
-              <Button onClick={handleToggle} variant="primary" className={styles.ctaButton}>
-                Stop
+                {isActive ? "Stop" : "Start"}
               </Button>
             </motion.div>
-          ) : (
-            <motion.div
-              key="input"
-              layout
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              transition={{ duration: 0.18 }}
-              className={styles.inputRow}
-              ref={listWrapperRef}
-              onKeyDown={handleWrapperKeyDown}
-              onBlur={handleWrapperBlur}
-            >
-              <div className={styles.searchControl}>
-                <EntitySearchInput
-                  type="activity"
-                  value={inputValue}
-                  onChange={setName}
-                  onSelect={handleUnifiedSelect}
-                  onCreate={handleUnifiedSubmit}
-                  placeholder="What are you working on? e.g. washing dishes"
-                  ariaLabel="Activity name"
-                  alwaysOpen
-                  defaultResults={defaultResults}
-                  maxVisibleRows={4}
-                  emptyMessage="No recent activities yet — type to create one."
-                  className={styles.entitySearch}
-                  inputClassName={styles.inputText}
-                />
-              </div>
 
-              {isActive ? (
-                <div className={styles.runningControls}>
-                  <div className={styles.timerPill}>
-                    {minutes}:{seconds.toString().padStart(2, "0")}
-                  </div>
-                  <Button onClick={handleToggle} variant="primary" className={styles.ctaButton}>
-                    Stop
-                  </Button>
-                </div>
-              ) : (
-                <div className={styles.startControls}>
-                  <Button
-                    onClick={handleToggle}
-                    variant="primary"
-                    disabled={!name.trim()}
-                    className={styles.ctaButton}
-                  >
-                    Start
-                  </Button>
-                  <Button onClick={handleBlankStartClick} variant="secondary" className={styles.blankStartButton}>
-                    Start blank
-                  </Button>
-                </div>
+            <AnimatePresence initial={false}>
+              {isActive && (
+                <motion.div key="timer" layout {...fadeProps} className={styles.timerPill}>
+                  {minutes}:{seconds.toString().padStart(2, "0")}
+                </motion.div>
               )}
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Row 2: the activity's identity — either its label (clickable to
+              edit) or the search input used to pick/type one. These are
+              mutually exclusive, genuinely different elements, so they
+              cross-fade; row 1 above is entirely unaffected by this swap. */}
+          <motion.div className={styles.entityRow}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {showLabelDisplay ? (
+                <motion.button
+                  key="label"
+                  {...fadeProps}
+                  type="button"
+                  className={styles.activityLabel}
+                  onClick={startEditingLabel}
+                  aria-label={`Editing label: ${inputValue || "Untitled activity"}. Click to change.`}
+                >
+                  {inputValue || "Untitled activity"}
+                </motion.button>
+              ) : (
+                <motion.div key="search" {...fadeProps} className={styles.searchControl}>
+                  <EntitySearchInput
+                    type="activity"
+                    value={inputValue}
+                    onChange={setName}
+                    onSelect={handleUnifiedSelect}
+                    onCreate={handleUnifiedSubmit}
+                    placeholder="What are you working on? e.g. washing dishes"
+                    ariaLabel="Activity name"
+                    // Always persistent/in-flow (not a floating overlay): a
+                    // floating dropdown here bled outside the wrapper card
+                    // and overlapped the support button below it. Reserving
+                    // its space in-flow lets the card grow to actually
+                    // contain the list instead.
+                    alwaysOpen
+                    defaultResults={defaultResults}
+                    maxVisibleRows={4}
+                    emptyMessage="Looking for a match..."
+                    className={styles.entitySearch}
+                    inputClassName={styles.inputText}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
 
         {showAutoStopWarning && (
           <p className={styles.limitWarning}>

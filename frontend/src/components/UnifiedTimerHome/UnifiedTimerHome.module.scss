@@ -22,15 +22,46 @@ $row-control-height: 44px;
   animation: timerPulse 1.6s ease-in-out infinite;
 }
 
-.runningRow {
+// Two fixed rows, always in this order: controls (toggle + timer) on top,
+// the activity's identity (label or search) below. Neither row's own
+// position ever depends on the other's content, so swapping label<->search
+// (row 2) can't disturb the toggle/timer (row 1), and vice versa.
+.container {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: map.get(sp.$gap, sm);
 }
 
+.controlsRow {
+  // Centered while idle (button alone); once the timer appears, the pair
+  // sits together at the right (justify-content flips via inline style —
+  // see UnifiedTimerHome.tsx).
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: map.get(sp.$gap, sm);
+  min-height: $row-control-height;
+}
+
+.entityRow {
+  // AnimatePresence mode="popLayout" (label <-> search) makes the exiting
+  // element position:absolute against the nearest positioned ancestor while
+  // it fades out — without this, that's `.wrapper`, not this row, and the
+  // exiting element jumps to the wrong place instead of fading in place.
+  position: relative;
+}
+
 .activityLabel {
-  flex: 1 1 auto;
-  min-width: 0;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  // Matches .searchControl/.inputText's height so swapping between the label
+  // display and the search input (click-to-edit, and committing back out of
+  // it) never changes entityRow's own height — otherwise the `layout`
+  // animation on entityRow/container stretches the row on every focus/blur,
+  // which reads as a jump. Long names can still grow past this floor.
+  min-height: $row-control-height;
+  box-sizing: border-box;
   text-align: left;
   border: 2px solid transparent;
   background: transparent;
@@ -50,27 +81,9 @@ $row-control-height: 44px;
   @include m.focus-outline(c.$color-border-accent);
 }
 
-.inputRow {
-  display: flex;
-  flex-direction: column;
-  gap: map.get(sp.$gap, sm);
-}
-
-// Height of a single EntitySearchInput dropdown row (option button padding +
-// line height), used to reserve space below the input.
-$list-row-height: 2.75rem;
-$list-group-label-height: 1.75rem;
-
 .searchControl {
   width: 100%;
-  // The dropdown is position:absolute (EntitySearchInput.module.scss), so it
-  // doesn't push layout on its own — without this reserved space it floats
-  // over the Start/Stop controls below and steals their clicks. Sized for
-  // maxVisibleRows (4) plus both group labels (Tasks/Activities) as the
-  // worst case, per Design decision 7 (fixed-height list container).
-  min-height: calc(
-    #{$row-control-height} + 4 * #{$list-row-height} + 2 * #{$list-group-label-height}
-  );
+  min-height: $row-control-height;
 }
 
 .entitySearch {
@@ -84,22 +97,19 @@ $list-group-label-height: 1.75rem;
   font-size: 1.05rem;
 }
 
-.startControls,
-.runningControls {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: map.get(sp.$gap, sm);
-}
-
 .timerPill {
   display: flex;
   align-items: center;
+  justify-content: center;
   height: $row-control-height;
   @include m.border(rgba(c.$color-border-primary, 0.3));
   border-radius: v.$border-radius;
-  padding: 0 v.$padding-base;
-  line-height: 1;
+  // $padding-base is itself a 2-value shorthand ($padding-vertical
+  // $padding-horizontal) — `0 $padding-base` silently expanded to a 3-value
+  // padding (0 top, $padding-vertical left/right, $padding-horizontal
+  // bottom), which is what was pushing the digits off-center. Use the
+  // horizontal-only variable instead so this stays a clean 2-value shorthand.
+  padding: 0 v.$padding-horizontal;
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 1.1rem;
@@ -107,12 +117,6 @@ $list-group-label-height: 1.75rem;
 }
 
 .ctaButton {
-  height: $row-control-height;
-  display: flex;
-  align-items: center;
-}
-
-.blankStartButton {
   height: $row-control-height;
   display: flex;
   align-items: center;
@@ -149,8 +153,7 @@ $list-group-label-height: 1.75rem;
 
 @include m.respond-to(md, down) {
   .timerPill,
-  .ctaButton,
-  .blankStartButton {
+  .ctaButton {
     height: 40px;
   }
 
@@ -162,26 +165,12 @@ $list-group-label-height: 1.75rem;
 
 @include m.respond-to(sm, down) {
   .timerPill,
-  .ctaButton,
-  .blankStartButton {
+  .ctaButton {
     height: 38px;
   }
 
   .inputText {
     height: 38px;
     font-size: 0.9rem;
-  }
-
-  .runningRow {
-    flex-wrap: wrap;
-  }
-
-  .startControls,
-  .runningControls {
-    justify-content: stretch;
-
-    > * {
-      flex: 1 1 auto;
-    }
   }
 }

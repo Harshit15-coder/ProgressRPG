@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import classNames from "classnames";
 
 import {
@@ -71,6 +72,16 @@ export default function EntitySearchInput({
     maxVisibleRows,
   });
 
+  // Persistent mode reserves room for maxVisibleRows (worst case: both group
+  // labels shown) so the list settling to fewer rows, or falling back to
+  // emptyMessage, doesn't reflow whatever sits below it.
+  const persistentMinHeightStyle =
+    alwaysOpen && typeof maxVisibleRows === "number"
+      ? ({
+          "--entity-search-persistent-min-height": `calc(${maxVisibleRows} * 2.75rem + 2 * 1.75rem)`,
+        } as CSSProperties)
+      : undefined;
+
   return (
     <div ref={rootRef} className={classNames(styles.root, className)}>
       <input
@@ -92,9 +103,10 @@ export default function EntitySearchInput({
       {isDropdownOpen && (
         <ul
           id={`${type}-entity-search-results`}
-          className={styles.dropdown}
+          className={classNames(styles.dropdown, { [styles.dropdownPersistent]: alwaysOpen })}
           role="listbox"
           aria-label={`${type} suggestions`}
+          style={persistentMinHeightStyle}
         >
           {(() => {
             const renderItem = (entity: SearchEntity, index: number) => {
@@ -142,7 +154,9 @@ export default function EntitySearchInput({
       )}
 
       {alwaysOpen && !isDropdownOpen && emptyMessage && (
-        <p className={styles.emptyMessage}>{emptyMessage}</p>
+        <p className={styles.emptyMessage} style={persistentMinHeightStyle}>
+          {emptyMessage}
+        </p>
       )}
     </div>
   );

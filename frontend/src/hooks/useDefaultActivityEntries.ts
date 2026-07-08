@@ -49,7 +49,20 @@ export function useDefaultActivityEntries(): SearchEntity[] {
       });
     });
 
-    const standalone: RankedEntity[] = [];
+    // Repeated activities (same name, different PlayerActivity/CharacterActivity
+    // rows — e.g. "Washing dishes" done on separate days) collapse into one
+    // row keyed by name, keeping whichever occurrence is most recent.
+    const standaloneByName = new Map<string, RankedEntity>();
+
+    function upsertStandalone(entry: RankedEntity) {
+      const key = entry.nameKey ?? "";
+      const existing = standaloneByName.get(key);
+      if (existing) {
+        if (entry.recency > existing.recency) existing.recency = entry.recency;
+        return;
+      }
+      standaloneByName.set(key, entry);
+    }
 
     (playerActivities ?? []).forEach((activity: PlayerActivity) => {
       const name = (activity.name || "").trim();
@@ -64,7 +77,7 @@ export function useDefaultActivityEntries(): SearchEntity[] {
         return;
       }
 
-      standalone.push({
+      upsertStandalone({
         id: `activity-${activity.id}`,
         name,
         nameKey: toNameKey(name),
@@ -78,7 +91,7 @@ export function useDefaultActivityEntries(): SearchEntity[] {
       const name = (activity.name || activity.kind || "").trim();
       if (!name) return;
 
-      standalone.push({
+      upsertStandalone({
         id: `character-activity-${activity.id}`,
         name,
         nameKey: toNameKey(name),
@@ -88,7 +101,7 @@ export function useDefaultActivityEntries(): SearchEntity[] {
       });
     });
 
-    return [...rowsByTaskId.values(), ...standalone]
+    return [...rowsByTaskId.values(), ...standaloneByName.values()]
       .sort((a, b) => b.recency - a.recency)
       .slice(0, MAX_DEFAULT_ENTRIES)
       .map((entity): SearchEntity => ({

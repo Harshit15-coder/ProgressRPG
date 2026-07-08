@@ -202,6 +202,23 @@ describe('useActivityInput unified handlers', () => {
     expect(result.current.isEditingLabel).toBe(true);
   });
 
+  it('inputValue reflects a fully-cleared name while editing, instead of falling back to the old committed name', () => {
+    mockGame({ status: 'active', currentActivity: { name: 'Deep work' } });
+
+    const { result } = renderHook(() => useActivityInput());
+
+    act(() => {
+      result.current.startEditingLabel();
+    });
+
+    // Simulates selecting all text in the input and pressing Backspace/Delete.
+    act(() => {
+      result.current.setName('');
+    });
+
+    expect(result.current.inputValue).toBe('');
+  });
+
   it('handleLabelCancel restores the original name without calling labelActivity', () => {
     mockGame({ status: 'active', currentActivity: { name: 'Deep work' } });
 

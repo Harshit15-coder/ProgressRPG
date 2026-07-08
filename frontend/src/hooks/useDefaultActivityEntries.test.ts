@@ -114,6 +114,23 @@ describe("useDefaultActivityEntries", () => {
     ]);
   });
 
+  it("collapses repeated standalone activities with the same name into one row", () => {
+    mockUseGame.mockReturnValue({
+      playerActivities: [
+        { id: 1, name: "Flow test activity", task: null, completed_at: "2026-01-01T00:00:00Z" },
+        { id: 2, name: "Flow test activity", task: null, completed_at: "2026-01-05T00:00:00Z" },
+        { id: 3, name: "flow test activity", task: null, completed_at: "2026-01-03T00:00:00Z" },
+      ],
+      characterActivities: [],
+    });
+    mockUseTasks.mockReturnValue({ data: [] });
+
+    const { result } = renderHook(() => useDefaultActivityEntries());
+
+    expect(result.current).toHaveLength(1);
+    expect(result.current[0]).toMatchObject({ name: "Flow test activity", source: "activity" });
+  });
+
   it("includes character activities as standalone entries", () => {
     mockUseGame.mockReturnValue({
       playerActivities: [],
