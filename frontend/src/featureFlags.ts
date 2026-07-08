@@ -11,6 +11,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   skillsPage: ['all'],
   projectsPage: ['all'],
   toastsFeature: [],
+  unified_homepage: [],
 };
 
 export default featureFlags;
