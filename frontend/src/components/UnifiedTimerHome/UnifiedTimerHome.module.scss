@@ -1,0 +1,177 @@
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
+@use '../../styles/semantic/spacing' as sp;
+@use 'sass:map';
+
+$row-control-height: 44px;
+
+.wrapper {
+  position: relative;
+  width: min(100%, 720px);
+  border: 1px solid rgba(c.$color-border-primary, 0.15);
+  border-radius: v.$border-radius;
+  padding: v.$padding-base;
+  background: rgba(c.$color-player, 0.14);
+}
+
+.isActive .timerPill {
+  border-color: rgba(c.$color-border-primary, 0.8);
+  box-shadow: 0 0 0 2px rgba(c.$color-border-primary, 0.25);
+  animation: timerPulse 1.6s ease-in-out infinite;
+}
+
+.runningRow {
+  display: flex;
+  align-items: center;
+  gap: map.get(sp.$gap, sm);
+}
+
+.activityLabel {
+  flex: 1 1 auto;
+  min-width: 0;
+  text-align: left;
+  border: 2px solid transparent;
+  background: transparent;
+  border-radius: v.$border-radius;
+  padding: v.$padding-sm;
+  font-size: 1.05rem;
+  cursor: pointer;
+  color: c.$color-text-body;
+  overflow-wrap: anywhere;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(c.$color-border-accent, 0.5);
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  @include m.focus-outline(c.$color-border-accent);
+}
+
+.inputRow {
+  display: flex;
+  flex-direction: column;
+  gap: map.get(sp.$gap, sm);
+}
+
+.searchControl {
+  width: 100%;
+  // Reserve space for up to maxVisibleRows (4) so the list opening/closing
+  // and filtering doesn't reflow the controls below it.
+  min-height: $row-control-height;
+}
+
+.entitySearch {
+  width: 100%;
+}
+
+.inputText {
+  width: 100%;
+  height: $row-control-height;
+  box-sizing: border-box;
+  font-size: 1.05rem;
+}
+
+.startControls,
+.runningControls {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: map.get(sp.$gap, sm);
+}
+
+.timerPill {
+  display: flex;
+  align-items: center;
+  height: $row-control-height;
+  @include m.border(rgba(c.$color-border-primary, 0.3));
+  border-radius: v.$border-radius;
+  padding: 0 v.$padding-base;
+  line-height: 1;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ctaButton {
+  height: $row-control-height;
+  display: flex;
+  align-items: center;
+}
+
+.blankStartButton {
+  height: $row-control-height;
+  display: flex;
+  align-items: center;
+}
+
+.limitWarning {
+  margin: v.$spacing-sm 0 0;
+  text-align: left;
+  color: c.$color-text-body;
+}
+
+.supportButtonRow {
+  display: flex;
+  justify-content: center;
+  padding-top: v.$spacing-md;
+}
+
+.supportModeButton {
+  max-width: 100%;
+  border: 1px solid rgba(c.$color-border-primary, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+}
+
+@keyframes timerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(c.$color-border-primary, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(c.$color-border-primary, 0.4);
+  }
+}
+
+@include m.respond-to(md, down) {
+  .timerPill,
+  .ctaButton,
+  .blankStartButton {
+    height: 40px;
+  }
+
+  .inputText {
+    height: 40px;
+    font-size: 1rem;
+  }
+}
+
+@include m.respond-to(sm, down) {
+  .timerPill,
+  .ctaButton,
+  .blankStartButton {
+    height: 38px;
+  }
+
+  .inputText {
+    height: 38px;
+    font-size: 0.9rem;
+  }
+
+  .runningRow {
+    flex-wrap: wrap;
+  }
+
+  .startControls,
+  .runningControls {
+    justify-content: stretch;
+
+    > * {
+      flex: 1 1 auto;
+    }
+  }
+}
