@@ -24,14 +24,21 @@ plan depends on them:
 3. "Attaches the selected label to the running timer" applies whenever a
    timer is active, regardless of whether it already has a label — i.e.
    picking a different list item while a *labelled* timer is running
-   relabels it in place, not just the unlabelled→labelled case. (Flagged
-   again under Open Questions in case that's not the intent.)
-4. Mode suggestion buttons ("Task planning", "Free text") are presentational
-   triggers only for this plan — their exact behaviour needs product input
-   (see Open Questions) and is scoped to a late, isolated phase so the rest
-   of the work isn't blocked on it.
+   relabels it in place, not just the unlabelled→labelled case. **Confirmed.**
+   This also covers the new click-to-edit interaction (Design decision 6).
+4. Mode suggestion buttons ("Task planning", "Free text") are **parked —
+   out of scope for this plan.** No phase implements them; `UnifiedTimerHome`
+   is built so they can be slotted into the Running-unlabelled state later
+   without restructuring anything.
 5. No existing animation library is present in `frontend/package.json`, so
    "a single animation system" requires adding one (Design decision 5).
+6. Support-flow-started activities need no special-casing: `useSupportFlow`'s
+   `onStartActivity` always calls `startActivity` with a non-blank
+   `activityText` (`useActivityInput.ts:193-214`), so `currentActivity.name`
+   is never blank for a support activity. The existing `isUnlabelled`
+   derivation (Phase 4) is `false` in that case, so it renders in
+   Running-labelled automatically — **confirmed as the desired behaviour**,
+   no extra work needed.
 
 ---
 
@@ -98,8 +105,7 @@ No model or migration changes — `rename_activity`/`change_task` already exist
 | File | Change | Exists? |
 |---|---|---|
 | `frontend/src/components/UnifiedTimerHome/UnifiedTimerHome.tsx` | New: three-state layout, uses shared hooks | New |
-| `frontend/src/components/UnifiedTimerHome/UnifiedTimerHome.module.scss` | New | New |
-| `frontend/src/components/UnifiedTimerHome/ModeSuggestions.tsx` | New, isolated (Phase 5) | New |
+| `frontend/src/components/UnifiedTimerHome/UnifiedTimerHome.module.scss` | New (incl. fixed-height list container, Design decision 7) | New |
 | `frontend/src/pages/Game2/ActivityTimelinePage.tsx` | Branch on `useFeatureFlag("unified_homepage")` | Yes, extend |
 | `frontend/package.json` | Add animation dependency (Design decision 5) | Yes, extend |
 
@@ -161,17 +167,30 @@ Add `label_activity` action to `ActivityTimerViewSet`:
   Assumption 3).
 - Derive `isUnlabelled = isActive && !(currentActivity?.name ??
   currentActivity?.text ?? "").trim()` for the new components to consume.
+- Add click-to-edit support (Design decision 6): local `isEditingLabel`
+  state plus `startEditingLabel()` and `handleLabelBlur()`. `startEditingLabel`
+  pre-fills `name` with `currentActivity.name` and sets `isEditingLabel =
+  true`; `handleLabelBlur` calls `handleUnifiedSubmit(name)` (which always
+  reaches `labelActivity` since `isActive` is true here, even for an empty
+  trimmed value — clearing the label is a valid outcome, see Edge cases),
+  then sets `isEditingLabel = false` unconditionally. The rendered UI state
+  is `isUnlabelled || isEditingLabel`, so once `labelActivity` resolves,
+  `currentActivity.name` drives the real state and `isEditingLabel` no
+  longer matters.
 - These are net-new exports from the hook; `ActivityInput.tsx` (legacy)
   doesn't call them, so its behaviour is unchanged. Unit tests for the new
-  branch logic.
+  branch logic, including click-to-edit → blur-with-value and
+  blur-with-empty-value.
 
 **Phase 5 — extend `EntitySearchInput` for a persistent/default list**
 - Add optional props: `alwaysOpen?: boolean`, `defaultResults?:
-  SearchEntity[]`, `emptyMessage?: string`.
+  SearchEntity[]`, `emptyMessage?: string`, `maxVisibleRows?: number`.
 - When `alwaysOpen` is true and the query is blank, render `defaultResults`
   (fed by `useDefaultActivityEntries` from the call site) instead of hiding
   the dropdown; when there's a query, existing Fuse-based `results` take
-  over unchanged.
+  over, sliced to `maxVisibleRows` when set (list container sizing, Design
+  decision 7) — `MAX_RESULTS = 8` internal to `useEntitySearchInput` is
+  unchanged, this is a display-layer cap on top of it.
 - Existing callers (`ActivityInput.tsx`) don't pass these props, so nothing
   changes for them. Unit/RTL tests for the new prop combination.
 
@@ -180,21 +199,25 @@ Add `label_activity` action to `ActivityTimerViewSet`:
   Running-labelled) using: `useActivityInput()` (extended),
   `useDefaultActivityEntries()`, extended `EntitySearchInput`, and the
   existing `Button` component for Start/Stop.
+- Render the running-labelled activity name as a clickable element wired to
+  `startEditingLabel()`/`handleLabelBlur()` (Design decision 6) so it drops
+  into the same Running-unlabelled layout, pre-filled, on click.
+- List container gets a fixed min-height sized for `maxVisibleRows = 4`
+  (Design decision 7) — reserved regardless of actual item count, so
+  switching between 0–4 rows (or fewer default entries) never shifts
+  surrounding layout.
 - Add the animation dependency (Design decision 5) and use it only inside
   this new tree.
 - Branch `ActivityTimelinePage.tsx` on `useFeatureFlag("unified_homepage")`:
   render `UnifiedTimerHome` instead of `CurrentActivity` + `ActivityTimeline`
   when on. This is the only edit to a shared file in the whole plan, and
   it's a pure conditional — flag off renders byte-identical output to today.
-- Component/RTL tests for state transitions; manual QA against real backend.
+- Component/RTL tests for state transitions, including click-to-edit;
+  manual QA against real backend.
+- Mode suggestion buttons are explicitly not built here (Assumption 4) —
+  layout leaves room for them but no component ships.
 
-**Phase 7 — mode suggestion buttons (isolated, needs Open Questions resolved)**
-- Add `ModeSuggestions.tsx`: dismissible buttons shown only in
-  Running-unlabelled state, per Assumption 4. Kept as its own commit since
-  its actual behaviour is unresolved (see Open Questions) and everything
-  else in the plan works without it.
-
-**Phase 8 — polish**
+**Phase 7 — polish**
 - Accessibility pass (`aria-live` on the timer, focus management across
   state transitions, list `role`/labelling consistency with existing
   `EntitySearchInput`/`List` patterns).
@@ -260,6 +283,35 @@ to maintain version of the same thing. Framer Motion is a natural fit for
 React 19 and has no dependency conflicts with the existing stack. Scoping it
 to `UnifiedTimerHome` only avoids any risk to the legacy tree.
 
+**6. Click-to-edit label: transient `isEditingLabel` flag, not a new derived
+state off `currentActivity`.**
+Clicking the running-labelled activity name needs to force the
+Running-unlabelled layout even though `currentActivity.name` is still
+populated (nothing has changed server-side yet). Alternative considered:
+optimistically clear `currentActivity.name` on click and restore it on
+cancel — rejected, because it would make the *displayed* current activity
+briefly diverge from the *actual* one for reasons (a UI edit hasn't been
+committed) unrelated to what `currentActivity` is supposed to represent
+elsewhere in the app (XP displays, auto-stop completion name, etc). A
+separate boolean that only affects which of the two running layouts renders
+keeps `currentActivity` as the single source of truth for "what is the
+timer actually tracking," while still giving the UI its edit-mode view.
+Chosen because it reuses the existing `labelActivity` write path unchanged —
+blur always resolves to a real state (`isUnlabelled` becomes true or false
+based on the post-write name), so `isEditingLabel` never needs manual
+resetting logic beyond "set to false after the blur handler runs."
+
+**7. List container: fixed min-height sized for `maxVisibleRows = 4`.**
+Alternative considered: let the container size to content (0–N rows).
+Rejected because the list's row count changes on every keystroke while
+filtering and on every state transition (Input ↔ Running-unlabelled), which
+would constantly reflow the Start/Stop button and timer display beneath it.
+A fixed-height container sized for 4 rows (matching the default-list cap
+already carried over from the reference branch, Design decision — see
+Phase 3/5) avoids layout jank without introducing a new number to justify
+separately. If fewer than 4 rows are available, the container keeps its
+reserved height with empty space rather than collapsing.
+
 ---
 
 ## 5. Edge cases
@@ -269,8 +321,19 @@ to `UnifiedTimerHome` only avoids any risk to the legacy tree.
   same pattern (disable Start while `status !== "empty"`/`!== "waiting"`)
   applies to the new blank-start button.
 - **Select/submit while a *labelled* timer is running**: per Assumption 3,
-  relabels in place rather than being a no-op — confirm this is the
-  intended reading before implementing Phase 4.
+  relabels in place rather than being a no-op.
+- **Click-to-edit label, blur with an empty input**: per the confirmed
+  behaviour, this clears the label — `handleLabelBlur` still calls
+  `labelActivity("")`, which the backend already tolerates (blank
+  `PlayerActivity.name` is valid, Design decision 2). The timer stays
+  active and running; the UI simply reflects the now-true `isUnlabelled`
+  state after the write resolves. This keeps server state and UI state in
+  sync rather than leaving a stale non-blank name on the server while the
+  UI shows blank.
+- **Click-to-edit label, blur with the value unchanged**: `handleUnifiedSubmit`
+  still calls `labelActivity` with the same name — an unnecessary network
+  call but harmless (idempotent rename). Not worth special-casing for a
+  first pass; flag as a possible follow-up optimization if it proves noisy.
 - **`label_activity` called after the timer already completed** (e.g. a
   queued UI event fires after Stop): the new action should check
   `timer.status in {"active", "waiting"}` server-side and return a 409/no-op
@@ -352,34 +415,31 @@ to `UnifiedTimerHome` only avoids any risk to the legacy tree.
 - **New animation dependency**: first use of Framer Motion in this repo —
   bundle size and unfamiliarity risk. Mitigated by scoping usage to one
   component tree and by the flag itself (fully reversible by toggling off).
-- **Default-list cap and dataset mismatch**: `useDefaultActivityEntries`
-  (ported, cap of 4, sourced from `useGame().playerActivities/
-  characterActivities`) and the Fuse-based filtered results (cap of 8,
-  sourced from `useEntitySearchCache`'s full-history query) are different
-  datasets with different caps. This is fine per the task brief's "single
-  source for both default and filtered list results" (they share the same
-  *component* and *search mechanism*, not literally the same array), but an
-  implementer should not assume they can be trivially merged into one
-  `useMemo`.
+- **Default-list and filtered-list dataset mismatch**: `useDefaultActivityEntries`
+  (ported, sourced from `useGame().playerActivities/characterActivities`)
+  and the Fuse-based filtered results (sourced from `useEntitySearchCache`'s
+  full-history query) are different underlying datasets — both are now
+  display-capped to 4 rows (`maxVisibleRows`, Design decision 7), but that
+  cap is cosmetic, not a sign they're the same data. This is fine per the
+  task brief's "single source for both default and filtered list results"
+  (they share the same *component* and *search mechanism*, not literally
+  the same array), but an implementer should not assume they can be
+  trivially merged into one `useMemo`.
 
 ---
 
 ## 8. Open questions
 
-1. Does relabelling apply to an already-labelled running timer (spec says
-   "otherwise attaches the selected label to the running timer" with no
-   unlabelled/labelled distinction), or should selecting a new item while a
-   labelled timer is running be a no-op? (Assumption 3 currently reads it as
-   "always relabels.")
-2. What do the mode suggestion buttons ("Task planning", "Free text")
-   actually do when clicked — prefill the input, open the existing
-   `SupportFlowModal`, or something else? Phase 7 is isolated specifically
-   so this can be resolved without blocking the rest of the plan.
-3. Is there a target row count for the default/persistent list, or is the
-   reference branch's `MAX_DEFAULT_ENTRIES = 4` acceptable to carry over
-   as-is?
-4. Any specific requirement for what happens to `handleUnifiedSelect` when
-   the running timer is a *support-flow* activity (`useSupportFlow`
-   integration in `useActivityInput.ts:185-215` has its own start path) —
-   out of scope for this plan unless flagged otherwise, since the brief
-   doesn't mention support mode.
+All four open questions from the previous draft are resolved (relabelling
+always applies while active — Assumption 3; mode suggestions parked —
+Assumption 4; default-list cap is 4 — Design decision 7; support-flow
+activities render as Running-labelled automatically — Assumption 6). One new
+item surfaced while designing click-to-edit:
+
+1. Should pressing **Escape** while editing a label cancel back to the
+   original name instead of committing whatever's currently typed (browsers
+   don't fire `blur` on Escape by default unless the input also loses
+   focus)? Not specified in the brief; current plan only wires `onBlur`, so
+   Escape today would just leave the input focused/unsaved until the user
+   clicks away. Worth a product call before Phase 6, but doesn't block
+   earlier phases.
