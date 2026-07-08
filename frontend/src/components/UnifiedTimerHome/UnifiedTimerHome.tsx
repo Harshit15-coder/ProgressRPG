@@ -141,7 +141,7 @@ export default function UnifiedTimerHome() {
               </Button>
             </motion.div>
 
-            <AnimatePresence initial={false}>
+            <AnimatePresence mode="popLayout" initial={false}>
               {isActive && (
                 <motion.div key="timer" layout {...fadeProps} className={styles.timerPill}>
                   {minutes}:{seconds.toString().padStart(2, "0")}
