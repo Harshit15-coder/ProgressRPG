@@ -56,11 +56,21 @@ $row-control-height: 44px;
   gap: map.get(sp.$gap, sm);
 }
 
+// Height of a single EntitySearchInput dropdown row (option button padding +
+// line height), used to reserve space below the input.
+$list-row-height: 2.75rem;
+$list-group-label-height: 1.75rem;
+
 .searchControl {
   width: 100%;
-  // Reserve space for up to maxVisibleRows (4) so the list opening/closing
-  // and filtering doesn't reflow the controls below it.
-  min-height: $row-control-height;
+  // The dropdown is position:absolute (EntitySearchInput.module.scss), so it
+  // doesn't push layout on its own — without this reserved space it floats
+  // over the Start/Stop controls below and steals their clicks. Sized for
+  // maxVisibleRows (4) plus both group labels (Tasks/Activities) as the
+  // worst case, per Design decision 7 (fixed-height list container).
+  min-height: calc(
+    #{$row-control-height} + 4 * #{$list-row-height} + 2 * #{$list-group-label-height}
+  );
 }
 
 .entitySearch {

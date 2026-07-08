@@ -190,6 +190,28 @@ describe('UnifiedTimerHome', () => {
     await user.click(screen.getByRole('button', { name: /Deep work/ }));
 
     expect(screen.getByRole('combobox', { name: 'Activity name' })).toHaveValue('Deep work');
+    expect(screen.getByRole('combobox', { name: 'Activity name' })).toHaveFocus();
+  });
+
+  it('Escape cancels click-to-edit without calling labelActivity', async () => {
+    const user = userEvent.setup();
+    mockGame({ status: 'active', currentActivity: { name: 'Deep work' } });
+
+    render(<UnifiedTimerHome />);
+
+    await user.click(screen.getByRole('button', { name: /Deep work/ }));
+    await user.keyboard('{Escape}');
+
+    expect(labelActivity).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: /Deep work/ })).toBeInTheDocument();
+  });
+
+  it('exposes a status message for screen readers reflecting the running state', () => {
+    mockGame({ status: 'active', currentActivity: { name: 'Deep work' } });
+
+    render(<UnifiedTimerHome />);
+
+    expect(screen.getByText('Timer running: Deep work')).toBeInTheDocument();
   });
 
   it('shows the auto-stop warning near the limit', () => {

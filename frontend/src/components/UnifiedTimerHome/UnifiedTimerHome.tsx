@@ -1,4 +1,4 @@
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import classNames from "classnames";
 import { AnimatePresence, motion } from "framer-motion";
 
@@ -45,14 +45,44 @@ export default function UnifiedTimerHome() {
   // an unlabelled running timer, or an in-progress click-to-edit).
   const showLabelDisplay = isActive && !isUnlabelled && !isEditingLabel;
 
+  const statusMessage = showLabelDisplay
+    ? `Timer running: ${inputValue || "Untitled activity"}`
+    : isActive
+      ? "Timer running, unlabelled"
+      : "Timer stopped";
+
+  // Click-to-edit needs the input focused immediately so the pre-filled
+  // name is ready to be replaced/confirmed without an extra click.
+  useEffect(() => {
+    if (!isEditingLabel) return;
+    listWrapperRef.current?.querySelector("input")?.focus();
+  }, [isEditingLabel]);
+
+  const handleBlankStartClick = async () => {
+    await handleBlankStart();
+    listWrapperRef.current?.querySelector("input")?.focus();
+  };
+
+  // The blur fired by `.blur()` below happens synchronously, before the
+  // setIsEditingLabel(false) from handleLabelCancel has flushed — so
+  // handleWrapperBlur's `isEditingLabel` closure would still read `true`
+  // and wrongly commit the cancelled edit. This ref sidesteps the stale
+  // closure without waiting on a render.
+  const justCancelledRef = useRef(false);
+
   const handleWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape" && isEditingLabel) {
+      justCancelledRef.current = true;
       handleLabelCancel();
       (event.target as HTMLElement).blur();
     }
   };
 
   const handleWrapperBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (justCancelledRef.current) {
+      justCancelledRef.current = false;
+      return;
+    }
     if (!isEditingLabel) return;
     if (listWrapperRef.current?.contains(event.relatedTarget as Node)) return;
     handleLabelBlur();
@@ -60,11 +90,11 @@ export default function UnifiedTimerHome() {
 
   return (
     <>
-      <section
-        className={classNames(styles.wrapper, { [styles.isActive]: isActive })}
-        aria-live="polite"
-      >
+      <section className={classNames(styles.wrapper, { [styles.isActive]: isActive })}>
         <h2 className="sr-only">Activity timer</h2>
+        <p className="sr-only" aria-live="polite">
+          {statusMessage}
+        </p>
 
         <AnimatePresence mode="wait" initial={false}>
           {showLabelDisplay ? (
@@ -144,7 +174,7 @@ export default function UnifiedTimerHome() {
                   >
                     Start
                   </Button>
-                  <Button onClick={handleBlankStart} variant="secondary" className={styles.blankStartButton}>
+                  <Button onClick={handleBlankStartClick} variant="secondary" className={styles.blankStartButton}>
                     Start blank
                   </Button>
                 </div>
