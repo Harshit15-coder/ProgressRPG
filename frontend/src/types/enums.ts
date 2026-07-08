@@ -19,7 +19,8 @@ export type FeatureFlagKey =
   | "categoriesPage"
   | "skillsPage"
   | "projectsPage"
-  | "toastsFeature";
+  | "toastsFeature"
+  | "onlinePlayerCount";
 
 // ---------------------------------------------------------------------------
 // Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)
@@ -52,7 +53,8 @@ export type WebSocketMessageType =
   | "action"
   | "response"
   | "error"
-  | "pong";
+  | "pong"
+  | "online_count";
 
 // WebSocket action strings sent from client (handle_client_request)
 export type ClientWebSocketAction =

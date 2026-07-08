@@ -25,6 +25,9 @@ export async function handleGlobalWebSocketEvent(
     case 'server_message':
       break;
 
+    case 'online_count':
+      break;
+
     case 'action':
       switch (data.action) {
         case 'refresh':

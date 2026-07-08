@@ -75,7 +75,7 @@ from locations.serializers import PopulationCentreSerializer
 
 from progression.serializers import PlayerActivitySerializer
 
-from users.models import TutorialStep
+from users.models import Player, TutorialStep
 from users.serializers import PlayerSerializer, TutorialStepSerializer
 from users.utils import send_email_to_users
 
@@ -570,6 +570,7 @@ class FetchInfoAPIView(APIView):
                 "login_reward_xp": login_state_data["login_reward_xp"],
                 "free_timer_limit_seconds": game_settings.free_timer_limit_seconds,
                 "game_settings": GameSettingsSerializer(game_settings).data,
+                "online_count": Player.online_count(),
             }
             return Response(data)
 

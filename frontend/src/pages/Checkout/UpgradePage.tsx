@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 
 import Button from "../../components/Button/Button";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { useAppConfig } from "../../hooks/useAppConfig";
 import { apiFetch } from "../../utils/api";
 import styles from "./UpgradePage.module.scss";

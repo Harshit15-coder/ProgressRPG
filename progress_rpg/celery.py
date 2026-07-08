@@ -41,6 +41,10 @@ app.conf.beat_schedule = {
         "task": "users.tasks.perform_account_wipe",
         "schedule": crontab(minute=0, hour=0),
     },
+    "reconcile_stale_online_players": {
+        "task": "users.tasks.reconcile_stale_online_players",
+        "schedule": 300.0,  # every 5 minutes
+    },
     # "generate_character_days_1am": {
     #     "task": "character.tasks.generate_character_days",
     #     "schedule": crontab(hour=1, minute=0),

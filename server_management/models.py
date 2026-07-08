@@ -97,6 +97,7 @@ class MaintenanceWindow(models.Model):
         logger.info("[DEACTIVATE MAINTENANCE] Deactivating maintenance mode...")
         print("Deactivating maintenance mode... wrapping up!")
         self.is_active = False
+        self.tasks_scheduled = False
         self.save()
 
         payload = {

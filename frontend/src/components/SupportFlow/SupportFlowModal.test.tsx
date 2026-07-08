@@ -19,7 +19,7 @@ vi.mock("../../hooks/useFeatureFlag", () => ({
   useFeatureFlag: () => false,
 }));
 
-vi.mock("../../context/GameContext", () => ({
+vi.mock("../../hooks/useGame", () => ({
   useGame: () => mockUseGame(),
 }));
 

@@ -1,9 +1,12 @@
+from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point
+from django.db import connection
 from django.test import TestCase
+from django.test.utils import CaptureQueriesContext
 from unittest.mock import patch
 
-from .models import Node, Path, Building, Journey
-from character.models import Character
+from .models import Node, Path, Building, Journey, PopulationCentre
+from character.models import Character, PlayerCharacterLink
 
 
 class LocationsModelsTestCase(TestCase):
@@ -131,3 +134,65 @@ class LocationsModelsTestCase(TestCase):
         journey.refresh_from_db()
         self.assertEqual(journey.status, "complete")
         self.assertIsNotNone(journey.finished_at)
+
+
+class PopulationCentreVillagePointsTest(TestCase):
+    """Guards against the N+1 pattern in PopulationCentre.village_points
+    (Sentry issue 129622699), where every resident triggered its own
+    unfiltered PlayerCharacterLink query, and progress/state each
+    recomputed village_points from scratch on top of that."""
+
+    def setUp(self):
+        self.centre = PopulationCentre.objects.create(
+            name="Test Village",
+            location=Point(0, 0, srid=3857),
+        )
+        self.residents = [
+            Character.objects.create(
+                first_name=f"Resident{i}",
+                location=Point(0, 0, srid=3857),
+                population_centre=self.centre,
+            )
+            for i in range(4)
+        ]
+
+        user = get_user_model().objects.create_user(
+            email="linked-resident@example.com", password="testpassword123"
+        )
+        PlayerCharacterLink.objects.create(
+            player=user.player, character=self.residents[0], is_active=True
+        )
+
+    def _link_queries(self, ctx):
+        return [
+            q["sql"]
+            for q in ctx.captured_queries
+            if "character_playercharacterlink" in q["sql"].lower()
+        ]
+
+    def test_village_points_batches_link_queries_per_resident(self):
+        with CaptureQueriesContext(connection) as ctx:
+            points = self.centre.village_points
+
+        self.assertIsInstance(points, int)
+        link_queries = self._link_queries(ctx)
+        self.assertEqual(
+            len(link_queries),
+            1,
+            "village_points should fetch all residents' links in one "
+            f"query instead of one per resident: {link_queries}",
+        )
+
+    def test_village_points_is_cached_across_progress_and_state(self):
+        with CaptureQueriesContext(connection) as ctx:
+            points = self.centre.village_points
+            self.centre.progress
+            self.centre.state
+
+        link_queries = self._link_queries(ctx)
+        self.assertEqual(
+            len(link_queries),
+            1,
+            "village_points should be computed once and reused by "
+            f"progress/state, not recomputed per property: {link_queries}",
+        )

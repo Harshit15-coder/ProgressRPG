@@ -2,7 +2,7 @@ import { useCallback, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useMutation } from "@tanstack/react-query";
 
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { useAppConfig } from "../../hooks/useAppConfig";
 import { deleteAccount, downloadUserData, updatePlayer } from "../../api/player";
 import {

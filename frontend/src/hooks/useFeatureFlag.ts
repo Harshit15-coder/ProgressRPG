@@ -1,5 +1,5 @@
 import featureFlags from "../featureFlags";
-import { useGame } from "../context/GameContext";
+import { useGame } from "../hooks/useGame";
 import { useAppConfig } from "./useAppConfig";
 import type { AccessGroup, FeatureFlagKey } from "../types";
 

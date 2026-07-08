@@ -4,7 +4,7 @@ import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { formatDuration, formatRewardDuration } from "../../../utils/formatUtils";
 import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
-import { useGame } from "../../../context/GameContext";
+import { useGame } from "../../../hooks/useGame";
 import styles from "../SupportFlowModal.module.scss";
 
 const SUPPORT_COUNTDOWN_MS = 3000;

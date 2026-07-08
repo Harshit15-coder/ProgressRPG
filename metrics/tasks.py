@@ -20,16 +20,25 @@ def calculate_daily_metrics():
     logger.info(f"Starting daily metrics calculation for {today}")
 
     player_count = 0
-    batch_size = 100
+    batch_size = 500
 
-    # Calculate daily snapshots for all non-deleted players using iterator() for memory efficiency
-    for player in (
-        Player.objects.filter(is_deleted=False)
-        .only("id")
-        .iterator(chunk_size=batch_size)
-    ):
-        MetricsCalculator.calculate_daily_snapshot(player, today)
-        player_count += 1
+    # Calculate daily snapshots in batches, one query per batch instead of
+    # per player, to avoid N+1 queries against progression_activity
+    player_ids = Player.objects.filter(is_deleted=False).values_list(
+        "id", flat=True
+    )
+    batch = []
+    for player_id in player_ids.iterator(chunk_size=batch_size):
+        batch.append(player_id)
+        if len(batch) >= batch_size:
+            player_count += MetricsCalculator.calculate_daily_snapshots_bulk(
+                batch, today
+            )
+            batch = []
+    if batch:
+        player_count += MetricsCalculator.calculate_daily_snapshots_bulk(
+            batch, today
+        )
 
     # Calculate global metrics for today
     MetricsCalculator.calculate_global_metrics(today)
