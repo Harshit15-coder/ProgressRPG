@@ -18,6 +18,14 @@ interface EntitySearchInputProps {
   inputClassName?: string;
   disabled?: boolean;
   searchEnabled?: boolean;
+  /** Shown in place of Fuse results when the query is blank. */
+  defaultResults?: SearchEntity[];
+  /** Keep the dropdown open regardless of focus (persistent list mode). */
+  alwaysOpen?: boolean;
+  /** Cap the combined (task + activity) rows rendered, regardless of source. */
+  maxVisibleRows?: number;
+  /** Shown instead of the list when alwaysOpen is set and there are no rows. */
+  emptyMessage?: string;
 }
 
 export default function EntitySearchInput({
@@ -32,6 +40,10 @@ export default function EntitySearchInput({
   inputClassName,
   disabled = false,
   searchEnabled = true,
+  defaultResults,
+  alwaysOpen = false,
+  maxVisibleRows,
+  emptyMessage,
 }: EntitySearchInputProps) {
   const {
     rootRef,
@@ -54,6 +66,9 @@ export default function EntitySearchInput({
     onCreate,
     disabled,
     searchEnabled,
+    defaultResults,
+    alwaysOpen,
+    maxVisibleRows,
   });
 
   return (
@@ -124,6 +139,10 @@ export default function EntitySearchInput({
             );
           })()}
         </ul>
+      )}
+
+      {alwaysOpen && !isDropdownOpen && emptyMessage && (
+        <p className={styles.emptyMessage}>{emptyMessage}</p>
       )}
     </div>
   );

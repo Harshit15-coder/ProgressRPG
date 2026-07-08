@@ -4,6 +4,7 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import EntitySearchInput from "./EntitySearchInput";
+import type { SearchEntity } from "./useEntitySearchInput";
 
 interface MockEntity {
   id: string | number;
@@ -23,9 +24,17 @@ vi.mock("../../hooks/useEntitySearchCache", () => ({
 function Harness({
   type = "activity",
   onCreate,
+  defaultResults,
+  alwaysOpen,
+  maxVisibleRows,
+  emptyMessage,
 }: {
   type?: "task" | "activity";
   onCreate?: (name: string) => void;
+  defaultResults?: SearchEntity[];
+  alwaysOpen?: boolean;
+  maxVisibleRows?: number;
+  emptyMessage?: string;
 }) {
   const [value, setValue] = useState("");
   return (
@@ -35,6 +44,10 @@ function Harness({
       onChange={setValue}
       onCreate={onCreate}
       ariaLabel="task search"
+      defaultResults={defaultResults}
+      alwaysOpen={alwaysOpen}
+      maxVisibleRows={maxVisibleRows}
+      emptyMessage={emptyMessage}
     />
   );
 }
@@ -91,5 +104,71 @@ describe("EntitySearchInput", () => {
 
     expect(onCreate).toHaveBeenCalledWith("Plan offsite");
     expect(addEntityToCache).toHaveBeenCalledWith("Plan offsite");
+  });
+
+  it("does not open a persistent list without alwaysOpen (legacy behaviour unchanged)", () => {
+    render(<Harness defaultResults={[{ id: "d1", name: "Default row", taskId: null, source: "activity" }]} />);
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+  });
+
+  it("shows defaultResults as a persistent list when alwaysOpen is set and the query is blank", () => {
+    render(
+      <Harness
+        alwaysOpen
+        defaultResults={[
+          { id: "d1", name: "Washing dishes", taskId: null, source: "activity" },
+          { id: "d2", name: "Ship it", taskId: 7, source: "task" },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole("listbox")).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Washing dishes" })).toBeInTheDocument();
+    expect(screen.getByRole("option", { name: "Ship it" })).toBeInTheDocument();
+  });
+
+  it("switches from defaultResults to Fuse results once a query is typed", async () => {
+    const user = userEvent.setup();
+    mockEntities = [{ id: "a1", name: "Write report", taskId: null, source: "activity" }];
+
+    render(
+      <Harness
+        alwaysOpen
+        defaultResults={[{ id: "d1", name: "Washing dishes", taskId: null, source: "activity" }]}
+      />
+    );
+
+    expect(screen.getByRole("option", { name: "Washing dishes" })).toBeInTheDocument();
+
+    await user.type(screen.getByRole("combobox"), "write");
+
+    await waitFor(() => {
+      expect(screen.getByRole("option", { name: "Write report" })).toBeInTheDocument();
+    });
+    expect(screen.queryByRole("option", { name: "Washing dishes" })).not.toBeInTheDocument();
+  });
+
+  it("caps combined rows to maxVisibleRows", () => {
+    render(
+      <Harness
+        alwaysOpen
+        maxVisibleRows={2}
+        defaultResults={[
+          { id: "d1", name: "Row one", taskId: null, source: "activity" },
+          { id: "d2", name: "Row two", taskId: null, source: "activity" },
+          { id: "d3", name: "Row three", taskId: null, source: "activity" },
+        ]}
+      />
+    );
+
+    expect(screen.getAllByRole("option")).toHaveLength(2);
+  });
+
+  it("shows emptyMessage instead of the list when alwaysOpen has no rows", () => {
+    render(<Harness alwaysOpen defaultResults={[]} emptyMessage="Nothing yet" />);
+
+    expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+    expect(screen.getByText("Nothing yet")).toBeInTheDocument();
   });
 });

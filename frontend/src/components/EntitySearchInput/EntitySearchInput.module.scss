@@ -82,3 +82,10 @@
 .optionButtonActive {
   background: rgba(c.$color-border-primary, 0.14);
 }
+
+.emptyMessage {
+  margin: v.$spacing-xs 0 0;
+  padding: v.$spacing-sm v.$padding-base;
+  color: rgba(c.$color-text-body, 0.6);
+  @include t.apply-text-style(t.$text-body);
+}
