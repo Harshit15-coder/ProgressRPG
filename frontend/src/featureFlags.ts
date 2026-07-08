@@ -13,6 +13,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   toastsFeature: [],
   onlinePlayerCount: ['testers'],
   your_library: [],
+  unified_homepage: [],
 };
 
 export default featureFlags;

@@ -98,17 +98,19 @@ export default function useActivityTimer(): ActivityTimerReturn {
 
 
   const startActivity = useCallback(async (newActivity: StartActivityInput | string): Promise<unknown> => {
-    const { text, taskId, limitSeconds: newLimit, limitReason = null } =
+    const { text, taskId, limitSeconds: newLimit, limitReason = null, allowBlank = false } =
       typeof newActivity === "string"
-        ? { text: newActivity, taskId: null, limitSeconds: null, limitReason: null }
+        ? { text: newActivity, taskId: null, limitSeconds: null, limitReason: null, allowBlank: false }
         : newActivity || {};
 
-    if (!text?.trim()) return null;
+    if (!text?.trim() && !allowBlank) return null;
+
+    const trimmedText = (text ?? "").trim();
 
     primeAudio(); // unlock AudioContext while still in user-gesture context
 
     // Optimistic local state
-    setCurrentActivity({ text: text.trim(), taskId });
+    setCurrentActivity({ text: trimmedText, taskId });
     setStatus("active");
     setElapsed(0);
     pausedTimeRef.current = 0;
@@ -135,7 +137,7 @@ export default function useActivityTimer(): ActivityTimerReturn {
       const setData = await apiFetch<{ activity_timer?: { activity?: CurrentActivity } }>(`/activity_timers/set_activity/`, {
         method: "POST",
         body: JSON.stringify({
-          activityName: text.trim(),
+          activityName: trimmedText,
           task_id: taskId ?? null,
           duration: 0,
         }),
@@ -181,6 +183,40 @@ export default function useActivityTimer(): ActivityTimerReturn {
       throw err;
     }
   }, [normalizeLimitSeconds, tickMain]);
+
+
+  // ----------------------------
+  // Label (rename in place) the running activity
+  // ----------------------------
+
+
+  const labelActivity = useCallback(async (name: string, taskId: number | null = null): Promise<unknown> => {
+    const trimmedName = (name ?? "").trim();
+    const previousActivity = currentActivityRef.current;
+
+    // Optimistic local update — unlike startActivity, elapsed/status/timer
+    // refs are left untouched so in-progress timing isn't lost.
+    setCurrentActivity((prev) => ({ ...(prev ?? {}), name: trimmedName, text: trimmedName, taskId }));
+
+    try {
+      const data = await apiFetch<{ activity_timer?: { activity?: CurrentActivity } }>(`/activity_timers/label_activity/`, {
+        method: "POST",
+        body: JSON.stringify({
+          activityName: trimmedName,
+          task_id: taskId ?? null,
+        }),
+      });
+
+      const serverActivity = data?.activity_timer?.activity;
+      if (serverActivity) setCurrentActivity({ taskId, ...serverActivity });
+
+      return data;
+    } catch (err) {
+      console.error("Failed to label activity:", err);
+      setCurrentActivity(previousActivity);
+      throw err;
+    }
+  }, []);
 
 
   // ----------------------------
@@ -379,6 +415,7 @@ export default function useActivityTimer(): ActivityTimerReturn {
     autoStopCompletion,
     currentActivity,
     startActivity,
+    labelActivity,
     stop,
     loadFromServer,
     clearAutoStopCompletion,

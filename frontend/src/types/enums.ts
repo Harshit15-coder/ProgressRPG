@@ -21,7 +21,8 @@ export type FeatureFlagKey =
   | "projectsPage"
   | "toastsFeature"
   | "onlinePlayerCount"
-  | "your_library";
+  | "your_library"
+  | "unified_homepage";
 
 // ---------------------------------------------------------------------------
 // Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)
