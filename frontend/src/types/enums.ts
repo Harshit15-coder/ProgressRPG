@@ -20,6 +20,8 @@ export type FeatureFlagKey =
   | "skillsPage"
   | "projectsPage"
   | "toastsFeature"
+  | "onlinePlayerCount"
+  | "your_library"
   | "unified_homepage";
 
 // ---------------------------------------------------------------------------
