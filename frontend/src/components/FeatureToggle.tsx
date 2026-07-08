@@ -50,5 +50,7 @@ export default function FeatureToggle({ flag, children, fallback }: FeatureToggl
     </div>
   );
 
-  return isEnabled ? <>{children}</> : <>{fallback ?? defaultFallback}</>;
+  const resolvedFallback = fallback !== undefined ? fallback : defaultFallback;
+
+  return isEnabled ? <>{children}</> : <>{resolvedFallback}</>;
 }
