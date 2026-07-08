@@ -12,6 +12,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   projectsPage: [],
   toastsFeature: [],
   onlinePlayerCount: ['testers'],
+  your_library: [],
 };
 
 export default featureFlags;

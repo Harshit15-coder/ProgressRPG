@@ -23,6 +23,7 @@ const UnavailablePage = lazy(() => import("../pages/UnavailablePage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage/NotFoundPage"));
 // const SkillsPage = lazy(() => import("../pages/SkillsPage/SkillsPage"));
 const TasksPage = lazy(() => import("../pages/TasksPage/TasksPage"));
+const LibraryPage = lazy(() => import("../pages/LibraryPage/LibraryPage"));
 const ProjectsPage = lazy(() => import("../pages/ProjectsPage/ProjectsPage"));
 const ActivitiesPage = lazy(() => import("../pages/ActivitiesPage"));
 // const CategoriesPage = lazy(() => import("../pages/CategoriesPage/CategoriesPage"));
@@ -170,6 +171,16 @@ export const routes = [
       <PrivateRoute>
         <FeatureToggle flag="projectsPage">
           <ProjectsPage />
+        </FeatureToggle>
+      </PrivateRoute>
+    ),
+  },
+  {
+    path: "/library",
+    element: (
+      <PrivateRoute>
+        <FeatureToggle flag="your_library">
+          <LibraryPage />
         </FeatureToggle>
       </PrivateRoute>
     ),
