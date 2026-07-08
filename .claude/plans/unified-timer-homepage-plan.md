@@ -168,13 +168,21 @@ Add `label_activity` action to `ActivityTimerViewSet`:
 - Derive `isUnlabelled = isActive && !(currentActivity?.name ??
   currentActivity?.text ?? "").trim()` for the new components to consume.
 - Add click-to-edit support (Design decision 6): local `isEditingLabel`
-  state plus `startEditingLabel()` and `handleLabelBlur()`. `startEditingLabel`
-  pre-fills `name` with `currentActivity.name` and sets `isEditingLabel =
-  true`; `handleLabelBlur` calls `handleUnifiedSubmit(name)` (which always
-  reaches `labelActivity` since `isActive` is true here, even for an empty
-  trimmed value — clearing the label is a valid outcome, see Edge cases),
-  then sets `isEditingLabel = false` unconditionally. The rendered UI state
-  is `isUnlabelled || isEditingLabel`, so once `labelActivity` resolves,
+  state plus `startEditingLabel()`, `handleLabelBlur()`, and
+  `handleLabelCancel()`. `startEditingLabel` pre-fills `name` with
+  `currentActivity.name` and sets `isEditingLabel = true`; `handleLabelBlur`
+  calls `handleUnifiedSubmit(name)` (which always reaches `labelActivity`
+  since `isActive` is true here, even for an empty trimmed value — clearing
+  the label is a valid outcome, see Edge cases), then sets `isEditingLabel =
+  false` unconditionally. `handleLabelCancel` (wired to the input's Escape
+  key, see Design decision 6) resets `name` back to `currentActivity.name`
+  and sets `isEditingLabel = false` *without* calling `labelActivity` — no
+  network call, no server-side change, the label edit is simply discarded.
+  The input's `onKeyDown` must check for Escape before `onBlur` fires (blur
+  the input first via `event.currentTarget.blur()` inside the Escape
+  handler so focus-out doesn't also trigger `handleLabelBlur`'s commit
+  path). The rendered UI state is `isUnlabelled || isEditingLabel`, so once
+  either handler resolves,
   `currentActivity.name` drives the real state and `isEditingLabel` no
   longer matters.
 - These are net-new exports from the hook; `ActivityInput.tsx` (legacy)
@@ -301,6 +309,16 @@ blur always resolves to a real state (`isUnlabelled` becomes true or false
 based on the post-write name), so `isEditingLabel` never needs manual
 resetting logic beyond "set to false after the blur handler runs."
 
+Escape cancels rather than commits: `handleLabelCancel` restores `name` to
+`currentActivity.name` and exits edit mode without calling `labelActivity`,
+so an accidental click on the label followed by Escape is a true no-op
+(no request, no rename). This is the standard inline-edit convention
+(Escape discards, blur/Enter commits) and needed an explicit `onKeyDown`
+handler on the input rather than relying on `onBlur` alone, since Escape
+doesn't reliably blur an input on its own — the handler blurs it manually
+after resetting state so the subsequent native blur event doesn't also fire
+`handleLabelBlur`'s commit logic.
+
 **7. List container: fixed min-height sized for `maxVisibleRows = 4`.**
 Alternative considered: let the container size to content (0–N rows).
 Rejected because the list's row count changes on every keystroke while
@@ -334,6 +352,12 @@ reserved height with empty space rather than collapsing.
   still calls `labelActivity` with the same name — an unnecessary network
   call but harmless (idempotent rename). Not worth special-casing for a
   first pass; flag as a possible follow-up optimization if it proves noisy.
+- **Click-to-edit label, Escape pressed**: per Design decision 6, discards
+  the edit entirely — no `labelActivity` call, `name` resets to
+  `currentActivity.name`, layout returns to Running-labelled with the
+  original name untouched. The Escape handler must blur the input itself
+  (`event.currentTarget.blur()`) after resetting state so the native blur
+  that follows doesn't re-trigger `handleLabelBlur`'s commit path.
 - **`label_activity` called after the timer already completed** (e.g. a
   queued UI event fires after Stop): the new action should check
   `timer.status in {"active", "waiting"}` server-side and return a 409/no-op
@@ -430,16 +454,9 @@ reserved height with empty space rather than collapsing.
 
 ## 8. Open questions
 
-All four open questions from the previous draft are resolved (relabelling
-always applies while active — Assumption 3; mode suggestions parked —
-Assumption 4; default-list cap is 4 — Design decision 7; support-flow
-activities render as Running-labelled automatically — Assumption 6). One new
-item surfaced while designing click-to-edit:
-
-1. Should pressing **Escape** while editing a label cancel back to the
-   original name instead of committing whatever's currently typed (browsers
-   don't fire `blur` on Escape by default unless the input also loses
-   focus)? Not specified in the brief; current plan only wires `onBlur`, so
-   Escape today would just leave the input focused/unsaved until the user
-   clicks away. Worth a product call before Phase 6, but doesn't block
-   earlier phases.
+All open questions from previous drafts are resolved: relabelling always
+applies while active (Assumption 3); mode suggestions parked (Assumption 4);
+default-list cap is 4 (Design decision 7); support-flow activities render as
+Running-labelled automatically (Assumption 6); Escape cancels a label edit
+without committing (Design decision 6). None outstanding — implementation
+can proceed through Phase 6 without further product input.
