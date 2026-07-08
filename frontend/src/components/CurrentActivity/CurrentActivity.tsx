@@ -1,6 +1,6 @@
 import React from "react";
 import classNames from "classnames";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import ActivityInput from "../ActivityInput/ActivityInput";
 import styles from "./CurrentActivity.module.scss";
 

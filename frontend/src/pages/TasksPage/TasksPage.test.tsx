@@ -39,7 +39,7 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => navigate,
 }));
 
-vi.mock("../../context/GameContext", () => ({
+vi.mock("../../hooks/useGame", () => ({
   useGame: () => gameValue,
 }));
 

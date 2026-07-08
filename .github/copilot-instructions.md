@@ -230,6 +230,11 @@ npx playwright test
 6. **Security first** - Always consider security implications
 7. **Performance matters** - Use database indexes, optimize queries, minimize API calls
 
+## Writing Style
+
+- Use UK English spelling in user-facing text, comments, documentation, changelog entries, and release notes.
+- Prefer forms such as `optimise`, `colour`, `favour`, `authorise`, and `organisation` unless an external API, library, or existing identifier requires US spelling.
+
 ## When Making Changes
 
 - Check for existing similar implementations first

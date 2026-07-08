@@ -1,7 +1,7 @@
 import React from "react";
 import List from "../../../components/List/List";
 import styles from "./ActivityPanel.module.scss";
-import { useGame } from "../../../context/GameContext";
+import { useGame } from "../../../hooks/useGame";
 import { formatDuration } from "../../../utils/formatUtils";
 import type { PlayerActivity } from "../../../types";
 

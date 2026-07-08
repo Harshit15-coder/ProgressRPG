@@ -1,3 +1,4 @@
+@use 'sass:map';
 @use '../../styles/base/variables' as v;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
@@ -56,7 +57,7 @@
 }
 
 .labelInside {
-  @include c.apply-text-tone(inverted);
+  @include c.apply-text-tone(map.get(c.$text-tone, inverted));
   @include t.apply-text-style(t.$text-body);
 }
 

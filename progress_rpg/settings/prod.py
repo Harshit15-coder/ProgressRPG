@@ -156,7 +156,10 @@ CHANNEL_LAYERS = {
     "default": {
         "BACKEND": "channels_redis.core.RedisChannelLayer",
         "CONFIG": {
-            "hosts": [REDIS_URL_MOD],
+            # socket_timeout must exceed channels_redis's BZPOPMIN brpop_timeout (5s),
+            # otherwise redis-py's client-side read timeout races the server-side
+            # blocking timeout and randomly raises TimeoutError, killing the consumer.
+            "hosts": [{"address": REDIS_URL_MOD, "socket_timeout": 20}],
         },
     },
 }

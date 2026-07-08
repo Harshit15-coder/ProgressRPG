@@ -1,7 +1,7 @@
 from django.contrib import admin
 from django.contrib.auth.admin import UserAdmin
 from django.contrib.admin import SimpleListFilter
-from django.db.models import Max
+from django.db.models import Max, Prefetch
 from django.forms.models import BaseInlineFormSet
 from adminsortable2.admin import SortableAdminMixin
 
@@ -69,7 +69,34 @@ class PlayerInline(admin.TabularInline):
 class UserLoginInlineFormSet(BaseInlineFormSet):
     def get_queryset(self):
         # Show only the most recent login events in the admin inline.
-        return super().get_queryset().order_by("-timestamp")[:5]
+        #
+        # Cache the sliced queryset on self: BaseInlineFormSet.get_queryset()
+        # already caches the unsliced queryset, but re-slicing it here on
+        # every call builds a new QuerySet object each time, so Django's
+        # formset machinery (initial_form_count, _construct_form, template
+        # rendering, ...) re-runs this query on every call instead of
+        # reusing one result.
+        if not hasattr(self, "_recent_logins_queryset"):
+            # The parent CustomUserAdmin.get_queryset() already prefetches
+            # the full, ordered login history onto self.instance (needed for
+            # the days_logged_in/streak display fields) - reuse that instead
+            # of running a second "logins ordered desc" query here.
+            prefetched = getattr(self.instance, "prefetched_logins", None)
+            if prefetched is not None:
+                queryset = prefetched[:5]
+            else:
+                # select_related("user") so is_first_login_of_day/
+                # annotate_first_of_day don't each re-fetch the parent
+                # CustomUser that's already loaded for this change view.
+                queryset = (
+                    super()
+                    .get_queryset()
+                    .select_related("user")
+                    .order_by("-timestamp")[:5]
+                )
+            UserLogin.annotate_first_of_day(queryset)
+            self._recent_logins_queryset = queryset
+        return self._recent_logins_queryset
 
 
 class UserLoginInline(admin.TabularInline):
@@ -169,8 +196,43 @@ class CustomUserAdmin(UserAdmin):
     ordering = ("-created_at",)
 
     def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        return queryset.annotate(last_recorded_login_sort=Max("logins__timestamp"))
+        queryset = super().get_queryset(request).select_related("player")
+
+        # Prefetch the full, ordered login history once per user - both the
+        # changelist (many rows) and the change view (one row) need it: the
+        # days_logged_in/streak readonly fields require the full history,
+        # and UserLoginInlineFormSet reuses this same list for its "most
+        # recent 5" display instead of running a second query.
+        # select_related("user") so annotate_first_of_day (called from the
+        # inline formset on this same list) doesn't re-fetch the parent.
+        queryset = queryset.prefetch_related(
+            Prefetch(
+                "logins",
+                queryset=UserLogin.objects.select_related("user")
+                .only("id", "user_id", "timestamp")
+                .order_by("-timestamp"),
+                to_attr="prefetched_logins",
+            ),
+            Prefetch(
+                "subscriptions",
+                queryset=UserSubscription.objects.filter(active=True)
+                .select_related("plan")
+                .order_by("-start_date", "-id"),
+                to_attr="prefetched_active_subscriptions",
+            ),
+        )
+
+        # Only the changelist orders by last_recorded_login, so only add the
+        # annotate() there - it LEFT JOINs users_userlogin, which on the
+        # change view would show up as a spurious extra "userlogin" query
+        # alongside the actual recent-logins/first-of-day queries.
+        resolver_match = getattr(request, "resolver_match", None)
+        if resolver_match and resolver_match.url_name.endswith("_changelist"):
+            queryset = queryset.annotate(
+                last_recorded_login_sort=Max("logins__timestamp")
+            )
+
+        return queryset
 
     def save_model(self, request, obj, form, change):
         if not change:

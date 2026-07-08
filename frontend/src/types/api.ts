@@ -68,6 +68,7 @@ export interface FetchInfoResponse {
   login_reward_xp: number;
   free_timer_limit_seconds: number;
   game_settings: GameSettings;
+  online_count: number;
 }
 
 // Forward references resolved in domain.ts

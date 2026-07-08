@@ -25,7 +25,7 @@ attrs==26.1.0
     #   referencing
     #   service-identity
     #   twisted
-autobahn==25.12.2
+autobahn==26.6.2
     # via daphne
 automat==25.4.16
     # via twisted
@@ -33,13 +33,13 @@ billiard==4.2.4
     # via
     #   -r requirements.in
     #   celery
-cbor2==6.0.1
+cbor2==6.1.2
     # via autobahn
 celery==5.6.3
     # via
     #   -r requirements.in
     #   django-celery-beat
-certifi==2026.4.22
+certifi==2026.6.17
     # via
     #   requests
     #   sentry-sdk
@@ -55,7 +55,7 @@ channels-redis==4.3.0
     # via -r requirements.in
 charset-normalizer==3.4.7
     # via requests
-click==8.3.3
+click==8.4.2
     # via
     #   -r requirements.in
     #   celery
@@ -80,7 +80,7 @@ cron-descriptor==1.4.5
     # via
     #   -r requirements.in
     #   django-celery-beat
-cryptography==48.0.1
+cryptography==49.0.0
     # via
     #   -r requirements.in
     #   autobahn
@@ -97,7 +97,7 @@ dj-database-url==3.1.2
     # via -r requirements.in
 dj-rest-auth==7.2.0
     # via -r requirements.in
-django==5.2.14
+django==5.2.15
     # via
     #   -r requirements.in
     #   channels
@@ -126,7 +126,7 @@ django-cf-turnstile==0.1.0
     # via -r requirements.in
 django-cors-headers==4.9.0
     # via -r requirements.in
-django-environ==0.13.0
+django-environ==0.14.0
     # via -r requirements.in
 django-extensions==4.1
     # via -r requirements.in
@@ -182,13 +182,13 @@ msgpack==1.2.1
     #   -r requirements.in
     #   autobahn
     #   channels-redis
-numpy==2.4.4
+numpy==2.5.0
     # via -r requirements.in
 packaging==26.2
     # via
     #   incremental
     #   kombu
-pillow==12.2.0
+pillow==12.3.0
     # via -r requirements.in
 prompt-toolkit==3.0.52
     # via click-repl
@@ -196,21 +196,13 @@ psycopg2==2.9.12
     # via -r requirements.in
 psycopg2-binary==2.9.12
     # via -r requirements.in
-py-ubjson==0.16.1
-    # via autobahn
-pyasn1==0.6.3
-    # via
-    #   pyasn1-modules
-    #   service-identity
-pyasn1-modules==0.4.2
-    # via service-identity
 pycparser==3.0
     # via cffi
 pyjwt==2.13.0
     # via
     #   -r requirements.in
     #   djangorestframework-simplejwt
-pyopenssl==26.2.0
+pyopenssl==26.3.0
     # via twisted
 python-crontab==3.3.0
     # via django-celery-beat
@@ -230,7 +222,7 @@ pyyaml==6.0.3
     # via
     #   -r requirements.in
     #   drf-spectacular
-redis==7.4.0
+redis==8.0.1
     # via
     #   -r requirements.in
     #   channels-redis
@@ -243,7 +235,7 @@ requests==2.34.2
     # via
     #   -r requirements.in
     #   stripe
-rpds-py==0.30.0
+rpds-py==2026.6.3
     # via
     #   jsonschema
     #   referencing
@@ -251,7 +243,7 @@ sendgrid==6.12.5
     # via -r requirements.in
 sentry-sdk==2.64.0
     # via -r requirements.in
-service-identity==24.2.0
+service-identity==26.1.0
     # via twisted
 six==1.17.0
     # via python-dateutil
@@ -265,11 +257,12 @@ twisted[tls]==26.4.0
     # via
     #   -r requirements.in
     #   daphne
-txaio==25.12.2
+txaio==26.6.1
     # via autobahn
-typing-extensions==4.15.0
+typing-extensions==4.16.0
     # via
     #   -r requirements.in
+    #   django-redis
     #   pyopenssl
     #   referencing
     #   stripe
@@ -279,7 +272,7 @@ tzdata==2026.2
     #   -r requirements.in
     #   django-celery-beat
     #   kombu
-tzlocal==5.3.1
+tzlocal==5.4.4
     # via celery
 ujson==5.13.0
     # via autobahn
@@ -297,11 +290,11 @@ vine==5.1.0
     #   amqp
     #   celery
     #   kombu
-wcwidth==0.7.0
+wcwidth==0.8.2
     # via prompt-toolkit
 werkzeug==3.1.8
     # via sendgrid
 whitenoise==6.12.0
     # via -r requirements.in
-zope-interface==8.4
+zope-interface==8.5
     # via twisted

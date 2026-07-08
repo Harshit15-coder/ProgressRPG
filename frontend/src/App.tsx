@@ -3,6 +3,7 @@ import { MaintenanceProvider } from './context/MaintenanceContext';
 import { ToastProvider } from './context/ToastContext';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { GameProvider } from './context/GameContext';
+import { OnlineCountProvider } from './context/OnlineCountContext';
 import { BrowserRouter, useLocation } from 'react-router-dom';
 import { WebSocketProvider } from './context/WebSocketContext';
 
@@ -48,15 +49,17 @@ function AppWithAuth(): React.ReactElement {
 
   return (
     <GameProvider>
-      <ToastProvider>
-        <WebSocketProvider>
-          <BrowserRouter>
-            <RouteChangeTracker />
-            <MaintenanceWatcher />
-            <AppContent />
-          </BrowserRouter>
-        </WebSocketProvider>
-      </ToastProvider>
+      <OnlineCountProvider>
+        <ToastProvider>
+          <WebSocketProvider>
+            <BrowserRouter>
+              <RouteChangeTracker />
+              <MaintenanceWatcher />
+              <AppContent />
+            </BrowserRouter>
+          </WebSocketProvider>
+        </ToastProvider>
+      </OnlineCountProvider>
     </GameProvider>
   );
 }
