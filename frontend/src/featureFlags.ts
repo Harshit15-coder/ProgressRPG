@@ -11,6 +11,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   skillsPage: ['all'],
   projectsPage: ['all'],
   toastsFeature: [],
+  onlinePlayerCount: [],
 };
 
 export default featureFlags;
