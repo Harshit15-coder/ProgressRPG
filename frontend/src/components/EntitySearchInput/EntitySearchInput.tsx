@@ -1,3 +1,4 @@
+import type { CSSProperties } from "react";
 import classNames from "classnames";
 
 import {
@@ -18,6 +19,14 @@ interface EntitySearchInputProps {
   inputClassName?: string;
   disabled?: boolean;
   searchEnabled?: boolean;
+  /** Shown in place of Fuse results when the query is blank. */
+  defaultResults?: SearchEntity[];
+  /** Keep the dropdown open regardless of focus (persistent list mode). */
+  alwaysOpen?: boolean;
+  /** Cap the combined (task + activity) rows rendered, regardless of source. */
+  maxVisibleRows?: number;
+  /** Shown instead of the list when alwaysOpen is set and there are no rows. */
+  emptyMessage?: string;
 }
 
 export default function EntitySearchInput({
@@ -32,6 +41,10 @@ export default function EntitySearchInput({
   inputClassName,
   disabled = false,
   searchEnabled = true,
+  defaultResults,
+  alwaysOpen = false,
+  maxVisibleRows,
+  emptyMessage,
 }: EntitySearchInputProps) {
   const {
     rootRef,
@@ -54,7 +67,20 @@ export default function EntitySearchInput({
     onCreate,
     disabled,
     searchEnabled,
+    defaultResults,
+    alwaysOpen,
+    maxVisibleRows,
   });
+
+  // Persistent mode reserves room for maxVisibleRows (worst case: both group
+  // labels shown) so the list settling to fewer rows, or falling back to
+  // emptyMessage, doesn't reflow whatever sits below it.
+  const persistentMinHeightStyle =
+    alwaysOpen && typeof maxVisibleRows === "number"
+      ? ({
+          "--entity-search-persistent-min-height": `calc(${maxVisibleRows} * 2.75rem + 2 * 1.75rem)`,
+        } as CSSProperties)
+      : undefined;
 
   return (
     <div ref={rootRef} className={classNames(styles.root, className)}>
@@ -77,9 +103,10 @@ export default function EntitySearchInput({
       {isDropdownOpen && (
         <ul
           id={`${type}-entity-search-results`}
-          className={styles.dropdown}
+          className={classNames(styles.dropdown, { [styles.dropdownPersistent]: alwaysOpen })}
           role="listbox"
           aria-label={`${type} suggestions`}
+          style={persistentMinHeightStyle}
         >
           {(() => {
             const renderItem = (entity: SearchEntity, index: number) => {
@@ -124,6 +151,12 @@ export default function EntitySearchInput({
             );
           })()}
         </ul>
+      )}
+
+      {alwaysOpen && !isDropdownOpen && emptyMessage && (
+        <p className={styles.emptyMessage} style={persistentMinHeightStyle}>
+          {emptyMessage}
+        </p>
       )}
     </div>
   );

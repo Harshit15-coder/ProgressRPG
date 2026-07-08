@@ -46,6 +46,28 @@
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
 
+// Persistent (alwaysOpen) mode is a permanent inline list, not a transient
+// overlay: it sits in normal document flow (so it can't float above a modal
+// or steal clicks from layout below it) and drops the floating-panel
+// styling (shadow, tooltip-level z-index) that implies "this will vanish
+// when you look away."
+.dropdownPersistent {
+  position: static;
+  top: auto;
+  left: auto;
+  right: auto;
+  z-index: v.$z-indexdropdown;
+  margin-top: v.$spacing-xs;
+  border-color: rgba(c.$color-border-primary, 0.12);
+  background: rgba(c.$color-bg, 0.6);
+  box-shadow: none;
+  box-sizing: border-box;
+  // Reserve room for maxVisibleRows so the list settling to fewer rows (or
+  // switching between the default and filtered result sets) doesn't reflow
+  // whatever sits below it.
+  min-height: var(--entity-search-persistent-min-height, auto);
+}
+
 .optionItem {
   margin: 0;
 }
@@ -81,4 +103,13 @@
 
 .optionButtonActive {
   background: rgba(c.$color-border-primary, 0.14);
+}
+
+.emptyMessage {
+  margin: v.$spacing-xs 0 0;
+  padding: v.$spacing-sm v.$padding-base;
+  color: rgba(c.$color-text-body, 0.6);
+  box-sizing: border-box;
+  min-height: var(--entity-search-persistent-min-height, auto);
+  @include t.apply-text-style(t.$text-body);
 }

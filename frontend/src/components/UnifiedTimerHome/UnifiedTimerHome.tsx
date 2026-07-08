@@ -1,0 +1,242 @@
+import React, { useEffect, useRef, useState } from "react";
+import classNames from "classnames";
+import { AnimatePresence, motion } from "framer-motion";
+
+import Button from "../Button/Button";
+import AlertDialog from "../AlertDialog/AlertDialog";
+import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
+import SupportFlowModal from "../SupportFlow/SupportFlowModal";
+import { useActivityInput } from "../ActivityInput/useActivityInput";
+import { useDefaultActivityEntries } from "../../hooks/useDefaultActivityEntries";
+import styles from "./UnifiedTimerHome.module.scss";
+
+const fadeTransition = { duration: 0.18 };
+const fadeProps = {
+  initial: { opacity: 0 },
+  animate: { opacity: 1 },
+  exit: { opacity: 0 },
+  transition: fadeTransition,
+};
+
+export default function UnifiedTimerHome() {
+  const {
+    name,
+    setName,
+    isActive,
+    isUnlabelled,
+    isEditingLabel,
+    inputValue,
+    minutes,
+    seconds,
+    formattedLimit,
+    showAutoStopWarning,
+    flowState,
+    flowDispatch,
+    handleConfirmActivity,
+    handleToggle,
+    handleBlankStart,
+    handleUnifiedSelect,
+    handleUnifiedSubmit,
+    startEditingLabel,
+    handleLabelBlur,
+    handleLabelCancel,
+    submitAndOpenSupport,
+    openSupportMode,
+  } = useActivityInput();
+
+  const defaultResults = useDefaultActivityEntries();
+  const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Label display (clickable name) only shows for a labelled, non-editing
+  // running timer; every other case shows the list/input (no timer running,
+  // an unlabelled running timer, or an in-progress click-to-edit).
+  const showLabelDisplay = isActive && !isUnlabelled && !isEditingLabel;
+
+  const statusMessage = showLabelDisplay
+    ? `Timer running: ${inputValue || "Untitled activity"}`
+    : isActive
+      ? "Timer running, unlabelled"
+      : "Timer stopped";
+
+  // Click-to-edit needs the input focused immediately so the pre-filled
+  // name is ready to be replaced/confirmed without an extra click.
+  useEffect(() => {
+    if (!isEditingLabel) return;
+    containerRef.current?.querySelector("input")?.focus();
+  }, [isEditingLabel]);
+
+  // Single Start button: starts blank if the input is empty, otherwise
+  // starts (or labels) with whatever's typed — same distinction as before,
+  // just collapsed into one action instead of two buttons.
+  const handleStartClick = async () => {
+    if (name.trim()) {
+      await handleToggle();
+      return;
+    }
+
+    await handleBlankStart();
+    containerRef.current?.querySelector("input")?.focus();
+  };
+
+  // The blur fired by `.blur()` below happens synchronously, before the
+  // setIsEditingLabel(false) from handleLabelCancel has flushed — so
+  // handleWrapperBlur's `isEditingLabel` closure would still read `true`
+  // and wrongly commit the cancelled edit. This ref sidesteps the stale
+  // closure without waiting on a render.
+  const justCancelledRef = useRef(false);
+
+  const handleWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Escape" && isEditingLabel) {
+      justCancelledRef.current = true;
+      handleLabelCancel();
+      (event.target as HTMLElement).blur();
+    }
+  };
+
+  const handleWrapperBlur = (event: React.FocusEvent<HTMLDivElement>) => {
+    if (justCancelledRef.current) {
+      justCancelledRef.current = false;
+      return;
+    }
+    if (!isEditingLabel) return;
+    if (containerRef.current?.contains(event.relatedTarget as Node)) return;
+    handleLabelBlur();
+  };
+
+  return (
+    <>
+      <section className={classNames(styles.wrapper, { [styles.isActive]: isActive })}>
+        <h2 className="sr-only">Activity timer</h2>
+        <p className="sr-only" aria-live="polite">
+          {statusMessage}
+        </p>
+
+        <motion.div
+          className={styles.container}
+          ref={containerRef}
+          onKeyDown={handleWrapperKeyDown}
+          onBlur={handleWrapperBlur}
+        >
+          {/* Row 1, fixed at the top regardless of state: the toggle button
+              is a single persistent element (same key, never unmounted) so
+              Start -> Stop is purely a label change the user perceives as
+              "the same button", not a swap. Centered while idle (alone);
+              once the timer fades in, the pair sits together at the right
+              — `layout` on the row and on the button's wrapper animates
+              that shift smoothly instead of jumping. Row 2 below is
+              unaffected either way. */}
+          <motion.div
+            layout
+            className={styles.controlsRow}
+            style={{ justifyContent: isActive ? "flex-end" : "center" }}
+          >
+            <motion.div layout>
+              <Button
+                onClick={isActive ? handleToggle : handleStartClick}
+                variant="primary"
+                className={styles.ctaButton}
+              >
+                {isActive ? "Stop" : "Start"}
+              </Button>
+            </motion.div>
+
+            <AnimatePresence mode="popLayout" initial={false}>
+              {isActive && (
+                <motion.div key="timer" layout {...fadeProps} className={styles.timerPill}>
+                  {minutes}:{seconds.toString().padStart(2, "0")}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Row 2: the activity's identity — either its label (clickable to
+              edit) or the search input used to pick/type one. These are
+              mutually exclusive, genuinely different elements, so they
+              cross-fade; row 1 above is entirely unaffected by this swap. */}
+          <motion.div className={styles.entityRow}>
+            <AnimatePresence mode="popLayout" initial={false}>
+              {showLabelDisplay ? (
+                <motion.button
+                  key="label"
+                  {...fadeProps}
+                  type="button"
+                  className={styles.activityLabel}
+                  onClick={startEditingLabel}
+                  aria-label={`Editing label: ${inputValue || "Untitled activity"}. Click to change.`}
+                >
+                  {inputValue || "Untitled activity"}
+                </motion.button>
+              ) : (
+                <motion.div key="search" {...fadeProps} className={styles.searchControl}>
+                  <EntitySearchInput
+                    type="activity"
+                    value={inputValue}
+                    onChange={setName}
+                    onSelect={handleUnifiedSelect}
+                    onCreate={handleUnifiedSubmit}
+                    placeholder="What are you working on? e.g. washing dishes"
+                    ariaLabel="Activity name"
+                    // Always persistent/in-flow (not a floating overlay): a
+                    // floating dropdown here bled outside the wrapper card
+                    // and overlapped the support button below it. Reserving
+                    // its space in-flow lets the card grow to actually
+                    // contain the list instead.
+                    alwaysOpen
+                    defaultResults={defaultResults}
+                    maxVisibleRows={4}
+                    emptyMessage="Looking for a match..."
+                    className={styles.entitySearch}
+                    inputClassName={styles.inputText}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </motion.div>
+        </motion.div>
+
+        {showAutoStopWarning && (
+          <p className={styles.limitWarning}>
+            This timer will stop automatically when it reaches {formattedLimit}.
+          </p>
+        )}
+
+        <div className={styles.supportButtonRow}>
+          <Button
+            onClick={() => {
+              if (isActive) {
+                setSubmitConfirmOpen(true);
+              } else {
+                openSupportMode();
+              }
+            }}
+            variant="secondary"
+            className={styles.supportModeButton}
+            ariaLabel="Open support mode"
+          >
+            Need support?
+          </Button>
+        </div>
+      </section>
+
+      <AlertDialog
+        open={submitConfirmOpen}
+        title="Submit active timer?"
+        description="You already have a timer running. Submit it before opening Task Support?"
+        confirmLabel="Submit & continue"
+        cancelLabel="Cancel"
+        onCancel={() => setSubmitConfirmOpen(false)}
+        onConfirm={() => {
+          setSubmitConfirmOpen(false);
+          submitAndOpenSupport();
+        }}
+      />
+
+      <SupportFlowModal
+        state={flowState}
+        dispatch={flowDispatch}
+        onConfirmActivity={handleConfirmActivity}
+      />
+    </>
+  );
+}

@@ -7,7 +7,11 @@ import Tooltip from "../../components/Tooltip/Tooltip";
 import { isTaskComplete, taskSortOptions, useTasksPage, type ItemRecord } from "./useTasksPage";
 import styles from "./TasksPage.module.scss";
 
-export default function TasksPage(): React.ReactElement | null {
+interface TasksPageProps {
+  showHeading?: boolean;
+}
+
+export default function TasksPage({ showHeading = true }: TasksPageProps = {}): React.ReactElement | null {
   const {
     isLoading,
     newName,
@@ -30,9 +34,11 @@ export default function TasksPage(): React.ReactElement | null {
   return (
     <div className={styles.page}>
       <div className={styles.content}>
-      <div className={styles.header}>
-        <h1>Tasks</h1>
-      </div>
+      {showHeading && (
+        <div className={styles.header}>
+          <h1>Tasks</h1>
+        </div>
+      )}
 
       <form className={styles.addTaskForm} onSubmit={handleSubmitForm}>
         <EntitySearchInput

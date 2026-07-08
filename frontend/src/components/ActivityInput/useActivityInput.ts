@@ -173,7 +173,7 @@ export function useActivityInput() {
     freeTimerLimitSeconds,
   } = useGame();
 
-  const { currentActivity, status, stop, startActivity, elapsed, limitSeconds, autoStopCompletion, clearAutoStopCompletion } =
+  const { currentActivity, status, stop, startActivity, labelActivity, elapsed, limitSeconds, autoStopCompletion, clearAutoStopCompletion } =
     activityTimer;
 
   const isPremium = Boolean(player?.is_premium);
@@ -181,6 +181,7 @@ export function useActivityInput() {
   const { addEntityToCache } = useEntitySearchCache("activity");
 
   const [name, setName] = useState("");
+  const [isEditingLabel, setIsEditingLabel] = useState(false);
 
   const {
     openWelcomeMessage,
@@ -215,7 +216,15 @@ export function useActivityInput() {
   });
 
   const isActive = status === "active";
-  const inputValue = isActive ? name || currentActivity?.name || "" : name;
+  // While actively editing (click-to-edit), `name` is the single source of
+  // truth — including when the user has deleted it down to "". Falling back
+  // to `currentActivity?.name` unconditionally here meant selecting all text
+  // in the input and pressing Backspace/Delete would visibly "undo" itself:
+  // `name` became "", so this fell back to the still-uncommitted old name.
+  // Outside of active editing, the fallback is still needed (e.g. showing
+  // the labelled activity's name before edit mode's own state has caught up).
+  const inputValue = isActive ? (isEditingLabel ? name : name || currentActivity?.name || "") : name;
+  const isUnlabelled = isActive && !(currentActivity?.name ?? currentActivity?.text ?? "").trim();
 
   useWelcomeMessageEffect({
     loginState,
@@ -318,6 +327,15 @@ export function useActivityInput() {
     stop,
   ]);
 
+  const handleBlankStart = useCallback(async () => {
+    primeAudio();
+    await startActivity({
+      text: "",
+      allowBlank: true,
+      limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+    });
+  }, [freeTimerLimitSeconds, isPremium, startActivity]);
+
   const handleSelectActivity = useCallback(
     async (activity: SelectedEntity) => {
       setName(activity.name);
@@ -342,6 +360,65 @@ export function useActivityInput() {
     },
     [addEntityToCache, freeTimerLimitSeconds, isPremium, startActivity]
   );
+
+  // Selecting a list item: starts a timer if none is running, otherwise
+  // attaches (or re-attaches) the selected label to the running timer —
+  // covers both unlabelled->labelled and relabelling an already-labelled
+  // timer, and is also what click-to-edit's blur/select path uses.
+  const handleUnifiedSelect = useCallback(
+    async (activity: SelectedEntity) => {
+      if (!isActive) {
+        await handleSelectActivity(activity);
+        return;
+      }
+
+      setName(activity.name);
+      addEntityToCache(activity as unknown as Partial<PlayerActivity>);
+      await labelActivity(activity.name, resolveSelectedTaskId(activity));
+      setIsEditingLabel(false);
+    },
+    [addEntityToCache, handleSelectActivity, isActive, labelActivity]
+  );
+
+  // Submitting free text: starts a timer if none is running, otherwise
+  // relabels the running timer (including clearing the label if blank —
+  // see handleLabelBlur).
+  const handleUnifiedSubmit = useCallback(
+    async (activityName: string) => {
+      const trimmedName = activityName.trim();
+
+      if (!isActive) {
+        if (!trimmedName) return;
+        await handleCreateActivity(trimmedName);
+        return;
+      }
+
+      setName(trimmedName);
+      if (trimmedName) addEntityToCache(trimmedName);
+      await labelActivity(trimmedName, null);
+      setIsEditingLabel(false);
+    },
+    [addEntityToCache, handleCreateActivity, isActive, labelActivity]
+  );
+
+  // Click-to-edit: clicking the running-labelled activity name pre-fills
+  // the input with the current name and drops into the unlabelled layout.
+  const startEditingLabel = useCallback(() => {
+    setName(currentActivity?.name ?? currentActivity?.text ?? "");
+    setIsEditingLabel(true);
+  }, [currentActivity?.name, currentActivity?.text]);
+
+  const handleLabelBlur = useCallback(async () => {
+    await handleUnifiedSubmit(name);
+    setIsEditingLabel(false);
+  }, [handleUnifiedSubmit, name]);
+
+  // Escape discards the edit — no labelActivity call, name reverts to
+  // whatever the timer is currently actually labelled.
+  const handleLabelCancel = useCallback(() => {
+    setName(currentActivity?.name ?? currentActivity?.text ?? "");
+    setIsEditingLabel(false);
+  }, [currentActivity?.name, currentActivity?.text]);
 
   // Called when user confirms the "submit active timer?" AlertDialog in ActivityInput.
   const submitAndOpenSupport = useCallback(async () => {
@@ -403,6 +480,8 @@ export function useActivityInput() {
     name,
     setName,
     isActive,
+    isUnlabelled,
+    isEditingLabel,
     inputValue,
     minutes,
     seconds,
@@ -412,8 +491,14 @@ export function useActivityInput() {
     flowDispatch,
     handleConfirmActivity,
     handleToggle,
+    handleBlankStart,
     handleSelectActivity,
     handleCreateActivity,
+    handleUnifiedSelect,
+    handleUnifiedSubmit,
+    startEditingLabel,
+    handleLabelBlur,
+    handleLabelCancel,
     submitAndOpenSupport,
     openSupportMode,
     isPremium,

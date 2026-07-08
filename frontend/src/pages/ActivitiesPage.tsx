@@ -73,7 +73,11 @@ const getActivityDateCategory = (dateString: string): "today" | "yesterday" | "o
   return "older";
 };
 
-export default function ActivitiesPage(): React.ReactElement | null {
+interface ActivitiesPageProps {
+  showHeading?: boolean;
+}
+
+export default function ActivitiesPage({ showHeading = true }: ActivitiesPageProps = {}): React.ReactElement | null {
   const { data: activities, isLoading } = useActivities();
   const deleteActivity = useDeleteActivity();
   const updateActivity = useUpdateActivity();
@@ -147,9 +151,11 @@ export default function ActivitiesPage(): React.ReactElement | null {
   return (
     <div className={styles.page}>
       <div className={styles.content}>
-      <div className={styles.header}>
-        <h1>Activities</h1>
-      </div>
+      {showHeading && (
+        <div className={styles.header}>
+          <h1>Activities</h1>
+        </div>
+      )}
 
       {hasActivities && (
         <>
