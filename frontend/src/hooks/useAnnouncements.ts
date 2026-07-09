@@ -9,10 +9,11 @@ import {
 export const ANNOUNCEMENTS_QUERY_KEY = ["announcements"] as const;
 export const ANNOUNCEMENT_UNREAD_QUERY_KEY = ["announcements", "unreadCount"] as const;
 
-export function useAnnouncements() {
+export function useAnnouncements(enabled: boolean = true) {
   return useQuery({
     queryKey: ANNOUNCEMENTS_QUERY_KEY,
     queryFn: fetchAnnouncements,
+    enabled,
   });
 }
 

@@ -23,11 +23,13 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const { isAuthenticated } = useAuth();
   const { announcementUnreadCount, setAnnouncementUnreadCount } = useGame();
   const location = useLocation();
-  const { data: announcementsData, isLoading: announcementsLoading } = useAnnouncements();
+  const isTasksEnabled = useFeatureFlag("tasksFeature");
+  const isAnnouncementsEnabled = useFeatureFlag("announcements");
+
+  const { data: announcementsData, isLoading: announcementsLoading } =
+    useAnnouncements(isAnnouncementsEnabled);
   const markAnnouncementReadMutation = useMarkAnnouncementRead();
   const markAllAnnouncementsReadMutation = useMarkAllAnnouncementsRead();
-
-  const isTasksEnabled = useFeatureFlag("tasksFeature");
 
   const isTimerPage = location.pathname === "/timer";
   const isHomePage = location.pathname === "/";
@@ -116,6 +118,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   ❓
                 </Button>
               )}
+              {isAnnouncementsEnabled && (
               <Popover.Root>
                 <Popover.Trigger asChild>
                   <Button
@@ -205,6 +208,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                   </Popover.Content>
                 </Popover.Portal>
               </Popover.Root>
+              )}
               <Link to="/account" aria-label="Go to your account">
                 <Button
                   className={styles.navLink}
@@ -296,6 +300,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                           <span aria-hidden="true">❓ </span>Tutorial
                         </DropdownMenu.Item>
                       )}
+                      {isAnnouncementsEnabled && (
                       <DropdownMenu.Item
                         className={styles.accountDropdownItem}
                         onSelect={(event) => {
@@ -310,7 +315,8 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                           </span>
                         )}
                       </DropdownMenu.Item>
-                      {mobileAnnouncementsOpen && (
+                      )}
+                      {isAnnouncementsEnabled && mobileAnnouncementsOpen && (
                         <div className={styles.mobileAnnouncementsPanel}>
                           <div className={styles.mobileAnnouncementsHeader}>
                             <strong>Announcements</strong>
