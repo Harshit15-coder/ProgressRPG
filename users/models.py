@@ -483,16 +483,6 @@ class Player(Person):
         if xp:
             levelups = self.add_xp(xp)
 
-        for event in levelups:
-            ServerMessage.objects.create(
-                group=self.group_name,
-                type="notification",
-                action="notification",
-                message=f"You levelled up! Now level {event['new_level']}.",
-                data={"level": event["new_level"]},
-                is_draft=False,
-            )
-
         return [event["new_level"] for event in levelups]
 
     def change_character(self, new_character: "Character"):
