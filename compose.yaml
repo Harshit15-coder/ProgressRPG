@@ -43,6 +43,26 @@ services:
       migrate:
         condition: service_completed_successfully
 
+  pgbouncer:
+    image: edoburu/pgbouncer:latest
+    container_name: pgbouncer
+    restart: always
+    depends_on:
+      - db
+    environment:
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_USER: progress
+      DB_PASSWORD: progress
+      DB_NAME: progress
+      POOL_MODE: transaction
+      MAX_CLIENT_CONN: 500
+      DEFAULT_POOL_SIZE: 20
+      LISTEN_PORT: 6432
+      AUTH_TYPE: scram-sha-256
+    ports:
+      - "6432:6432"
+
   db:
     image: postgis/postgis:17-3.4
     restart: always
@@ -73,6 +93,7 @@ services:
     build:
       context: .
       target: celery
+    command: celery -A progress_rpg worker --loglevel=info --concurrency=1 --prefetch-multiplier=1
     depends_on:
       redis:
         condition: service_healthy

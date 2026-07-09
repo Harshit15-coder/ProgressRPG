@@ -60,11 +60,16 @@ class CustomUserManager(UserManager["CustomUser"]):
         """
         if not email:
             raise ValueError("The Email field must be set")
+        raw = extra_fields.pop("raw", False)
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", True)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+
+        from users.services.registration_services import ensure_player_setup_for_user
+
+        ensure_player_setup_for_user(user, raw=raw)
         return user
 
     @transaction.atomic
@@ -537,13 +542,66 @@ class InviteCode(models.Model):
         return True
 
     def use(self):
-        self.uses += 1
-        if self.max_uses and self.uses >= self.max_uses:
-            self.is_active = False
-        self.save(update_fields=["uses", "is_active"])
+        now = timezone.now()
+        updated_rows = (
+            InviteCode.objects.filter(pk=self.pk, is_active=True)
+            .filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
+            .filter(models.Q(max_uses__isnull=True) | models.Q(uses__lt=F("max_uses")))
+            .update(
+                uses=F("uses") + 1,
+                is_active=Case(
+                    When(
+                        max_uses__isnull=False,
+                        uses__gte=F("max_uses") - 1,
+                        then=Value(False),
+                    ),
+                    default=F("is_active"),
+                    output_field=models.BooleanField(),
+                ),
+            )
+        )
+        return updated_rows == 1
 
     def __str__(self):
         return self.code
+
+
+class Waitlist(models.Model):
+    class Status(models.TextChoices):
+        WAITING = "waiting", "Waiting"
+        INVITED = "invited", "Invited"
+        REDEEMED = "redeemed", "Redeemed"
+        REMOVED = "removed", "Removed"
+
+    email = models.EmailField()
+    signup_timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.WAITING, db_index=True
+    )
+    invite_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    invited_at = models.DateTimeField(null=True, blank=True)
+    nudge_3day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_7day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_30day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_removal_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["signup_timestamp"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(status__in=["waiting", "invited"]),
+                name="unique_active_waitlist_email",
+            )
+        ]
+        indexes = [models.Index(fields=["status", "signup_timestamp"])]
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.email} ({self.status})"
 
 
 class PlayerCurrency(CurrencyAccountBase):

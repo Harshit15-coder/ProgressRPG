@@ -17,6 +17,8 @@ from .views import (
     CustomTokenRefreshView,
     AppConfigView,
     WaitlistSignupAPIView,
+    RegistrationStatusAPIView,
+    WaitlistJoinAPIView,
 )
 
 from character.views import CharacterViewSet
@@ -81,6 +83,12 @@ urlpatterns = [
     path("game_settings/", GameSettingsAPIView.as_view(), name="game_settings"),
     path("fetch_info/", FetchInfoAPIView.as_view(), name="fetch_info"),
     path("waitlist_signup/", WaitlistSignupAPIView.as_view(), name="waitlist_signup"),
+    path(
+        "registration_status/",
+        RegistrationStatusAPIView.as_view(),
+        name="registration_status",
+    ),
+    path("waitlist_join/", WaitlistJoinAPIView.as_view(), name="waitlist_join"),
     # Auth urls
     path("auth/", include(auth_urls)),
     path("auth/jwt/create/", CustomTokenObtainPairView.as_view(), name="jwt_create"),

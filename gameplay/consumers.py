@@ -4,7 +4,6 @@ from channels.db import database_sync_to_async
 
 # from channels.exceptions import StopConsumer
 from channels.generic.websocket import AsyncJsonWebsocketConsumer
-from django.db import transaction
 
 from django.utils import timezone
 import json, logging
@@ -335,16 +334,7 @@ class TimerConsumer(AsyncJsonWebsocketConsumer):
 
     @database_sync_to_async
     def set_player_and_character(self, user):
-        with transaction.atomic():
-            from character.models import PlayerCharacterLink
-
-            link = (
-                PlayerCharacterLink.objects.select_related("player", "character")
-                .filter(player=user.player, is_active=True)
-                .first()
-            )
-            character = link.character if link else None
-            return user.player, character, link
+        return user.player, None, None
 
     @database_sync_to_async
     def get_activity_timer(self):

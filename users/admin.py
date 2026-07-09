@@ -12,7 +12,9 @@ from .models import (
     UserLogin,
     InviteCode,
     TutorialStep,
+    Waitlist,
 )
+from .services import waitlist_service
 from character.models import PlayerCharacterLink, Character
 from payments.models import UserSubscription
 
@@ -412,6 +414,75 @@ class InviteCodeAdmin(admin.ModelAdmin):
         "uses",
     ]
     readonly_fields = ["uses"]
+
+
+@admin.register(Waitlist)
+class WaitlistAdmin(admin.ModelAdmin):
+    list_display = ["email", "status", "signup_timestamp", "invited_at"]
+    list_filter = ["status"]
+    search_fields = ["email"]
+    ordering = ["signup_timestamp"]
+    readonly_fields = ["invite_token", "signup_timestamp"]
+    actions = [
+        "invite_selected_now",
+        "resend_invite_email_action",
+        "mark_as_removed",
+        "export_selected_to_csv",
+    ]
+
+    @admin.action(description="Invite selected now")
+    def invite_selected_now(self, request, queryset):
+        eligible = queryset.filter(status=Waitlist.Status.WAITING)
+        count = 0
+        for entry in eligible:
+            waitlist_service.invite_entry(entry)
+            count += 1
+        skipped = queryset.count() - count
+        msg = f"Invited {count} waitlist entrant(s)."
+        if skipped:
+            msg += f" Skipped {skipped} not in 'waiting' status."
+        self.message_user(request, msg)
+
+    @admin.action(description="Resend invite email")
+    def resend_invite_email_action(self, request, queryset):
+        eligible = queryset.filter(status=Waitlist.Status.INVITED)
+        count = 0
+        for entry in eligible:
+            waitlist_service.resend_invite_email(entry)
+            count += 1
+        skipped = queryset.count() - count
+        msg = f"Resent invite email to {count} entrant(s)."
+        if skipped:
+            msg += f" Skipped {skipped} not currently 'invited'."
+        self.message_user(request, msg)
+
+    @admin.action(description="Mark as removed")
+    def mark_as_removed(self, request, queryset):
+        updated = queryset.update(status=Waitlist.Status.REMOVED)
+        self.message_user(request, f"Marked {updated} entrant(s) as removed.")
+
+    @admin.action(description="Export selected to CSV")
+    def export_selected_to_csv(self, request, queryset):
+        import csv
+        from django.http import HttpResponse
+
+        response = HttpResponse(content_type="text/csv")
+        response["Content-Disposition"] = 'attachment; filename="waitlist_export.csv"'
+        writer = csv.writer(response)
+        writer.writerow(
+            ["email", "status", "signup_timestamp", "invited_at", "invite_token"]
+        )
+        for entry in queryset:
+            writer.writerow(
+                [
+                    entry.email,
+                    entry.status,
+                    entry.signup_timestamp,
+                    entry.invited_at,
+                    entry.invite_token,
+                ]
+            )
+        return response
 
 
 @admin.register(TutorialStep)

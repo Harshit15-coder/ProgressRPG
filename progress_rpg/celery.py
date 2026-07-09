@@ -45,6 +45,10 @@ app.conf.beat_schedule = {
         "task": "users.tasks.reconcile_stale_online_players",
         "schedule": 300.0,  # every 5 minutes
     },
+    "send_waitlist_nudges": {
+        "task": "users.tasks.send_waitlist_nudges",
+        "schedule": 7200.0,  # every 2 hours
+    },
     # "generate_character_days_1am": {
     #     "task": "character.tasks.generate_character_days",
     #     "schedule": crontab(hour=1, minute=0),
