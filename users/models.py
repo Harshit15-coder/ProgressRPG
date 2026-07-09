@@ -26,6 +26,7 @@ from datetime import timedelta
 from decimal import Decimal
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models, transaction
+from django.db.models import Case, F, Value, When
 from django.db.models import Sum
 from django.utils import timezone
 from typing import TYPE_CHECKING, Optional
@@ -59,11 +60,16 @@ class CustomUserManager(UserManager["CustomUser"]):
         """
         if not email:
             raise ValueError("The Email field must be set")
+        raw = extra_fields.pop("raw", False)
         email = self.normalize_email(email)
         extra_fields.setdefault("is_active", True)
         user = self.model(email=email, **extra_fields)
         user.set_password(password)
         user.save(using=self._db)
+
+        from users.services.registration_services import ensure_player_setup_for_user
+
+        ensure_player_setup_for_user(user, raw=raw)
         return user
 
     @transaction.atomic
@@ -151,6 +157,10 @@ class UserLogin(models.Model):
         return timezone.localtime(self.timestamp).date()
 
     def is_first_login_of_day(self):
+        cached = getattr(self, "_is_first_of_day", None)
+        if cached is not None:
+            return cached
+
         today = self.local_date()
         previous_logins_today = UserLogin.objects.filter(
             user=self.user,
@@ -160,29 +170,80 @@ class UserLogin(models.Model):
         return not previous_logins_today.exists()
 
     @classmethod
+    def annotate_first_of_day(cls, logins):
+        """
+        Given already-fetched UserLogin instances for a single user, work
+        out (in one query) which of them was the first login of its local
+        day, and cache the answer on each instance so is_first_login_of_day
+        doesn't issue its own query when called on them - avoids a query
+        per row when rendering these in the admin inline.
+        """
+        logins = list(logins)
+        if not logins:
+            return logins
+
+        user = logins[0].user
+        dates = {login.local_date() for login in logins}
+        first_by_date = {}
+        for ts in (
+            cls.objects.filter(user=user, timestamp__date__in=dates)
+            .order_by("timestamp")
+            .values_list("timestamp", flat=True)
+        ):
+            day = timezone.localtime(ts).date()
+            first_by_date.setdefault(day, ts)
+
+        for login in logins:
+            login._is_first_of_day = (
+                first_by_date.get(login.local_date()) == login.timestamp
+            )
+        return logins
+
+    @classmethod
+    def _ordered_logins(cls, user):
+        """
+        Return the user's logins, newest first.
+
+        Uses `user.prefetched_logins` when present (set via
+        Prefetch("logins", ..., to_attr="prefetched_logins")) so that bulk
+        callers like the admin changelist pay for one query total instead
+        of one per user. Also caches the result on the user instance so
+        that days_logged_in/current_login_streak/max_login_streak/
+        last_recorded_login share a single query when none of that is set.
+        """
+        cached = getattr(user, "_ordered_logins_cache", None)
+        if cached is not None:
+            return cached
+
+        logins = getattr(user, "prefetched_logins", None)
+        if logins is None:
+            logins = list(
+                cls.objects.filter(user=user).only("timestamp").order_by("-timestamp")
+            )
+        user._ordered_logins_cache = logins
+        return logins
+
+    @classmethod
     def total_login_events(cls, user):
+        logins = getattr(user, "prefetched_logins", None)
+        if logins is not None:
+            return len(logins)
         return cls.objects.filter(user=user).count()
 
     @classmethod
     def days_logged_in(cls, user):
-        login_dates = {
-            login.local_date()
-            for login in cls.objects.filter(user=user).only("timestamp")
-        }
+        login_dates = {login.local_date() for login in cls._ordered_logins(user)}
         return len(login_dates)
 
     @classmethod
     def last_recorded_login(cls, user):
-        last = cls.objects.filter(user=user).order_by("-timestamp").first()
-        return last.timestamp if last else None
+        logins = cls._ordered_logins(user)
+        return logins[0].timestamp if logins else None
 
     @classmethod
     def current_login_streak(cls, user):
         login_dates = sorted(
-            {
-                login.local_date()
-                for login in cls.objects.filter(user=user).only("timestamp")
-            },
+            {login.local_date() for login in cls._ordered_logins(user)},
             reverse=True,
         )
         if not login_dates:
@@ -199,10 +260,7 @@ class UserLogin(models.Model):
     @classmethod
     def max_login_streak(cls, user):
         login_dates = sorted(
-            {
-                login.local_date()
-                for login in cls.objects.filter(user=user).only("timestamp")
-            }
+            {login.local_date() for login in cls._ordered_logins(user)}
         )
         if not login_dates:
             return 0
@@ -344,21 +402,48 @@ class Player(Person):
         currency, _ = self.currencies.get_or_create(currency=currency_def)
         return currency
 
-    def set_online(self):
-        """Marks player as online."""
-        logger.debug("[SET ONLINE] Running set_online for player")
-        self.is_online = True
-        self.save(update_fields=["is_online"])
+    @transaction.atomic
+    def register_connection(self):
+        """
+        Increment active connections and mark player online.
 
-    def set_offline(self):
-        """Marks player as offline."""
-        self.is_online = False
-        self.save(update_fields=["is_online"])
+        Stamps `last_seen` immediately so a freshly connected player isn't
+        mistaken for stale before their first heartbeat ping arrives (up to
+        HEARTBEAT_INTERVAL_MS later).
+        """
+        type(self).objects.filter(pk=self.pk).update(
+            active_connections=F("active_connections") + 1,
+            is_online=True,
+            last_seen=timezone.now(),
+        )
+        self.refresh_from_db(fields=["active_connections", "is_online", "last_seen"])
+
+    @transaction.atomic
+    def unregister_connection(self):
+        """Decrement active connections safely and update online status."""
+        type(self).objects.filter(pk=self.pk).update(
+            active_connections=Case(
+                When(active_connections__gt=0, then=F("active_connections") - 1),
+                default=Value(0),
+                output_field=models.PositiveIntegerField(),
+            ),
+            # Condition is evaluated on the pre-update value.
+            is_online=Case(
+                When(active_connections__gt=1, then=Value(True)),
+                default=Value(False),
+                output_field=models.BooleanField(),
+            ),
+        )
+        self.refresh_from_db(fields=["active_connections", "is_online"])
 
     @classmethod
     def get_online_players(cls):
         """Returns a QuerySet of all currently online players."""
         return cls.objects.filter(is_online=True)
+
+    @classmethod
+    def online_count(cls) -> int:
+        return cls.objects.filter(is_online=True).count()
 
     @property
     def active_link(self):
@@ -397,16 +482,6 @@ class Player(Person):
         levelups = []
         if xp:
             levelups = self.add_xp(xp)
-
-        for event in levelups:
-            ServerMessage.objects.create(
-                group=self.group_name,
-                type="notification",
-                action="notification",
-                message=f"You levelled up! Now level {event['new_level']}.",
-                data={"level": event["new_level"]},
-                is_draft=False,
-            )
 
         return [event["new_level"] for event in levelups]
 
@@ -464,13 +539,66 @@ class InviteCode(models.Model):
         return True
 
     def use(self):
-        self.uses += 1
-        if self.max_uses and self.uses >= self.max_uses:
-            self.is_active = False
-        self.save(update_fields=["uses", "is_active"])
+        now = timezone.now()
+        updated_rows = (
+            InviteCode.objects.filter(pk=self.pk, is_active=True)
+            .filter(models.Q(expires_at__isnull=True) | models.Q(expires_at__gt=now))
+            .filter(models.Q(max_uses__isnull=True) | models.Q(uses__lt=F("max_uses")))
+            .update(
+                uses=F("uses") + 1,
+                is_active=Case(
+                    When(
+                        max_uses__isnull=False,
+                        uses__gte=F("max_uses") - 1,
+                        then=Value(False),
+                    ),
+                    default=F("is_active"),
+                    output_field=models.BooleanField(),
+                ),
+            )
+        )
+        return updated_rows == 1
 
     def __str__(self):
         return self.code
+
+
+class Waitlist(models.Model):
+    class Status(models.TextChoices):
+        WAITING = "waiting", "Waiting"
+        INVITED = "invited", "Invited"
+        REDEEMED = "redeemed", "Redeemed"
+        REMOVED = "removed", "Removed"
+
+    email = models.EmailField()
+    signup_timestamp = models.DateTimeField(auto_now_add=True)
+    status = models.CharField(
+        max_length=10, choices=Status.choices, default=Status.WAITING, db_index=True
+    )
+    invite_token = models.CharField(max_length=64, blank=True, null=True, unique=True)
+    invited_at = models.DateTimeField(null=True, blank=True)
+    nudge_3day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_7day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_30day_sent_at = models.DateTimeField(null=True, blank=True)
+    nudge_removal_sent_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["signup_timestamp"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["email"],
+                condition=models.Q(status__in=["waiting", "invited"]),
+                name="unique_active_waitlist_email",
+            )
+        ]
+        indexes = [models.Index(fields=["status", "signup_timestamp"])]
+
+    def save(self, *args, **kwargs):
+        self.email = self.email.strip().lower()
+        super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"{self.email} ({self.status})"
 
 
 class PlayerCurrency(CurrencyAccountBase):

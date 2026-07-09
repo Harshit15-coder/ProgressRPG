@@ -2,7 +2,7 @@ import React from "react";
 import GameSection from "../GameSection";
 import ActivityPanel from "./ActivityPanel";
 import { ActivityTimer } from "../../../components/Timer/ActivityTimer";
-import { useGame } from "../../../context/GameContext";
+import { useGame } from "../../../hooks/useGame";
 
 // `onboardingStage` is a legacy field not yet in the typed GameContextValue.
 // It will be added when GameContext is updated in a later migration step.

@@ -77,6 +77,8 @@ export interface StartActivityInput {
   limitSeconds?: number | null;
   /** Human-readable reason for the limit (shown in auto-stop notification) */
   limitReason?: string | null;
+  /** Explicitly allow starting with blank/empty text (e.g. "Blank Start") */
+  allowBlank?: boolean;
 }
 
 /**
@@ -104,6 +106,12 @@ export interface ActivityTimerReturn {
   autoStopCompletion: AutoStopCompletion | null;
   currentActivity: CurrentActivity | null;
   startActivity: (newActivity: StartActivityInput | string) => Promise<unknown>;
+  /**
+   * Rename (and optionally re-link to a task) the activity already assigned
+   * to a running/waiting timer, in place — unlike startActivity, this does
+   * not reset elapsed time or status.
+   */
+  labelActivity: (name: string, taskId?: number | null) => Promise<unknown>;
   stop: (opts?: {
     activityName?: string;
     elapsedSeconds?: number;
@@ -175,6 +183,11 @@ export interface WebSocketServerMessage {
   message?: string;
 }
 
+export interface WebSocketOnlineCountMessage {
+  type: "online_count";
+  count: number;
+}
+
 /** Union of all known incoming WebSocket message shapes */
 export type IncomingWebSocketMessage =
   | WebSocketConsoleMessage
@@ -182,7 +195,8 @@ export type IncomingWebSocketMessage =
   | WebSocketNotificationMessage
   | WebSocketErrorMessage
   | WebSocketActionMessage
-  | WebSocketServerMessage;
+  | WebSocketServerMessage
+  | WebSocketOnlineCountMessage;
 
 /** Client-to-server message shape */
 export interface OutgoingWebSocketMessage {

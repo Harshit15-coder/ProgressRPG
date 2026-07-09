@@ -43,7 +43,7 @@ describe("LoginPage", () => {
     mockNavigate.mockReset();
   });
 
-  it("submits credentials and navigates to the game after a successful login", async () => {
+  it("submits credentials without remember me by default", async () => {
     const user = userEvent.setup();
     mockLoginWithJwt.mockResolvedValue({
       success: true,
@@ -61,9 +61,34 @@ describe("LoginPage", () => {
     await user.click(screen.getByRole("button", { name: "Log In" }));
 
     await waitFor(() => {
-      expect(mockLoginWithJwt).toHaveBeenCalledWith("player@example.com", "secretpass");
+      expect(mockLoginWithJwt).toHaveBeenCalledWith("player@example.com", "secretpass", false);
     });
-    expect(mockAuthLogin).toHaveBeenCalledWith("access-123", "refresh-123");
+    expect(mockAuthLogin).toHaveBeenCalledWith("access-123", "refresh-123", { rememberMe: false });
+    expect(mockNavigate).toHaveBeenCalledWith("/");
+  });
+
+  it("submits remembered sessions when the checkbox is selected", async () => {
+    const user = userEvent.setup();
+    mockLoginWithJwt.mockResolvedValue({
+      success: true,
+      tokens: {
+        access_token: "access-123",
+        refresh_token: "refresh-123",
+      },
+    });
+    mockAuthLogin.mockResolvedValue({});
+
+    renderLoginPage();
+
+    await user.type(screen.getByPlaceholderText("Email"), "player@example.com");
+    await user.type(screen.getByPlaceholderText("Password"), "secretpass");
+    await user.click(screen.getByRole("checkbox", { name: "Remember me" }));
+    await user.click(screen.getByRole("button", { name: "Log In" }));
+
+    await waitFor(() => {
+      expect(mockLoginWithJwt).toHaveBeenCalledWith("player@example.com", "secretpass", true);
+    });
+    expect(mockAuthLogin).toHaveBeenCalledWith("access-123", "refresh-123", { rememberMe: true });
     expect(mockNavigate).toHaveBeenCalledWith("/");
   });
 

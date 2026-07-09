@@ -6,7 +6,7 @@ import * as Accordion from "@radix-ui/react-accordion";
 import styles from "./Navbar.module.scss";
 import Button from "../../components/Button/Button";
 import { useAuth } from "../../context/AuthContext";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import {
   useAnnouncements,
@@ -25,6 +25,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const location = useLocation();
   const isTasksEnabled = useFeatureFlag("tasksFeature");
   const isAnnouncementsEnabled = useFeatureFlag("announcements");
+  const isLibraryEnabled = useFeatureFlag("your_library");
 
   const { data: announcementsData, isLoading: announcementsLoading } =
     useAnnouncements(isAnnouncementsEnabled);
@@ -35,6 +36,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const isHomePage = location.pathname === "/";
   const isActivitiesPage = location.pathname === "/activities";
   const isTasksPage = location.pathname === "/tasks";
+  const isLibraryPage = location.pathname.startsWith("/library");
   const isAccountPage = location.pathname === "/account";
 
   const announcements = announcementsData?.results ?? [];
@@ -83,23 +85,36 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
 
           {isAuthenticated && (
             <>
-              <Link to="/activities" aria-label="Go to activities">
-                <Button
-                  variant={isActivitiesPage ? "primary" : "secondary"}
-                  className={styles.navLink}
-                >
-                  <span aria-hidden="true">📋 </span>Activities
-                </Button>
-              </Link>
-              {isTasksEnabled && (
-                <Link to="/tasks" aria-label="Go to tasks">
+              {isLibraryEnabled ? (
+                <Link to="/library" aria-label="Go to your library">
                   <Button
-                    variant={isTasksPage ? "primary" : "secondary"}
+                    variant={isLibraryPage ? "primary" : "secondary"}
                     className={styles.navLink}
                   >
-                    <span aria-hidden="true">✅ </span>Tasks
+                    <span aria-hidden="true">📚 </span>Your library
                   </Button>
                 </Link>
+              ) : (
+                <>
+                  <Link to="/activities" aria-label="Go to activities">
+                    <Button
+                      variant={isActivitiesPage ? "primary" : "secondary"}
+                      className={styles.navLink}
+                    >
+                      <span aria-hidden="true">📋 </span>Activities
+                    </Button>
+                  </Link>
+                  {isTasksEnabled && (
+                    <Link to="/tasks" aria-label="Go to tasks">
+                      <Button
+                        variant={isTasksPage ? "primary" : "secondary"}
+                        className={styles.navLink}
+                      >
+                        <span aria-hidden="true">✅ </span>Tasks
+                      </Button>
+                    </Link>
+                  )}
+                </>
               )}
             </>
           )}

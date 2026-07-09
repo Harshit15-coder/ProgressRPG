@@ -41,6 +41,13 @@ export interface AppConfig {
   trial_period_days: number;
 }
 
+/** Registration status (public, unauthenticated) */
+export interface RegistrationStatus {
+  registration_open: boolean;
+  registration_enabled: boolean;
+  self_serve_registration: boolean;
+}
+
 /** Game settings returned in fetch_info and /game_settings/ */
 export interface GameSettings {
   free_timer_limit_seconds: number;
@@ -69,6 +76,7 @@ export interface FetchInfoResponse {
   announcement_unread_count: number;
   free_timer_limit_seconds: number;
   game_settings: GameSettings;
+  online_count: number;
 }
 
 export interface AnnouncementListResponse {

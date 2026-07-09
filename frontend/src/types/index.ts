@@ -13,6 +13,7 @@ export type {
   AccessTokenResponse,
   CheckoutSessionResponse,
   AppConfig,
+  RegistrationStatus,
   GameSettings,
   FetchInfoResponse,
   AnnouncementListResponse,

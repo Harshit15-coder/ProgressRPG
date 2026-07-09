@@ -24,6 +24,12 @@ interface UseEntitySearchInputProps {
   onCreate?: (name: string) => void | Promise<void>;
   disabled?: boolean;
   searchEnabled?: boolean;
+  /** Shown in place of Fuse results when the query is blank. */
+  defaultResults?: SearchEntity[];
+  /** Keep the dropdown open regardless of focus (persistent list mode). */
+  alwaysOpen?: boolean;
+  /** Cap the combined (task + activity) rows rendered, regardless of source. */
+  maxVisibleRows?: number;
 }
 
 function normalizeQuery(value: string | undefined): string {
@@ -38,10 +44,14 @@ function useEntitySearchResults({
   entities,
   value,
   canSearch,
+  defaultResults,
+  maxVisibleRows,
 }: {
   entities: SearchEntity[];
   value: string;
   canSearch: boolean;
+  defaultResults?: SearchEntity[];
+  maxVisibleRows?: number;
 }) {
   const [debouncedQuery, setDebouncedQuery] = useState(value);
 
@@ -75,6 +85,7 @@ function useEntitySearchResults({
     if (!canSearch) return [];
 
     const query = normalizeQuery(debouncedQuery);
+    if (!query) return defaultResults ?? [];
     if (query.length < MIN_QUERY_LENGTH) return [];
 
     const queryKey = getEntityNameKey(query);
@@ -120,7 +131,7 @@ function useEntitySearchResults({
       });
 
     return uniqueResults.slice(0, MAX_RESULTS);
-  }, [canSearch, debouncedQuery, fuse, normalizedValue, searchableEntities]);
+  }, [canSearch, debouncedQuery, defaultResults, fuse, normalizedValue, searchableEntities]);
 
   const results = useMemo(() => {
     const taskResults = rawResults.filter((result) => result.source === "task");
@@ -129,8 +140,9 @@ function useEntitySearchResults({
       (result) => result.source !== "task" && !taskNames.has(result.nameKey ?? "")
     );
 
-    return [...taskResults, ...activityResults];
-  }, [rawResults]);
+    const combined = [...taskResults, ...activityResults];
+    return typeof maxVisibleRows === "number" ? combined.slice(0, maxVisibleRows) : combined;
+  }, [rawResults, maxVisibleRows]);
 
   const taskItems = useMemo(() => results.filter((result) => result.source === "task"), [results]);
   const activityItems = useMemo(
@@ -177,6 +189,9 @@ export function useEntitySearchInput({
   onCreate,
   disabled = false,
   searchEnabled = true,
+  defaultResults,
+  alwaysOpen = false,
+  maxVisibleRows,
 }: UseEntitySearchInputProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const { entities, addEntityToCache } = useEntitySearchCache(type);
@@ -190,9 +205,11 @@ export function useEntitySearchInput({
     entities,
     value,
     canSearch,
+    defaultResults,
+    maxVisibleRows,
   });
 
-  const isDropdownOpen = isFocused && results.length > 0;
+  const isDropdownOpen = alwaysOpen ? results.length > 0 : isFocused && results.length > 0;
 
   const activeHighlightedIndex =
     highlightedIndex >= 0 && highlightedIndex < results.length ? highlightedIndex : -1;

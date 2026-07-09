@@ -10,10 +10,15 @@ from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
     TokenRefreshSerializer,
 )
+from rest_framework_simplejwt.tokens import RefreshToken
 
-from core.models import Announcement
-from users.models import Player, InviteCode, UserLogin
-from users.validators import clean_player_name
+from core.models import Announcement, GameSettings
+from users.models import Player, InviteCode, UserLogin, Waitlist
+from users.services.registration_services import (
+    ensure_player_setup_for_user,
+    verified_user_count,
+)
+from users.validators import clean_player_name, reject_disposable_email
 
 from django.contrib.auth import get_user_model
 
@@ -33,6 +38,10 @@ def validate_timezone_name(value: str) -> str:
 
 
 class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
+    remember_me = serializers.BooleanField(
+        required=False, default=False, write_only=True
+    )
+
     @classmethod
     def get_token(cls, user):
         token = super().get_token(user)
@@ -40,9 +49,17 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         return token
 
     def validate(self, attrs):
+        remember_me = attrs.pop("remember_me", False)
         attrs["username"] = attrs.get("email")
+
         data = super().validate(attrs)
         UserLogin.objects.create(user=self.user)
+
+        if remember_me:
+            refresh = RefreshToken(data["refresh"])
+            refresh.set_exp(lifetime=settings.LONG_SESSION_REFRESH_TOKEN_LIFETIME)
+            data["refresh"] = str(refresh)
+            data["access"] = str(refresh.access_token)
 
         return {
             "access_token": data["access"],
@@ -124,6 +141,7 @@ class FetchInfoResponseSerializer(serializers.Serializer):
     announcement_unread_count = serializers.IntegerField()
     free_timer_limit_seconds = serializers.IntegerField()
     game_settings = serializers.JSONField()
+    online_count = serializers.IntegerField()
 
 
 class AnnouncementSerializer(serializers.ModelSerializer):
@@ -215,10 +233,38 @@ class DeleteAccountResponseSerializer(serializers.Serializer):
 class WaitlistSignupRequestSerializer(serializers.Serializer):
     email = serializers.EmailField(required=True)
 
+    def validate_email(self, value):
+        try:
+            reject_disposable_email(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value
+
 
 class WaitlistSignupResponseSerializer(serializers.Serializer):
     detail = serializers.CharField()
     state = serializers.ChoiceField(choices=["pending", "subscribed"])
+
+
+class RegistrationStatusResponseSerializer(serializers.Serializer):
+    registration_open = serializers.BooleanField()
+    registration_enabled = serializers.BooleanField()
+    self_serve_registration = serializers.BooleanField()
+
+
+class WaitlistJoinRequestSerializer(serializers.Serializer):
+    email = serializers.EmailField(required=True)
+
+    def validate_email(self, value):
+        try:
+            reject_disposable_email(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
+        return value
+
+
+class WaitlistJoinResponseSerializer(serializers.Serializer):
+    detail = serializers.CharField()
 
 
 def _frontend_password_reset_url(request, user, temp_key):
@@ -251,7 +297,12 @@ def _verify_turnstile(token: str) -> bool:
 
 
 class CustomRegisterSerializer(RegisterSerializer):
-    invite_code = serializers.CharField(write_only=True, required=True)
+    invite_code = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
+    invite_token = serializers.CharField(
+        write_only=True, required=False, allow_blank=True
+    )
     agree_to_terms = serializers.BooleanField(write_only=True, required=True)
     turnstile_token = serializers.CharField(write_only=True, required=True)
     email = serializers.EmailField(required=True)
@@ -264,10 +315,18 @@ class CustomRegisterSerializer(RegisterSerializer):
             "password1",
             "password2",
             "invite_code",
+            "invite_token",
             "agree_to_terms",
             "turnstile_token",
             "timezone",
         )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # The inherited RegisterSerializer may expose a username field even
+        # when the project has no username field, yielding impossible
+        # validation constraints (required with max_length=0).
+        self.fields.pop("username", None)
 
     def get_email_context(self):
         context = super().get_email_context()
@@ -279,6 +338,8 @@ class CustomRegisterSerializer(RegisterSerializer):
         return context
 
     def validate_invite_code(self, value):
+        if not value:
+            return value
         try:
             invite = InviteCode.objects.get(code=value, is_active=True)
         except InviteCode.DoesNotExist:
@@ -302,21 +363,75 @@ class CustomRegisterSerializer(RegisterSerializer):
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("A user with that email already exists.")
+        try:
+            reject_disposable_email(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc)) from exc
         return value
 
     def validate_timezone(self, value):
         return validate_timezone_name(value)
 
+    def validate(self, data):
+        data = super().validate(data)
+        invite_code = data.get("invite_code")
+        invite_token = data.get("invite_token")
+        if invite_code and invite_token:
+            raise serializers.ValidationError(
+                "Provide at most one of invite_code or invite_token."
+            )
+        if not invite_code and not invite_token:
+            game_settings = GameSettings.current()
+            if not game_settings.self_serve_registration:
+                raise serializers.ValidationError(
+                    "Provide exactly one of invite_code or invite_token."
+                )
+            # Self-serve signups must respect the cap; invite holders bypass
+            # it because their invite is proof of a slot at invite time.
+            # Only confirmed users count, so unconfirmed/abandoned signups
+            # can't exhaust the cap and block real users.
+            if verified_user_count() >= game_settings.registration_cap:
+                raise serializers.ValidationError(
+                    "Registration is currently full. Please join the waitlist."
+                )
+        if invite_token:
+            try:
+                entry = Waitlist.objects.get(
+                    invite_token=invite_token, status=Waitlist.Status.INVITED
+                )
+            except Waitlist.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"invite_token": "Invalid or already used invite token."}
+                )
+            if entry.email != data.get("email", "").strip().lower():
+                raise serializers.ValidationError(
+                    {
+                        "invite_token": "This invite token is for a different email address."
+                    }
+                )
+            self._waitlist_entry = entry
+        return data
+
     def custom_signup(self, request, user):
-        code = self.validated_data.get("invite_code")
-        try:
-            invite = InviteCode.objects.get(code=code, is_active=True)
-            invite.use()
-            user.player.invited_by_code = code
-            user.player.save()
-        except InviteCode.DoesNotExist:
-            # Should not happen due to earlier validation, but fail safe
-            pass
+        ensure_player_setup_for_user(user)
+        invite_code = self.validated_data.get("invite_code")
+        if invite_code:
+            try:
+                invite = InviteCode.objects.get(code=invite_code)
+                if not invite.use():
+                    raise serializers.ValidationError("Invalid or expired invite code.")
+            except InviteCode.DoesNotExist:
+                # Should not happen due to earlier validation, but fail safe
+                raise serializers.ValidationError("Invalid or expired invite code.")
+        elif self.validated_data.get("invite_token"):
+            entry = self._waitlist_entry
+            updated = Waitlist.objects.filter(
+                pk=entry.pk, status=Waitlist.Status.INVITED
+            ).update(status=Waitlist.Status.REDEEMED)
+            if not updated:
+                raise serializers.ValidationError(
+                    {"invite_token": "This invite token has already been redeemed."}
+                )
 
     def save(self, request):
         user = super().save(request)

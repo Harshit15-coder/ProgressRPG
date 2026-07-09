@@ -21,7 +21,7 @@ const { playLimitReachedSound, primeAudio } = vi.hoisted(() => ({
   primeAudio: vi.fn(),
 }));
 
-vi.mock('../../context/GameContext', () => ({
+vi.mock('../../hooks/useGame', () => ({
   useGame: () => mockUseGame(),
 }));
 

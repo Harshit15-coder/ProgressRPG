@@ -10,7 +10,7 @@ vi.mock('../../../hooks/useTasks', () => ({
   useUpdateTask: () => ({ mutate: vi.fn() }),
 }));
 
-vi.mock('../../../context/GameContext', () => ({
+vi.mock('../../../hooks/useGame', () => ({
   useGame: () => mockUseGame(),
 }));
 

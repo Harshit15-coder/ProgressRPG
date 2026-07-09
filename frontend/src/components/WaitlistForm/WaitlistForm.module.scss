@@ -1,0 +1,12 @@
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
+
+.confirmation {
+  text-align: center;
+  @include t.apply-text-style(t.$text-body);
+}
+
+.error {
+  color: c.$color-danger;
+  text-align: center;
+}

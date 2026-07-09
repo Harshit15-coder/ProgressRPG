@@ -41,12 +41,16 @@ def _run_task(player_id, task_id):
 class DummyChannelLayer:
     def __init__(self):
         self.groups = set()
+        self.group_messages = []
 
     async def group_add(self, group, channel_name):
         self.groups.add(group)
 
     async def group_discard(self, group, channel_name):
         self.groups.discard(group)
+
+    async def group_send(self, group, message):
+        self.group_messages.append((group, message))
 
 
 class AsyncCallRecorder:

@@ -13,6 +13,7 @@ export default function NavDrawer({ drawerOpen, onClose }: NavDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
   const { isAuthenticated } = useAuth();
   const isTasksEnabled = useFeatureFlag("tasksFeature");
+  const isLibraryEnabled = useFeatureFlag("your_library");
 
   const handleClose = useCallback(() => {
     const activeElement = document.activeElement as HTMLElement | null;
@@ -75,25 +76,39 @@ export default function NavDrawer({ drawerOpen, onClose }: NavDrawerProps) {
                   <span aria-hidden="true">⏱ </span>Timer
                 </Link>
               </li>
-              <li>
-                <Link
-                  to="/activities"
-                  onClick={handleClose}
-                  tabIndex={drawerOpen ? 0 : -1}
-                >
-                  <span aria-hidden="true">📋 </span>Activities
-                </Link>
-              </li>
-              {isTasksEnabled && (
+              {isLibraryEnabled ? (
                 <li>
                   <Link
-                    to="/tasks"
+                    to="/library"
                     onClick={handleClose}
                     tabIndex={drawerOpen ? 0 : -1}
                   >
-                    <span aria-hidden="true">✅ </span>Tasks
+                    <span aria-hidden="true">📚 </span>Your library
                   </Link>
                 </li>
+              ) : (
+                <>
+                  <li>
+                    <Link
+                      to="/activities"
+                      onClick={handleClose}
+                      tabIndex={drawerOpen ? 0 : -1}
+                    >
+                      <span aria-hidden="true">📋 </span>Activities
+                    </Link>
+                  </li>
+                  {isTasksEnabled && (
+                    <li>
+                      <Link
+                        to="/tasks"
+                        onClick={handleClose}
+                        tabIndex={drawerOpen ? 0 : -1}
+                      >
+                        <span aria-hidden="true">✅ </span>Tasks
+                      </Link>
+                    </li>
+                  )}
+                </>
               )}
             </>
           ) : (

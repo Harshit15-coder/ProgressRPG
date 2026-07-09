@@ -160,6 +160,34 @@ class ActivityTimerViewSet(BaseTimerViewSet):
         updated.refresh_from_db()
         return Response({"success": True, "activity_timer": self.serialize(updated)})
 
+    @action(detail=False, methods=["post"])
+    def label_activity(self, request):
+        """
+        Rename (and optionally re-link to a task) the activity already
+        assigned to a running/waiting timer, in place — unlike
+        set_activity, this does not reset elapsed time or status.
+        """
+        timer = self.get_timer(request)
+
+        if timer.status not in ("active", "waiting") or not timer.activity:
+            return Response(
+                {"error": "No running timer to label."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        name = request.data.get("activityName")
+        if not name:
+            name = ""
+
+        task_id = request.data.get("task_id")
+        if task_id:
+            task = get_object_or_404(Task, pk=task_id, player=request.user.player)
+            timer.change_task(task)
+
+        timer.rename_activity(name)
+
+        return Response({"success": True, "activity_timer": self.serialize(timer)})
+
 
 class QuestTimerViewSet(BaseTimerViewSet):
     serializer_class = QuestTimerSerializer

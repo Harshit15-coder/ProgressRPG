@@ -2,6 +2,7 @@
 import { jwtDecode } from "jwt-decode";
 import { API_BASE_URL } from "../config";
 import type { AccessTokenResponse } from "../types/api";
+import { clearAuthStorage, getStoredAuthTokens, updateStoredAccessToken } from "./authStorage";
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
@@ -23,8 +24,7 @@ function isTokenExpiringSoon(token: string, bufferSeconds = 60): boolean {
 }
 
 function clearAuthAndRedirect(): void {
-  localStorage.removeItem("accessToken");
-  localStorage.removeItem("refreshToken");
+  clearAuthStorage();
   window.dispatchEvent(new CustomEvent("auth:expired"));
 }
 
@@ -41,7 +41,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
     const data: Partial<AccessTokenResponse> = await response.json();
 
     if (data.access_token) {
-      localStorage.setItem("accessToken", data.access_token);
+      updateStoredAccessToken(data.access_token);
       return data.access_token;
     }
     throw new Error("No access token returned from refresh");
@@ -51,8 +51,7 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
 }
 
 export async function getValidAccessToken(): Promise<string> {
-  const accessToken = localStorage.getItem("accessToken");
-  const refreshToken = localStorage.getItem("refreshToken");
+  const { accessToken, refreshToken } = getStoredAuthTokens();
   if (!accessToken || !refreshToken) {
     clearAuthAndRedirect();
     throw new Error("Missing tokens");

@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useCallback } from 'react';
 import { apiFetch } from "../utils/api";
-import { useGame } from '../context/GameContext';
+import { useGame } from './useGame';
 
 export default function useOnboarding() {
   const {

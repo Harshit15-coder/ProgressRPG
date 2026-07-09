@@ -1,0 +1,176 @@
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
+@use '../../styles/semantic/spacing' as sp;
+@use 'sass:map';
+
+$row-control-height: 44px;
+
+.wrapper {
+  position: relative;
+  width: min(100%, 720px);
+  border: 1px solid rgba(c.$color-border-primary, 0.15);
+  border-radius: v.$border-radius;
+  padding: v.$padding-base;
+  background: rgba(c.$color-player, 0.14);
+}
+
+.isActive .timerPill {
+  border-color: rgba(c.$color-border-primary, 0.8);
+  box-shadow: 0 0 0 2px rgba(c.$color-border-primary, 0.25);
+  animation: timerPulse 1.6s ease-in-out infinite;
+}
+
+// Two fixed rows, always in this order: controls (toggle + timer) on top,
+// the activity's identity (label or search) below. Neither row's own
+// position ever depends on the other's content, so swapping label<->search
+// (row 2) can't disturb the toggle/timer (row 1), and vice versa.
+.container {
+  display: flex;
+  flex-direction: column;
+  gap: map.get(sp.$gap, sm);
+}
+
+.controlsRow {
+  // Centered while idle (button alone); once the timer appears, the pair
+  // sits together at the right (justify-content flips via inline style —
+  // see UnifiedTimerHome.tsx).
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: map.get(sp.$gap, sm);
+  min-height: $row-control-height;
+}
+
+.entityRow {
+  // AnimatePresence mode="popLayout" (label <-> search) makes the exiting
+  // element position:absolute against the nearest positioned ancestor while
+  // it fades out — without this, that's `.wrapper`, not this row, and the
+  // exiting element jumps to the wrong place instead of fading in place.
+  position: relative;
+}
+
+.activityLabel {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  // Matches .searchControl/.inputText's height so swapping between the label
+  // display and the search input (click-to-edit, and committing back out of
+  // it) never changes entityRow's own height — otherwise the `layout`
+  // animation on entityRow/container stretches the row on every focus/blur,
+  // which reads as a jump. Long names can still grow past this floor.
+  min-height: $row-control-height;
+  box-sizing: border-box;
+  text-align: left;
+  border: 2px solid transparent;
+  background: transparent;
+  border-radius: v.$border-radius;
+  padding: v.$padding-sm;
+  font-size: 1.05rem;
+  cursor: pointer;
+  color: c.$color-text-body;
+  overflow-wrap: anywhere;
+
+  &:hover,
+  &:focus-visible {
+    border-color: rgba(c.$color-border-accent, 0.5);
+    background: rgba(255, 255, 255, 0.6);
+  }
+
+  @include m.focus-outline(c.$color-border-accent);
+}
+
+.searchControl {
+  width: 100%;
+  min-height: $row-control-height;
+}
+
+.entitySearch {
+  width: 100%;
+}
+
+.inputText {
+  width: 100%;
+  height: $row-control-height;
+  box-sizing: border-box;
+  font-size: 1.05rem;
+}
+
+.timerPill {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: $row-control-height;
+  @include m.border(rgba(c.$color-border-primary, 0.3));
+  border-radius: v.$border-radius;
+  // $padding-base is itself a 2-value shorthand ($padding-vertical
+  // $padding-horizontal) — `0 $padding-base` silently expanded to a 3-value
+  // padding (0 top, $padding-vertical left/right, $padding-horizontal
+  // bottom), which is what was pushing the digits off-center. Use the
+  // horizontal-only variable instead so this stays a clean 2-value shorthand.
+  padding: 0 v.$padding-horizontal;
+  white-space: nowrap;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 1.1rem;
+  transition: border-color 0.3s ease, box-shadow 0.3s ease;
+}
+
+.ctaButton {
+  height: $row-control-height;
+  display: flex;
+  align-items: center;
+}
+
+.limitWarning {
+  margin: v.$spacing-sm 0 0;
+  text-align: left;
+  color: c.$color-text-body;
+}
+
+.supportButtonRow {
+  display: flex;
+  justify-content: center;
+  padding-top: v.$spacing-md;
+}
+
+.supportModeButton {
+  max-width: 100%;
+  border: 1px solid rgba(c.$color-border-primary, 0.35);
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(2px);
+}
+
+@keyframes timerPulse {
+  0%,
+  100% {
+    box-shadow: 0 0 0 2px rgba(c.$color-border-primary, 0.25);
+  }
+  50% {
+    box-shadow: 0 0 0 3px rgba(c.$color-border-primary, 0.4);
+  }
+}
+
+@include m.respond-to(md, down) {
+  .timerPill,
+  .ctaButton {
+    height: 40px;
+  }
+
+  .inputText {
+    height: 40px;
+    font-size: 1rem;
+  }
+}
+
+@include m.respond-to(sm, down) {
+  .timerPill,
+  .ctaButton {
+    height: 38px;
+  }
+
+  .inputText {
+    height: 38px;
+    font-size: 0.9rem;
+  }
+}

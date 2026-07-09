@@ -26,7 +26,7 @@ export default function useRegister() {
     email: string,
     password1: string,
     password2: string,
-    inviteCode: string,
+    invite: { code?: string; token?: string },
     agreeToTerms: boolean,
     turnstileToken: string,
     timezone: string,
@@ -41,7 +41,7 @@ export default function useRegister() {
           email,
           password1,
           password2,
-          invite_code: inviteCode,
+          ...(invite.token ? { invite_token: invite.token } : { invite_code: invite.code }),
           agree_to_terms: agreeToTerms,
           turnstile_token: turnstileToken,
           timezone,
@@ -74,9 +74,7 @@ export default function useRegister() {
        // fallback: handle unexpected case (tokens returned)
       const { accessToken, refreshToken } = data;
       if (accessToken && refreshToken) {
-        localStorage.setItem('accessToken', accessToken);
-        localStorage.setItem('refreshToken', refreshToken);
-        await login(accessToken, refreshToken);
+        await login(accessToken, refreshToken, { rememberMe: false });
         return { success: true };
       }
 

@@ -1,7 +1,7 @@
 // src/pages/VillagePage.tsx
 import React, { useEffect, useState } from "react";
 import PopulationCentreMap from "../../components/Map/Map";
-import { useGame } from "../../context/GameContext";
+import { useGame } from "../../hooks/useGame";
 import { apiFetch } from "../../utils/api";
 import ProgressBar from "../../components/ProgressBar/ProgressBar";
 import PopulationCentreResidents from "../../components/PopulationCentreResidents/PopulationCentreResidents";

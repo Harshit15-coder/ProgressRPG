@@ -6,10 +6,12 @@ import NavDrawer from './layout/NavDrawer/NavDrawer';
 import StaticBanner from './components/StaticBanner/StaticBanner';
 import AppRoutes from "./routes/AppRoutes";
 import Footer from './layout/Footer/Footer';
+import OnlineCountBadge from './components/OnlineCountBadge/OnlineCountBadge';
+import FeatureToggle from './components/FeatureToggle';
 import FeedbackWidget from './components/FeedbackWidget/FeedbackWidget';
 import TutorialModal from './components/TutorialModal/TutorialModal';
 import { useAuth } from './context/AuthContext';
-import { useGame } from './context/GameContext';
+import { useGame } from './hooks/useGame';
 import { apiFetch } from './utils/api';
 
 const announcement = `Progress RPG is in alpha status, and under active development. Bugs may appear, and data may be lost. Thank you for testing!`;
@@ -60,6 +62,9 @@ export default function AppContent(): React.ReactElement {
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
         <AppRoutes />
       </main>
+      <FeatureToggle flag="onlinePlayerCount" fallback={null}>
+        <OnlineCountBadge />
+      </FeatureToggle>
       <Footer />
       {isAuthenticated && !tutorialOpen && <FeedbackWidget />}
       {tutorialOpen && (

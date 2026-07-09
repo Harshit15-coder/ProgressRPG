@@ -14,7 +14,7 @@ const mockDeleteAccount = vi.fn();
 
 const TEST_BILLING_PORTAL_URL = "https://billing.stripe.com/p/login/test_portal";
 
-vi.mock("../../context/GameContext", () => ({
+vi.mock("../../hooks/useGame", () => ({
   useGame: () => mockUseGame(),
 }));
 

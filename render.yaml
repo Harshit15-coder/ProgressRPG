@@ -64,6 +64,45 @@ projects:
             ipAllowList:
               - source: 81.108.41.12/32
 
+          - type: pserv
+            name: pgbouncer
+            runtime: image
+            image:
+              url: docker.io/edoburu/pgbouncer:latest
+            plan: starter
+            region: frankfurt
+            envVars:
+              - key: DB_HOST
+                fromDatabase:
+                  name: postgres
+                  property: host
+              - key: DB_PORT
+                fromDatabase:
+                  name: postgres
+                  property: port
+              - key: DB_USER
+                fromDatabase:
+                  name: postgres
+                  property: user
+              - key: DB_PASSWORD
+                fromDatabase:
+                  name: postgres
+                  property: password
+              - key: DB_NAME
+                fromDatabase:
+                  name: postgres
+                  property: database
+              - key: POOL_MODE
+                value: transaction
+              - key: MAX_CLIENT_CONN
+                value: "500"
+              - key: DEFAULT_POOL_SIZE
+                value: "20"
+              - key: LISTEN_PORT
+                value: "6432"
+              - key: AUTH_TYPE
+                value: scram-sha-256
+
           - type: web
             name: frontend
             runtime: static

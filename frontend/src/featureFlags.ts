@@ -6,12 +6,15 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   // Groups: 'all' | 'premium' | 'testers'
   // Empty array = disabled for everyone.
   activityList: ['all'],
-  tasksFeature: ['all'],
-  categoriesPage: ['all'],
-  skillsPage: ['all'],
-  projectsPage: ['all'],
+  tasksFeature: ['testers'],
+  categoriesPage: [],
+  skillsPage: [],
+  projectsPage: [],
   toastsFeature: [],
   announcements: ['testers'],
+  onlinePlayerCount: ['testers'],
+  your_library: [],
+  unified_homepage: [],
 };
 
 export default featureFlags;

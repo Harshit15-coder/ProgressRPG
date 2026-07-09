@@ -559,16 +559,6 @@ class ActivityTimer(Timer):
         level_ups = self.player.add_activity(self.elapsed_time, xp=xp_gained)
         reward_summary["level_ups"] = level_ups
 
-        message_text = f"Activity submitted. You got {xp_gained} XP!"
-        ServerMessage.objects.create(
-            group=self.player.group_name,
-            type="notification",
-            action="notification",
-            data={},
-            message=message_text,
-            is_draft=False,
-        )
-
         logger.debug(
             f"[TIMER COMPLETE] Timer {self.id} completed — elapsed_time: {self.elapsed_time}, completed_at: {self.activity.completed_at}"
         )
