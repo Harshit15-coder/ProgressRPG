@@ -399,12 +399,19 @@ class Player(Person):
 
     @transaction.atomic
     def register_connection(self):
-        """Increment active connections and mark player online."""
+        """
+        Increment active connections and mark player online.
+
+        Stamps `last_seen` immediately so a freshly connected player isn't
+        mistaken for stale before their first heartbeat ping arrives (up to
+        HEARTBEAT_INTERVAL_MS later).
+        """
         type(self).objects.filter(pk=self.pk).update(
             active_connections=F("active_connections") + 1,
             is_online=True,
+            last_seen=timezone.now(),
         )
-        self.refresh_from_db(fields=["active_connections", "is_online"])
+        self.refresh_from_db(fields=["active_connections", "is_online", "last_seen"])
 
     @transaction.atomic
     def unregister_connection(self):
