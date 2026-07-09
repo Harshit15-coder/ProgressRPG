@@ -41,10 +41,33 @@ Typical variables:
 
 Based on installed packages, backend deploys may require:
 
-- Email/service provider credentials (for example SendGrid API key)
+- Email/service provider credentials (see Transactional email below)
 - Payment provider credentials (Stripe secret/public settings where applicable)
 - Error/telemetry DSN (Sentry)
 - Turnstile/site verification keys if anti-bot flows are enabled
+
+## Transactional email
+
+Delivery path: Django's SMTP backend (`django.core.mail.backends.smtp.EmailBackend`)
+relaying through **Resend** (`smtp.resend.com:587`), configured in
+`progress_rpg/settings/prod.py`. `EMAIL_HOST_USER` is the literal string `resend`
+(required by Resend's SMTP relay); `EMAIL_HOST_PASSWORD` is `RESEND_API_KEY`.
+
+- `RESEND_API_KEY`
+  - API key used as the SMTP password for the Resend relay
+- `DEFAULT_FROM_EMAIL` / `SERVER_EMAIL`
+  - Set to `Progress RPG <noreply@mail.progressrpg.com>` in prod
+
+Web and Celery worker must share the same env vars — confirmation emails for
+signup (`ACCOUNT_EMAIL_VERIFICATION = "mandatory"`) are queued through Celery
+(`users/adapters.py`), so a healthy worker with matching config is required
+for delivery, not just the web service.
+
+Verify delivery with `python manage.py send_test_email --to <address>` —
+confirmed working end-to-end in staging (2026-07-09).
+
+This relay was previously SendGrid; it was switched to Resend (see
+`7ac194a`) after the initial SendGrid SMTP fix in #272.
 
 ## Recommended environment management
 
