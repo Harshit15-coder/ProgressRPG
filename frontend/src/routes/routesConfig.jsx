@@ -52,6 +52,10 @@ export const routes = [
     element: <RegisterPage />,
   },
   {
+    path: "/waitlist/redeem/:token",
+    element: <RegisterPage />,
+  },
+  {
     path: "/reset-password/:key",
     element: <PasswordResetConfirmPage />,
   },

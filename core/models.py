@@ -92,6 +92,10 @@ class GameSettings(models.Model):
     task_completion_xp = models.IntegerField(default=100)
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
+    registration_cap = models.IntegerField(default=1_000_000_000)
+    registration_enabled = models.BooleanField(default=True)
+    self_serve_registration = models.BooleanField(default=False)
+    waitlist_nudges_enabled_from = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Game settings"
@@ -130,9 +134,23 @@ class GameSettings(models.Model):
             errors["task_completion_xp"] = "Must be non-negative."
         if self.trial_period_days < 0:
             errors["trial_period_days"] = "Must be non-negative."
+        if self.registration_cap < 0:
+            errors["registration_cap"] = "Must be non-negative."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        previous_cap = None
+        if self.pk:
+            previous_cap = (
+                GameSettings.objects.filter(pk=self.pk)
+                .values_list("registration_cap", flat=True)
+                .first()
+            )
         super().save(*args, **kwargs)
+        if previous_cap is not None and self.registration_cap > previous_cap:
+            from django.db import transaction
+            from users.tasks import invite_waitlist_entries
+
+            transaction.on_commit(lambda: invite_waitlist_entries.delay())

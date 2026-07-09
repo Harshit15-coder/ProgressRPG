@@ -49,6 +49,10 @@ app.conf.beat_schedule = {
         "task": "gameplay.tasks.auto_complete_timers_for_stale_players",
         "schedule": 30.0,  # every 30 seconds
     },
+    "send_waitlist_nudges": {
+        "task": "users.tasks.send_waitlist_nudges",
+        "schedule": 7200.0,  # every 2 hours
+    },
     # "generate_character_days_1am": {
     #     "task": "character.tasks.generate_character_days",
     #     "schedule": crontab(hour=1, minute=0),
