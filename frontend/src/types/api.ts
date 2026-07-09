@@ -73,14 +73,30 @@ export interface FetchInfoResponse {
   login_streak: number;
   login_event_at: string | null;
   login_reward_xp: number;
+  announcement_unread_count: number;
   free_timer_limit_seconds: number;
   game_settings: GameSettings;
   online_count: number;
 }
 
+export interface AnnouncementListResponse {
+  unread_count: number;
+  results: Announcement[];
+}
+
+export interface AnnouncementUnreadCountResponse {
+  unread_count: number;
+}
+
+export interface AnnouncementReadMutationResponse {
+  success: boolean;
+  unread_count: number;
+}
+
 // Forward references resolved in domain.ts
 import type { Player } from "./domain";
 import type { Character } from "./domain";
+import type { Announcement } from "./domain";
 import type { ActivityTimerApiData } from "./timers";
 import type { PopulationCentre } from "./domain";
 import type { XpModifier } from "./domain";

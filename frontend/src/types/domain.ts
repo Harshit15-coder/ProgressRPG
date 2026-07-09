@@ -58,6 +58,16 @@ export interface Player {
   unseen_tutorial_step_ids: number[];
 }
 
+export interface Announcement {
+  id: number;
+  title: string;
+  summary: string;
+  body: string;
+  published_at: string | null;
+  created_at: string;
+  is_read: boolean;
+}
+
 // ---------------------------------------------------------------------------
 // Character (character/serializers.py — CharacterSerializer)
 // ---------------------------------------------------------------------------

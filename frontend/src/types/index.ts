@@ -16,6 +16,9 @@ export type {
   RegistrationStatus,
   GameSettings,
   FetchInfoResponse,
+  AnnouncementListResponse,
+  AnnouncementUnreadCountResponse,
+  AnnouncementReadMutationResponse,
 } from "./api";
 
 // Enums and literal union types
@@ -39,6 +42,7 @@ export type {
 export type {
   User,
   Player,
+  Announcement,
   AchievementGoal,
   Character,
   GeoJSONPoint,

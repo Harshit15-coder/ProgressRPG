@@ -154,3 +154,56 @@ class GameSettings(models.Model):
             from users.tasks import invite_waitlist_entries
 
             transaction.on_commit(lambda: invite_waitlist_entries.delay())
+
+
+class AnnouncementQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(is_published=True)
+
+
+class Announcement(models.Model):
+    title = models.CharField(max_length=200)
+    summary = models.CharField(max_length=300, blank=True)
+    body = models.TextField()
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = AnnouncementQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class PlayerAnnouncementState(models.Model):
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="announcement_states",
+    )
+    announcement = models.ForeignKey(
+        Announcement,
+        on_delete=models.CASCADE,
+        related_name="player_states",
+    )
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("player", "announcement")
+
+    def __str__(self):
+        return f"{self.player_id}:{self.announcement_id}"
+
+    @classmethod
+    def unread_count_for_player(cls, player):
+        read_ids = cls.objects.filter(
+            player=player,
+            read_at__isnull=False,
+        ).values_list("announcement_id", flat=True)
+        return Announcement.objects.published().exclude(id__in=read_ids).count()
