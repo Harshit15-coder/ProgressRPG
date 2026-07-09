@@ -113,8 +113,6 @@ projects:
                 sync: false
               - key: VITE_API_BASE_URL
                 sync: false
-              - key: VITE_GA_TRACKING_ID
-                sync: false
               - fromGroup: Prod env
             staticPublishPath: dist
             buildCommand: npm ci && npm run build:production
