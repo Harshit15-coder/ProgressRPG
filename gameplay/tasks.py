@@ -1,11 +1,22 @@
+from datetime import timedelta
+
 from celery import shared_task
 from django.core.cache import cache
+from django.db.models import Q
 from django.utils import timezone
 
 from character.models import PlayerCharacterLink
 from .models import Quest, XpModifier
 
 DISCONNECT_TASK_CACHE_KEY = "disconnect_task:{player_id}"
+
+# A player's websocket heartbeat ping refreshes `last_seen` every 60s
+# (see WebSocketContext.tsx HEARTBEAT_INTERVAL_MS). If a connection dies
+# without a clean disconnect (crash, sleep, dropped network), Channels'
+# disconnect() may never fire, so TimerConsumer's grace-period auto-complete
+# never runs. This threshold is this sweep's backstop: 1.5x the ping
+# interval tolerates one missed ping before treating a timer as abandoned.
+STALE_TIMER_THRESHOLD = timedelta(seconds=90)
 
 
 @shared_task(bind=True)
@@ -35,6 +46,35 @@ def auto_complete_timer_on_disconnect(self, player_id: int):
     timer.complete(completion_source="auto")
     cache.delete(DISCONNECT_TASK_CACHE_KEY.format(player_id=player_id))
     return "completed"
+
+
+@shared_task
+def auto_complete_timers_for_stale_players():
+    """
+    Backstop for connections that die without a clean websocket disconnect
+    (crash, sleep, dropped network) — in these cases TimerConsumer.disconnect()
+    never fires, so its 30s grace-period auto-complete never runs and an
+    active timer would otherwise keep accruing XP indefinitely.
+
+    Sweeps for active ActivityTimers belonging to players whose last_seen
+    heartbeat is older than STALE_TIMER_THRESHOLD (or was never set), and
+    completes them the same way the disconnect grace period does.
+    """
+    from .models import ActivityTimer
+
+    cutoff = timezone.now() - STALE_TIMER_THRESHOLD
+    stale_timers = (
+        ActivityTimer.objects.select_related("player", "activity")
+        .filter(status="active")
+        .filter(Q(player__last_seen__isnull=True) | Q(player__last_seen__lt=cutoff))
+    )
+
+    completed_count = 0
+    for timer in stale_timers:
+        timer.complete(completion_source="auto")
+        completed_count += 1
+
+    return completed_count
 
 
 @shared_task

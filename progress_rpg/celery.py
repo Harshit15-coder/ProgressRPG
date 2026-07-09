@@ -45,6 +45,10 @@ app.conf.beat_schedule = {
         "task": "users.tasks.reconcile_stale_online_players",
         "schedule": 300.0,  # every 5 minutes
     },
+    "auto_complete_timers_for_stale_players": {
+        "task": "gameplay.tasks.auto_complete_timers_for_stale_players",
+        "schedule": 30.0,  # every 30 seconds
+    },
     "send_waitlist_nudges": {
         "task": "users.tasks.send_waitlist_nudges",
         "schedule": 7200.0,  # every 2 hours
