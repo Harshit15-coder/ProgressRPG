@@ -52,6 +52,8 @@ export interface Player {
   is_premium: boolean;
   is_tester: boolean;
   has_previous_subscription: boolean;
+  is_trialing: boolean;
+  trial_end: string | null;
   onboarding_step: number;
   onboarding_completed: boolean;
   login_streak: number;

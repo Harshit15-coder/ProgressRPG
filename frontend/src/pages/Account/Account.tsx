@@ -18,6 +18,8 @@ export default function Account(): React.ReactElement {
     totalMinutes,
     achievements,
     nameDisplay,
+    isTrialing,
+    trialDaysRemaining,
     isEditingName,
     draftName,
     nameError,
@@ -134,6 +136,12 @@ export default function Account(): React.ReactElement {
                 <span className={styles.premiumBadge}>Premium</span>
               ) : (
                 <span className={styles.value}>Free</span>
+              )}
+              {isTrialing && (
+                <p className={styles.description}>
+                  Free trial &mdash; {trialDaysRemaining}{" "}
+                  {trialDaysRemaining === 1 ? "day" : "days"} remaining
+                </p>
               )}
             </div>
             <div className={styles.billingAction}>

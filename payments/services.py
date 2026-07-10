@@ -2,6 +2,8 @@ import logging
 from datetime import datetime, timezone as dt_timezone
 
 import stripe
+
+from payments.webhooks import _stripe_ts_to_datetime
 from django.conf import settings
 from django.db import transaction
 from django.db.models import Q
@@ -235,6 +237,7 @@ def _reconcile_subscriptions(user, subscriptions_data):
     )
 
     if stripe_status in ACTIVE_STATUSES:
+        new_trial_end = _stripe_ts_to_datetime(getattr(candidate, "trial_end", None))
         local_sub = UserSubscription.objects.filter(
             stripe_subscription_id=stripe_sub_id
         ).first()
@@ -245,6 +248,7 @@ def _reconcile_subscriptions(user, subscriptions_data):
                 plan=plan,
                 stripe_subscription_id=stripe_sub_id,
                 active=True,
+                trial_end=new_trial_end,
             )
             logger.info(
                 "[PAYMENTS.SYNC] Created missing local subscription id=%s for user_id=%s "
@@ -258,6 +262,9 @@ def _reconcile_subscriptions(user, subscriptions_data):
             if plan and local_sub.plan != plan:
                 local_sub.plan = plan
                 local_sub.save(update_fields=["plan"])
+            if local_sub.trial_end != new_trial_end:
+                local_sub.trial_end = new_trial_end
+                local_sub.save(update_fields=["trial_end"])
             if not local_sub.active:
                 local_sub.activate()
                 logger.info(
