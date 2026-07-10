@@ -15,6 +15,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   onlinePlayerCount: ['testers'],
   your_library: [],
   unified_homepage: [],
+  map: ['testers'],
 };
 
 export default featureFlags;

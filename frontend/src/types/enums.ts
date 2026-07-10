@@ -23,7 +23,8 @@ export type FeatureFlagKey =
   | "announcements"
   | "onlinePlayerCount"
   | "your_library"
-  | "unified_homepage";
+  | "unified_homepage"
+  | "map";
 
 // ---------------------------------------------------------------------------
 // Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)
