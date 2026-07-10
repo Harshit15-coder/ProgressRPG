@@ -370,7 +370,9 @@ class CustomRegisterSerializer(RegisterSerializer):
         try:
             reject_disposable_email(value)
         except ValueError as exc:
-            raise serializers.ValidationError(str(exc)) from exc
+            raise serializers.ValidationError(
+                "Please use a valid non-disposable email address."
+            ) from exc
         return value
 
     def validate_timezone(self, value):
