@@ -141,6 +141,24 @@ class CustomUser(AbstractUser):
 
         return UserSubscription.objects.filter(user=self).exists()
 
+    @property
+    def is_trialing(self):
+        from payments.models import UserSubscription
+
+        subscription = UserSubscription.active_for_user(self)
+        if not subscription:
+            return False
+        return subscription.is_trialing
+
+    @property
+    def trial_end(self):
+        from payments.models import UserSubscription
+
+        subscription = UserSubscription.active_for_user(self)
+        if not subscription:
+            return None
+        return subscription.trial_end
+
     def __str__(self):
         return self.email
 
