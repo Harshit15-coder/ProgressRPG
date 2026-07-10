@@ -4,7 +4,7 @@ import random
 import math
 
 from character.models import Character
-from locations.models import Building
+from locations.models import Building, Node
 
 
 class Command(BaseCommand):
@@ -46,7 +46,15 @@ class Command(BaseCommand):
                 room = random.choice(rooms)
                 node = room.nodes.first()
             if not node:
-                node = building.nodes.filter(kind=Building.Node.Kind.BUILDING).first()
+                node = building.nodes.filter(kind=Node.Kind.BUILDING).first()
+
+            if not node:
+                self.stdout.write(
+                    self.style.WARNING(
+                        f"Building {building.id} has no usable node – skipping character placement"
+                    )
+                )
+                continue
 
             char.move_to(node)
 

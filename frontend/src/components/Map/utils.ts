@@ -1,23 +1,23 @@
 
-export function computeTransformFromBBox(
+/**
+ * Build an SVG viewBox string directly from a GeoJSON bbox, with a little
+ * breathing room around the edges. Plotting features at their raw
+ * coordinates inside this viewBox (rather than pre-scaling to a fixed pixel
+ * canvas) lets the browser's native viewBox scaling handle resizing/zoom
+ * correctly, and keeps the map filling its container instead of floating
+ * small inside a much bigger, mismatched canvas.
+ */
+export function computeViewBox(
   bbox: [number, number, number, number],
-  width: number,
-  height: number
-): { scale: number; offsetX: number; offsetY: number } {
+  paddingRatio = 0.08
+): string {
   const [minX, minY, maxX, maxY] = bbox;
 
   const geomWidth = maxX - minX || 1;
   const geomHeight = maxY - minY || 1;
 
-  // scale to fit SVG, leaving padding
-  const padding = 20;
-  const sx = (width - padding * 2) / geomWidth;
-  const sy = (height - padding * 2) / geomHeight;
-  const scale = Math.min(sx, sy);
+  const padX = geomWidth * paddingRatio;
+  const padY = geomHeight * paddingRatio;
 
-  // centre in viewport
-  const offsetX = padding - minX * scale + (width - geomWidth * scale) / 2;
-  const offsetY = padding - minY * scale + (height - geomHeight * scale) / 2;
-
-  return { scale, offsetX, offsetY };
+  return `${minX - padX} ${minY - padY} ${geomWidth + padX * 2} ${geomHeight + padY * 2}`;
 }
