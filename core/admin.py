@@ -1,6 +1,7 @@
 from django.contrib import admin
+from django.utils import timezone
 
-from .models import GameSettings, Image
+from .models import Announcement, GameSettings, Image, PlayerAnnouncementState
 
 
 @admin.register(Image)
@@ -18,6 +19,9 @@ class GameSettingsAdmin(admin.ModelAdmin):
         "daily_login_max_xp",
         "premium_activity_xp_multiplier",
         "trial_period_days",
+        "registration_cap",
+        "registration_enabled",
+        "self_serve_registration",
     )
     fieldsets = (
         ("Timer", {"fields": ("free_timer_limit_seconds",)}),
@@ -43,7 +47,55 @@ class GameSettingsAdmin(admin.ModelAdmin):
             },
         ),
         ("Stripe", {"fields": ("trial_period_days",)}),
+        (
+            "Registration",
+            {
+                "fields": (
+                    "registration_cap",
+                    "registration_enabled",
+                    "self_serve_registration",
+                )
+            },
+        ),
     )
 
     def has_add_permission(self, request):
         return not GameSettings.objects.exists()
+
+
+@admin.action(description="Publish selected announcements")
+def publish_selected_announcements(_modeladmin, _request, queryset):
+    now = timezone.now()
+    queryset.update(is_published=True, published_at=now)
+
+
+@admin.action(description="Unpublish selected announcements")
+def unpublish_selected_announcements(_modeladmin, _request, queryset):
+    queryset.update(is_published=False)
+
+
+@admin.register(Announcement)
+class AnnouncementAdmin(admin.ModelAdmin):
+    list_display = [
+        "title",
+        "is_published",
+        "published_at",
+        "created_at",
+        "updated_at",
+    ]
+    list_filter = ["is_published", "published_at", "created_at"]
+    search_fields = ["title", "summary", "body"]
+    actions = [publish_selected_announcements, unpublish_selected_announcements]
+
+
+@admin.register(PlayerAnnouncementState)
+class PlayerAnnouncementStateAdmin(admin.ModelAdmin):
+    list_display = [
+        "player",
+        "announcement",
+        "read_at",
+        "created_at",
+    ]
+    list_filter = ["read_at", "created_at"]
+    search_fields = ["player__name", "player__user__email", "announcement__title"]
+    readonly_fields = ["created_at", "updated_at"]

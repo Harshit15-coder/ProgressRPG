@@ -1,0 +1,12 @@
+You're invited to Progress RPG!
+
+Hello,
+
+A spot has opened up and you're invited to join Progress RPG. Click the link below to complete your registration:
+
+{{ invite_url }}
+
+Best wishes,
+Duncan (Founder, Progress RPG)
+
+© {{ current_year }} Progress RPG. All rights reserved.

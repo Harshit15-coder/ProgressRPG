@@ -92,6 +92,10 @@ class GameSettings(models.Model):
     task_completion_xp = models.IntegerField(default=100)
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
+    registration_cap = models.IntegerField(default=1_000_000_000)
+    registration_enabled = models.BooleanField(default=True)
+    self_serve_registration = models.BooleanField(default=False)
+    waitlist_nudges_enabled_from = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         verbose_name = "Game settings"
@@ -130,9 +134,76 @@ class GameSettings(models.Model):
             errors["task_completion_xp"] = "Must be non-negative."
         if self.trial_period_days < 0:
             errors["trial_period_days"] = "Must be non-negative."
+        if self.registration_cap < 0:
+            errors["registration_cap"] = "Must be non-negative."
         if errors:
             raise ValidationError(errors)
 
     def save(self, *args, **kwargs):
         self.full_clean()
+        previous_cap = None
+        if self.pk:
+            previous_cap = (
+                GameSettings.objects.filter(pk=self.pk)
+                .values_list("registration_cap", flat=True)
+                .first()
+            )
         super().save(*args, **kwargs)
+        if previous_cap is not None and self.registration_cap > previous_cap:
+            from django.db import transaction
+            from users.tasks import invite_waitlist_entries
+
+            transaction.on_commit(lambda: invite_waitlist_entries.delay())
+
+
+class AnnouncementQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(is_published=True)
+
+
+class Announcement(models.Model):
+    title = models.CharField(max_length=200)
+    summary = models.CharField(max_length=300, blank=True)
+    body = models.TextField()
+    is_published = models.BooleanField(default=False)
+    published_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    objects = AnnouncementQuerySet.as_manager()
+
+    class Meta:
+        ordering = ["-published_at", "-created_at"]
+
+    def __str__(self):
+        return self.title
+
+
+class PlayerAnnouncementState(models.Model):
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="announcement_states",
+    )
+    announcement = models.ForeignKey(
+        Announcement,
+        on_delete=models.CASCADE,
+        related_name="player_states",
+    )
+    read_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ("player", "announcement")
+
+    def __str__(self):
+        return f"{self.player_id}:{self.announcement_id}"
+
+    @classmethod
+    def unread_count_for_player(cls, player):
+        read_ids = cls.objects.filter(
+            player=player,
+            read_at__isnull=False,
+        ).values_list("announcement_id", flat=True)
+        return Announcement.objects.published().exclude(id__in=read_ids).count()

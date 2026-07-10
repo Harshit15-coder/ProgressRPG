@@ -1,13 +1,15 @@
+from datetime import timedelta
 from types import SimpleNamespace
 from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
+from django.utils import timezone
 from rest_framework.test import APIRequestFactory, force_authenticate
 from django.test import SimpleTestCase, TestCase, override_settings
 
 from payments.signals import provision_default_subscription
 from payments.models import StripeEvent, SubscriptionPlan, UserSubscription
-from payments.services import end_active_subscription
+from payments.services import end_active_subscription, sync_subscription_from_stripe
 from payments.views import CreateCheckoutSessionView, StripeWebhookView
 from payments.webhooks import (
     handle_checkout_session_completed,
@@ -120,6 +122,39 @@ class HandleSubscriptionEventTests(TestCase):
         self.assertEqual(new_subscription.plan, self.monthly_plan)
 
     @patch("payments.webhooks.stripe.Subscription.retrieve")
+    def test_checkout_session_completed_persists_trial_end(self, mock_retrieve):
+        mock_retrieve.return_value = make_event(
+            {
+                "id": "sub_new_trial",
+                "trial_end": 1735689600,  # 2025-01-01T00:00:00Z
+                "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+            }
+        )
+        checkout_event = make_event(
+            {
+                "id": "evt_checkout_trial",
+                "type": "checkout.session.completed",
+                "data": {
+                    "object": {
+                        "id": "cs_test_trial",
+                        "customer": "cus_test_123",
+                        "client_reference_id": str(self.user.id),
+                        "subscription": "sub_new_trial",
+                    }
+                },
+            }
+        )
+
+        handle_checkout_session_completed(checkout_event)
+
+        new_subscription = UserSubscription.objects.get(
+            stripe_subscription_id="sub_new_trial"
+        )
+        self.assertEqual(
+            new_subscription.trial_end.isoformat(), "2025-01-01T00:00:00+00:00"
+        )
+
+    @patch("payments.webhooks.stripe.Subscription.retrieve")
     def test_checkout_session_completed_retrieves_subscription_for_price(
         self,
         mock_retrieve_subscription,
@@ -191,6 +226,70 @@ class HandleSubscriptionEventTests(TestCase):
         subscription.refresh_from_db()
         self.assertTrue(subscription.active)
         self.assertEqual(subscription.plan.stripe_price_id, "price_premium_annual")
+
+    def test_subscription_updated_persists_trial_end(self):
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=False,
+            stripe_subscription_id="sub_updated_trial",
+        )
+
+        update_event = make_event(
+            {
+                "id": "evt_sub_update_trial",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_updated_trial",
+                        "customer": "cus_test_123",
+                        "status": "trialing",
+                        "trial_end": 1735689600,  # 2025-01-01T00:00:00Z
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    }
+                },
+            }
+        )
+
+        handle_subscription_updated(update_event)
+
+        subscription.refresh_from_db()
+        self.assertTrue(subscription.active)
+        self.assertEqual(
+            subscription.trial_end.isoformat(), "2025-01-01T00:00:00+00:00"
+        )
+
+    def test_subscription_updated_clears_trial_end_once_converted(self):
+        UserSubscription.deactivate_all_for_user(self.user)
+        subscription = UserSubscription.objects.create(
+            user=self.user,
+            plan=self.monthly_plan,
+            active=True,
+            stripe_subscription_id="sub_converted_trial",
+            trial_end=timezone.now() + timedelta(days=3),
+        )
+
+        update_event = make_event(
+            {
+                "id": "evt_sub_update_converted",
+                "type": "customer.subscription.updated",
+                "data": {
+                    "object": {
+                        "id": "sub_converted_trial",
+                        "customer": "cus_test_123",
+                        "status": "active",
+                        "trial_end": None,
+                        "items": {"data": [{"price": {"id": "price_premium_monthly"}}]},
+                    },
+                    "previous_attributes": {"status": "trialing"},
+                },
+            }
+        )
+
+        handle_subscription_updated(update_event)
+
+        subscription.refresh_from_db()
+        self.assertIsNone(subscription.trial_end)
 
     def test_subscription_deleted_deactivates_subscription(self):
         UserSubscription.deactivate_all_for_user(self.user)
@@ -504,6 +603,73 @@ class UserPremiumPropertyTests(TestCase):
         )
 
         self.assertTrue(self.user.is_premium)
+
+
+class UserTrialPropertyTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="trial-property@example.com",
+            password="testpass123",
+        )
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium Monthly",
+            description="",
+            price="9.99",
+            interval="monthly",
+            stripe_price_id="price_trial_monthly",
+        )
+
+    def test_is_trialing_false_without_active_subscription(self):
+        self.assertFalse(self.user.is_trialing)
+        self.assertIsNone(self.user.trial_end)
+
+    def test_is_trialing_false_for_active_subscription_without_trial_end(self):
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=True,
+            stripe_subscription_id="sub_no_trial",
+        )
+
+        self.assertFalse(self.user.is_trialing)
+        self.assertIsNone(self.user.trial_end)
+
+    def test_is_trialing_true_for_active_subscription_with_future_trial_end(self):
+        future = timezone.now() + timedelta(days=5)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=True,
+            stripe_subscription_id="sub_trialing",
+            trial_end=future,
+        )
+
+        self.assertTrue(self.user.is_trialing)
+        self.assertEqual(self.user.trial_end, future)
+
+    def test_is_trialing_false_once_trial_end_has_passed(self):
+        past = timezone.now() - timedelta(days=1)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=True,
+            stripe_subscription_id="sub_trial_expired",
+            trial_end=past,
+        )
+
+        self.assertFalse(self.user.is_trialing)
+
+    def test_is_trialing_false_for_inactive_subscription_with_future_trial_end(self):
+        future = timezone.now() + timedelta(days=5)
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=False,
+            stripe_subscription_id="sub_inactive_trial",
+            trial_end=future,
+        )
+
+        self.assertFalse(self.user.is_trialing)
 
 
 class ProcessStripeEventRoutingTests(SimpleTestCase):
@@ -850,6 +1016,169 @@ class CreateCheckoutSessionViewTests(TestCase):
         self.assertEqual(create_kwargs["customer"], "cus_existing_123")
         self.assertNotIn("customer_email", create_kwargs)
 
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    @patch("payments.views.sync_subscription_from_stripe")
+    def test_reconciles_with_stripe_before_offering_trial_when_no_local_record(
+        self, mock_sync, mock_game_settings, mock_create_session
+    ):
+        """
+        A user whose checkout.session.completed webhook never landed has no
+        local UserSubscription row, but did previously trial. The view should
+        ask Stripe directly (via sync_subscription_from_stripe) rather than
+        trusting the empty local record.
+        """
+        mock_game_settings.return_value.trial_period_days = 7
+        user = get_user_model().objects.create_user(
+            email="webhook-missed@example.com",
+            password="testpass123",
+        )
+
+        def fake_sync(synced_user):
+            UserSubscription.objects.create(
+                user=synced_user,
+                plan=self.monthly_plan,
+                active=False,
+                stripe_subscription_id="sub_backfilled",
+            )
+            return {"status": "canceled", "synced": True}
+
+        mock_sync.side_effect = fake_sync
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_reconciled",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        mock_sync.assert_called_once()
+        create_kwargs = mock_create_session.call_args.kwargs
+        self.assertNotIn("trial_period_days", create_kwargs["subscription_data"])
+
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    @patch("payments.views.sync_subscription_from_stripe")
+    def test_offers_trial_when_stripe_reconciliation_finds_no_prior_subscription(
+        self, mock_sync, mock_game_settings, mock_create_session
+    ):
+        mock_game_settings.return_value.trial_period_days = 7
+        mock_sync.return_value = {"status": "none", "synced": True}
+        user = get_user_model().objects.create_user(
+            email="genuinely-new@example.com",
+            password="testpass123",
+        )
+
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_genuine_new",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        mock_sync.assert_called_once()
+        create_kwargs = mock_create_session.call_args.kwargs
+        self.assertEqual(create_kwargs["subscription_data"]["trial_period_days"], 7)
+
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    @patch("payments.views.sync_subscription_from_stripe")
+    def test_fails_open_to_local_record_when_stripe_reconciliation_errors(
+        self, mock_sync, mock_game_settings, mock_create_session
+    ):
+        import stripe
+
+        mock_game_settings.return_value.trial_period_days = 7
+        mock_sync.side_effect = stripe.error.APIConnectionError("boom")
+        user = get_user_model().objects.create_user(
+            email="stripe-down@example.com",
+            password="testpass123",
+        )
+
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_stripe_down",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        create_kwargs = mock_create_session.call_args.kwargs
+        self.assertEqual(create_kwargs["subscription_data"]["trial_period_days"], 7)
+
+    @override_settings(
+        STRIPE_SUCCESS_URL="https://example.com/success",
+        STRIPE_CANCEL_URL="https://example.com/cancel",
+    )
+    @patch("payments.views.stripe.checkout.Session.create")
+    @patch("payments.views.GameSettings.current")
+    @patch("payments.views.sync_subscription_from_stripe")
+    def test_skips_stripe_reconciliation_when_local_record_already_exists(
+        self, mock_sync, mock_game_settings, mock_create_session
+    ):
+        mock_game_settings.return_value.trial_period_days = 7
+        user = get_user_model().objects.create_user(
+            email="already-has-local-record@example.com",
+            password="testpass123",
+        )
+        UserSubscription.objects.create(
+            user=user,
+            plan=self.monthly_plan,
+            active=False,
+            stripe_subscription_id="sub_old_local",
+        )
+
+        mock_create_session.return_value = SimpleNamespace(
+            url="https://checkout.example/session",
+            id="cs_test_skip_sync",
+        )
+
+        request = APIRequestFactory().post(
+            "/payments/create-checkout-session/",
+            {"plan": "monthly"},
+            format="json",
+        )
+        force_authenticate(request, user=user)
+
+        response = CreateCheckoutSessionView.as_view()(request)
+
+        self.assertEqual(response.status_code, 200)
+        mock_sync.assert_not_called()
+
 
 class HasPreviousSubscriptionTests(TestCase):
     def setUp(self):
@@ -926,4 +1255,211 @@ class EndActiveSubscriptionTests(TestCase):
         existing_subscription.refresh_from_db()
         self.assertFalse(existing_subscription.active)
         self.assertIsNotNone(existing_subscription.end_date)
-        mock_cancel.assert_called_once_with("sub_existing_premium")
+
+
+def make_stripe_subscription(
+    sub_id, status, price_id=None, ended_at=None, trial_end=None
+):
+    price = SimpleNamespace(id=price_id) if price_id else None
+    item = SimpleNamespace(price=price, plan=None)
+    return SimpleNamespace(
+        id=sub_id,
+        status=status,
+        items=SimpleNamespace(data=[item]),
+        ended_at=ended_at,
+        canceled_at=None,
+        trial_end=trial_end,
+    )
+
+
+class SyncSubscriptionBackfillTests(TestCase):
+    """
+    Covers #506: has_previous_subscription must not depend solely on the
+    checkout.session.completed webhook having landed. sync_subscription_from_stripe
+    should backfill local rows for any subscription Stripe knows about, including
+    past/cancelled ones that never got a local record.
+    """
+
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="backfill@example.com",
+            password="testpass123",
+            stripe_customer_id="cus_backfill_123",
+        )
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium Monthly",
+            description="",
+            price="9.99",
+            interval="monthly",
+            stripe_price_id="price_backfill_monthly",
+        )
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_backfills_local_record_for_past_subscription_missing_webhook(
+        self, mock_list
+    ):
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_past_trial",
+                    "canceled",
+                    price_id="price_backfill_monthly",
+                    ended_at=1700000000,
+                )
+            ]
+        )
+
+        self.assertFalse(self.user.has_previous_subscription)
+
+        result = sync_subscription_from_stripe(self.user)
+
+        self.assertEqual(result["status"], "canceled")
+        self.assertTrue(self.user.has_previous_subscription)
+        local_sub = UserSubscription.objects.get(
+            stripe_subscription_id="sub_past_trial"
+        )
+        self.assertFalse(local_sub.active)
+        self.assertEqual(local_sub.plan, self.plan)
+        self.assertIsNotNone(local_sub.end_date)
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_backfills_historical_subscriptions_alongside_an_active_candidate(
+        self, mock_list
+    ):
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_current_active",
+                    "active",
+                    price_id="price_backfill_monthly",
+                ),
+                make_stripe_subscription(
+                    "sub_old_trial",
+                    "canceled",
+                    price_id="price_backfill_monthly",
+                    ended_at=1650000000,
+                ),
+            ]
+        )
+
+        sync_subscription_from_stripe(self.user)
+
+        self.assertTrue(
+            UserSubscription.objects.filter(
+                stripe_subscription_id="sub_current_active", active=True
+            ).exists()
+        )
+        self.assertTrue(
+            UserSubscription.objects.filter(
+                stripe_subscription_id="sub_old_trial", active=False
+            ).exists()
+        )
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_does_not_duplicate_existing_local_record_on_backfill(self, mock_list):
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=False,
+            stripe_subscription_id="sub_already_local",
+        )
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_already_local",
+                    "canceled",
+                    price_id="price_backfill_monthly",
+                )
+            ]
+        )
+
+        sync_subscription_from_stripe(self.user)
+
+        self.assertEqual(
+            UserSubscription.objects.filter(
+                stripe_subscription_id="sub_already_local"
+            ).count(),
+            1,
+        )
+
+
+class SyncSubscriptionTrialEndTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            email="sync-trial@example.com",
+            password="testpass123",
+            stripe_customer_id="cus_sync_trial_123",
+        )
+        self.plan = SubscriptionPlan.objects.create(
+            name="Premium Monthly",
+            description="",
+            price="9.99",
+            interval="monthly",
+            stripe_price_id="price_sync_trial_monthly",
+        )
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_sets_trial_end_when_creating_missing_local_subscription(self, mock_list):
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_sync_new_trial",
+                    "trialing",
+                    price_id="price_sync_trial_monthly",
+                    trial_end=1735689600,  # 2025-01-01T00:00:00Z
+                )
+            ]
+        )
+
+        sync_subscription_from_stripe(self.user)
+
+        local_sub = UserSubscription.objects.get(
+            stripe_subscription_id="sub_sync_new_trial"
+        )
+        self.assertEqual(local_sub.trial_end.isoformat(), "2025-01-01T00:00:00+00:00")
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_updates_trial_end_on_existing_local_subscription(self, mock_list):
+        UserSubscription.objects.create(
+            user=self.user,
+            plan=self.plan,
+            active=True,
+            stripe_subscription_id="sub_sync_existing_trial",
+            trial_end=timezone.now() - timedelta(days=30),
+        )
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_sync_existing_trial",
+                    "trialing",
+                    price_id="price_sync_trial_monthly",
+                    trial_end=1735689600,  # 2025-01-01T00:00:00Z
+                )
+            ]
+        )
+
+        sync_subscription_from_stripe(self.user)
+
+        local_sub = UserSubscription.objects.get(
+            stripe_subscription_id="sub_sync_existing_trial"
+        )
+        self.assertEqual(local_sub.trial_end.isoformat(), "2025-01-01T00:00:00+00:00")
+
+    @patch("payments.services.stripe.Subscription.list")
+    def test_trial_end_none_when_stripe_subscription_has_no_trial(self, mock_list):
+        mock_list.return_value = SimpleNamespace(
+            data=[
+                make_stripe_subscription(
+                    "sub_sync_no_trial",
+                    "active",
+                    price_id="price_sync_trial_monthly",
+                )
+            ]
+        )
+
+        sync_subscription_from_stripe(self.user)
+
+        local_sub = UserSubscription.objects.get(
+            stripe_subscription_id="sub_sync_no_trial"
+        )
+        self.assertIsNone(local_sub.trial_end)

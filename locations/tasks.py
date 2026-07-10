@@ -1,3 +1,5 @@
+import random
+
 from celery import shared_task
 from django.core.management import call_command
 
@@ -61,6 +63,36 @@ def move_characters_tick(time_delta=1.0):
     # Check if there are still moving characters
     if Character.objects.filter(is_moving=True).exists():
         move_characters_tick.apply_async(countdown=time_delta)
+
+
+@shared_task
+def wander_tick(fraction=0.2):
+    """
+    Decorative-only movement for the village view: each tick, nudges a random
+    subset of idle characters within their village boundary (linked or not -
+    this is purely visual, not tied to gameplay). Deliberately independent of
+    move_characters_tick/Journey - does not touch is_moving/current_node, so
+    it can't interfere with the travel/pathfinding system. Only a subgroup
+    moves per tick so the whole village doesn't shuffle in lockstep.
+    """
+    from character.models import Character
+    from .services.wander import wander
+
+    candidate_ids = list(
+        Character.objects.filter(
+            is_moving=False, population_centre__isnull=False
+        ).values_list("id", flat=True)
+    )
+    if not candidate_ids:
+        return
+
+    sample_size = max(1, round(len(candidate_ids) * fraction))
+    chosen_ids = random.sample(candidate_ids, min(sample_size, len(candidate_ids)))
+
+    for character in Character.objects.filter(id__in=chosen_ids).select_related(
+        "population_centre"
+    ):
+        wander(character)
 
 
 @shared_task

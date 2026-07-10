@@ -1,0 +1,14 @@
+You've been removed from the Progress RPG waitlist
+
+Hello,
+
+You were invited to join Progress RPG {{ day }} days ago, but we haven't seen you complete your registration, so your invitation has now expired and your spot has been released.
+
+No hard feelings — if you'd still like to join, you're welcome to sign up again at your leisure:
+
+{{ frontend_url }}
+
+Best wishes,
+Duncan (Founder, Progress RPG)
+
+© {{ current_year }} Progress RPG. All rights reserved.

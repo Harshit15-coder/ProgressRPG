@@ -178,6 +178,18 @@ export function useAccountPage() {
   const achievements = Array.isArray(player?.achievements) ? player.achievements : [];
   const nameDisplay = loading ? "Loading..." : player?.name?.trim() || "Unnamed player";
 
+  const isTrialing = player?.is_trialing ?? false;
+  const [nowMs] = useState(() => Date.now());
+  const trialDaysRemaining =
+    isTrialing && player?.trial_end
+      ? Math.max(
+          0,
+          Math.ceil(
+            (new Date(player.trial_end).getTime() - nowMs) / (24 * 60 * 60 * 1000)
+          )
+        )
+      : 0;
+
   const handleDownloadData = useCallback(() => {
     downloadUserDataMutation.mutate();
   }, [downloadUserDataMutation]);
@@ -191,6 +203,8 @@ export function useAccountPage() {
     totalMinutes,
     achievements,
     nameDisplay,
+    isTrialing,
+    trialDaysRemaining,
     isEditingName,
     draftName,
     nameError,

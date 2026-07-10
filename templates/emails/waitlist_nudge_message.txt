@@ -1,0 +1,12 @@
+Still there? Your Progress RPG invite is waiting
+
+Hello,
+
+It's been {{ day }} days since you were invited to join Progress RPG, and we haven't seen you register yet. Your spot is still reserved — click the link below to complete your registration:
+
+{{ invite_url }}
+
+Best wishes,
+Duncan (Founder, Progress RPG)
+
+© {{ current_year }} Progress RPG. All rights reserved.

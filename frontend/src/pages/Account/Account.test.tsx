@@ -323,4 +323,62 @@ describe("Account", () => {
     ).toHaveAttribute("href", TEST_BILLING_PORTAL_URL);
     expect(screen.queryByRole("link", { name: "Upgrade" })).not.toBeInTheDocument();
   });
+
+  it("shows the trial status line with days remaining for trialing users", () => {
+    const trialEnd = new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString();
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({
+        is_premium: true,
+        is_trialing: true,
+        trial_end: trialEnd,
+      }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.getByText(/Free trial.*5 days remaining/)).toBeInTheDocument();
+  });
+
+  it("shows singular 'day' when exactly one day remains", () => {
+    const trialEnd = new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString();
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({
+        is_premium: true,
+        is_trialing: true,
+        trial_end: trialEnd,
+      }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.getByText(/Free trial.*1 day remaining/)).toBeInTheDocument();
+  });
+
+  it("does not show the trial status line for non-trialing free users", () => {
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({ is_premium: false, is_trialing: false, trial_end: null }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.queryByText(/Free trial/)).not.toBeInTheDocument();
+  });
+
+  it("does not show the trial status line once a premium user's trial has ended", () => {
+    mockUseGame.mockReturnValue({
+      player: mockPlayer({ is_premium: true, is_trialing: false, trial_end: null }),
+      loading: false,
+      fetchPlayerAndCharacter: vi.fn(),
+    });
+
+    renderAccount();
+
+    expect(screen.queryByText(/Free trial/)).not.toBeInTheDocument();
+  });
 });

@@ -22,6 +22,11 @@ logger = logging.getLogger("general")
 stripe.api_key = settings.STRIPE_SECRET_KEY
 
 
+def _stripe_ts_to_datetime(timestamp):
+    """Convert a Stripe unix timestamp (or None) to an aware datetime (or None)."""
+    return datetime.fromtimestamp(timestamp, tz=dt_timezone.utc) if timestamp else None
+
+
 def process_stripe_event(event):
     event_type = event.type
 
@@ -102,6 +107,9 @@ def handle_checkout_session_completed(event):
         plan=plan,
         stripe_subscription_id=subscription_id,
         active=True,
+        trial_end=_stripe_ts_to_datetime(
+            getattr(retrieved_subscription, "trial_end", None)
+        ),
     )
     logger.info(
         "[PAYMENTS.WEBHOOK] Created subscription id=%s for user_id=%s "
@@ -126,6 +134,13 @@ def handle_subscription_updated(event):
         return
 
     status = subscription_payload.status
+
+    new_trial_end = _stripe_ts_to_datetime(
+        getattr(subscription_payload, "trial_end", None)
+    )
+    if subscription.trial_end != new_trial_end:
+        subscription.trial_end = new_trial_end
+        subscription.save(update_fields=["trial_end"])
 
     price_id = extract_price_id(subscription_payload)
     if price_id:
@@ -208,12 +223,7 @@ def handle_trial_will_end(event):
     if not user or not subscription_payload:
         return
 
-    trial_end_ts = getattr(subscription_payload, "trial_end", None)
-    trial_end = (
-        datetime.fromtimestamp(trial_end_ts, tz=dt_timezone.utc)
-        if trial_end_ts
-        else None
-    )
+    trial_end = _stripe_ts_to_datetime(getattr(subscription_payload, "trial_end", None))
 
     send_trial_ending_soon_email(user, trial_end)
     logger.info(

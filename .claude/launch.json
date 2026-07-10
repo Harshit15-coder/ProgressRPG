@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "frontend-dev",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": ["-e", "bash", "-lc", "cd /home/gaidheal/repos/progressrpg/frontend && npm run dev -- --host --port 5183 --strictPort"],
+      "port": 5183
+    }
+  ]
+}
