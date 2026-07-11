@@ -1,9 +1,13 @@
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
+import dts from 'vite-plugin-dts';
 import path from 'path';
 
 export default defineConfig({
-  plugins: [react()],
+  plugins: [
+    react(),
+    dts({ rollupTypes: true, tsconfigPath: './tsconfig.ds.json', entryRoot: 'src' }),
+  ],
   build: {
     lib: {
       entry: path.resolve(__dirname, 'src/ds-entry.js'),
@@ -13,7 +17,13 @@ export default defineConfig({
     },
     outDir: 'dist-ds',
     rollupOptions: {
-      external: ['react', 'react-dom'],
+      external: [
+        'react',
+        'react-dom',
+        /^react\/jsx-runtime$/,
+        /^react\/jsx-dev-runtime$/,
+        /^react-dom\/.*/,
+      ],
       output: {
         globals: {
           react: 'React',

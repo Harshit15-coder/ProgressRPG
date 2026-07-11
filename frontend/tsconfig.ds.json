@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "src/ds-entry.js",
+    "src/vite-env.d.ts",
+    "src/components/Button/**/*",
+    "src/components/Tooltip/**/*",
+    "src/components/ProgressBar/**/*",
+    "src/components/Input/**/*",
+    "src/components/Form/**/*",
+    "src/components/Modal/**/*",
+    "src/components/AlertDialog/**/*"
+  ],
+  "exclude": ["node_modules", "dist", "**/*.test.*", "**/*.stories.*"]
+}
