@@ -5,10 +5,6 @@
   @include m.page-layout();
 }
 
-.header {
-  @include lp.list-page-header;
-}
-
 .addProjectForm {
   @include lp.list-page-add-form;
 }

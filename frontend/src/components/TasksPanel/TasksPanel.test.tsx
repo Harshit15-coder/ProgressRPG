@@ -2,13 +2,13 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { TooltipProvider } from "../../components/Tooltip/Tooltip";
-import TasksPage from "./TasksPage";
+import { TooltipProvider } from "../Tooltip/Tooltip";
+import TasksPanel from "./TasksPanel";
 
-function renderTasksPage() {
+function renderTasksPanel() {
   return render(
     <TooltipProvider>
-      <TasksPage />
+      <TasksPanel />
     </TooltipProvider>
   );
 }
@@ -25,7 +25,7 @@ const navigate = vi.fn();
 const startActivity = vi.fn().mockResolvedValue(undefined);
 const fetchPlayerAndCharacter = vi.fn();
 
-// TasksPage pulls navigation, the activity timer and the player from context.
+// TasksPanel pulls navigation, the activity timer and the player from context.
 let gameValue: Record<string, unknown>;
 
 vi.mock("../../hooks/useTasks", () => ({
@@ -44,7 +44,7 @@ vi.mock("../../hooks/useGame", () => ({
 }));
 
 // Stub the autocomplete input so these tests don't depend on the search cache.
-vi.mock("../../components/EntitySearchInput/EntitySearchInput", () => ({
+vi.mock("../EntitySearchInput/EntitySearchInput", () => ({
   default: ({
     value,
     onChange,
@@ -87,7 +87,7 @@ const completeTask = {
   total_records: 1,
 };
 
-describe("TasksPage", () => {
+describe("TasksPanel", () => {
   beforeEach(() => {
     createMutate.mockReset();
     updateMutate.mockReset();
@@ -114,7 +114,7 @@ describe("TasksPage", () => {
   });
 
   it("hides completed tasks by default", () => {
-    renderTasksPage();
+    renderTasksPanel();
 
     expect(screen.getByText("Morning routine")).toBeInTheDocument();
     expect(screen.queryByText("Taxes")).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe("TasksPage", () => {
 
   it("reveals completed tasks and persists the preference when toggled", async () => {
     const user = userEvent.setup();
-    renderTasksPage();
+    renderTasksPanel();
 
     await user.click(screen.getByRole("button", { name: "Show complete" }));
 
@@ -134,14 +134,14 @@ describe("TasksPage", () => {
 
   it("respects a persisted 'show complete' preference on mount", () => {
     localStorage.setItem("tasks.hideCompleted", "false");
-    renderTasksPage();
+    renderTasksPanel();
 
     expect(screen.getByText("Taxes")).toBeInTheDocument();
   });
 
   it("toggles task completion with the row checkbox", async () => {
     const user = userEvent.setup();
-    renderTasksPage();
+    renderTasksPanel();
 
     await user.click(
       screen.getByRole("checkbox", { name: "Mark Morning routine as complete" }),
@@ -159,7 +159,7 @@ describe("TasksPage", () => {
     // The play button lives in a hover-revealed row (pointer-events:none until
     // hover), which jsdom can't simulate, so skip the pointer-events guard.
     const user = userEvent.setup({ pointerEventsCheck: 0 });
-    renderTasksPage();
+    renderTasksPanel();
 
     await user.click(screen.getByRole("button", { name: "Start working on Morning routine" }));
 
@@ -176,7 +176,7 @@ describe("TasksPage", () => {
   it("does not start an activity when a timer is already running", async () => {
     const user = userEvent.setup({ pointerEventsCheck: 0 });
     gameValue.activityTimer = { status: "active", startActivity };
-    renderTasksPage();
+    renderTasksPanel();
 
     await user.click(screen.getByRole("button", { name: "Start working on Morning routine" }));
 
@@ -186,7 +186,7 @@ describe("TasksPage", () => {
 
   it("edits a task name through the PlayerItemList dialog", async () => {
     const user = userEvent.setup();
-    renderTasksPage();
+    renderTasksPanel();
 
     // hoverEdit renders the name and a 📝 button with the same label; either opens the dialog.
     await user.click(

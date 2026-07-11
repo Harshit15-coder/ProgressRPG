@@ -6,27 +6,23 @@
   @include m.page-layout();
 }
 
-.header {
-  @include lp.list-page-header;
-}
-
-.addSkillForm {
+.addCategoryForm {
   @include lp.list-page-add-form;
 }
 
-.addSkillInput {
+.addCategoryInput {
   @include lp.list-page-add-input;
 }
 
-.skillsList {
+.categoriesList {
   @include lp.list-page-list;
 }
 
-.skillItem {
+.categoryItem {
   @include lp.list-page-item;
 }
 
-.skillDetails {
+.categoryDetails {
   @include lp.list-page-details;
 }
 

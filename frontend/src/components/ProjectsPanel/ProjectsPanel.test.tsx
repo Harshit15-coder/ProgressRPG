@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import ProjectsPage from "./ProjectsPage";
+import ProjectsPanel from "./ProjectsPanel";
 
 const mockUseProjects = vi.fn();
 const mockUseCreateProject = vi.fn();
@@ -19,7 +19,7 @@ vi.mock("../../hooks/useProjects", () => ({
   useDeleteProject: () => mockUseDeleteProject(),
 }));
 
-describe("ProjectsPage", () => {
+describe("ProjectsPanel", () => {
   beforeEach(() => {
     createMutate.mockReset();
     updateMutate.mockReset();
@@ -45,7 +45,7 @@ describe("ProjectsPage", () => {
 
   it("creates a project", async () => {
     const user = userEvent.setup();
-    render(<ProjectsPage />);
+    render(<ProjectsPanel />);
 
     await user.type(screen.getByRole("textbox"), "New client portal");
     await user.click(screen.getByRole("button", { name: /add project/i }));
@@ -57,7 +57,7 @@ describe("ProjectsPage", () => {
 
   it("toggles project completion with the row checkbox", async () => {
     const user = userEvent.setup();
-    render(<ProjectsPage />);
+    render(<ProjectsPanel />);
 
     await user.click(screen.getByRole("checkbox", { name: "Mark Website overhaul as complete" }));
 
@@ -71,7 +71,7 @@ describe("ProjectsPage", () => {
 
   it("edits and deletes projects through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<ProjectsPage />);
+    render(<ProjectsPanel />);
 
     await user.click(screen.getByRole("button", { name: "Open project Website overhaul" }));
     const input = screen.getByLabelText("project name");

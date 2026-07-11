@@ -21,12 +21,7 @@ const MapPage = lazy(() => import("../pages/MapPage/MapPage"));
 const MaintenancePage = lazy(() => import("../pages/MaintenancePage/MaintenancePage"));
 const UnavailablePage = lazy(() => import("../pages/UnavailablePage"));
 const NotFoundPage = lazy(() => import("../pages/NotFoundPage/NotFoundPage"));
-// const SkillsPage = lazy(() => import("../pages/SkillsPage/SkillsPage"));
-const TasksPage = lazy(() => import("../pages/TasksPage/TasksPage"));
 const LibraryPage = lazy(() => import("../pages/LibraryPage/LibraryPage"));
-const ProjectsPage = lazy(() => import("../pages/ProjectsPage/ProjectsPage"));
-const ActivitiesPage = lazy(() => import("../pages/ActivitiesPage"));
-// const CategoriesPage = lazy(() => import("../pages/CategoriesPage/CategoriesPage"));
 const ActivityTimelinePage = lazy(() => import("../pages/Game2/ActivityTimelinePage"))
 const SuccessPage = lazy(() => import("../pages/SuccessPage"));
 const CancelPage = lazy(() => import("../pages/CancelPage"));
@@ -149,64 +144,14 @@ export const routes = [
       </PrivateRoute>
     ),
   },
-  // {
-  //   path: "/skills",
-  //   element: (
-  //     <PrivateRoute>
-  //       <RequireOnboardingComplete>
-  //         <SkillsPage />
-  //       </RequireOnboardingComplete>
-  //     </PrivateRoute>
-  //   ),
-  // },
-  {
-    path: "/tasks",
-    element: (
-      <PrivateRoute>
-        <FeatureToggle flag="tasksFeature">
-          <TasksPage />
-        </FeatureToggle>
-      </PrivateRoute>
-    ),
-  },
-  {
-    path: "/projects",
-    element: (
-      <PrivateRoute>
-        <FeatureToggle flag="projectsPage">
-          <ProjectsPage />
-        </FeatureToggle>
-      </PrivateRoute>
-    ),
-  },
   {
     path: "/library",
     element: (
       <PrivateRoute>
-        <FeatureToggle flag="your_library">
-          <LibraryPage />
-        </FeatureToggle>
+        <LibraryPage />
       </PrivateRoute>
     ),
   },
-  {
-    path: "/activities",
-    element: (
-      <PrivateRoute>
-        <ActivitiesPage />
-      </PrivateRoute>
-    ),
-  },
-  // {
-  //   path: "/categories",
-  //   element: (
-  //     <PrivateRoute>
-  //       <RequireOnboardingComplete>
-  //         <CategoriesPage />
-  //       </RequireOnboardingComplete>
-  //     </PrivateRoute>
-  //   ),
-  // },
   // Premium-only route pattern:
   // {
   //   path: "/premium-example",

@@ -2,12 +2,12 @@ import React, { useCallback, useState } from "react";
 
 import { useSkills, useCreateSkill, useUpdateSkill, useDeleteSkill } from "../../hooks/useSkills";
 import type { PlayerSkill } from "../../types";
-import Input from "../../components/Input/Input";
-import Button from "../../components/Button/Button";
-import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
-import styles from "./SkillsPage.module.scss";
+import Input from "../Input/Input";
+import Button from "../Button/Button";
+import PlayerItemList from "../PlayerItemList/PlayerItemList";
+import styles from "./SkillsPanel.module.scss";
 
-export default function SkillsPage(): React.ReactElement | null {
+export default function SkillsPanel(): React.ReactElement | null {
   const { data: skills, isLoading } = useSkills();
   const createSkill = useCreateSkill();
   const updateSkill = useUpdateSkill();
@@ -44,10 +44,6 @@ export default function SkillsPage(): React.ReactElement | null {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1>Skills</h1>
-      </div>
-
       <form className={styles.addSkillForm} onSubmit={handleCreateSkill}>
         <Input
           id="new-skill-name"

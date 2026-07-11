@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
 import { useGame } from "../../hooks/useGame";
 import type { Task } from "../../types";
-import type { SortOption } from "../../components/PlayerItemList/PlayerItemList";
+import type { SortOption } from "../PlayerItemList/PlayerItemList";
 import { formatRewardDuration } from "../../utils/formatUtils";
 import { TASKS_HIDE_COMPLETED_KEY } from "../../utils/userPreferences";
 
@@ -80,7 +80,7 @@ function formatLastWorkedOn(task: Task): string {
   return `Last worked on ${diffWeeks} ${diffWeeks === 1 ? "week" : "weeks"} ago`;
 }
 
-export function useTasksPage() {
+export function useTasksPanel() {
   const navigate = useNavigate();
   const { fetchPlayerAndCharacter, activityTimer, freeTimerLimitSeconds, player } = useGame();
   const isPremium = Boolean(player?.is_premium);

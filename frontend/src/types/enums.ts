@@ -22,7 +22,6 @@ export type FeatureFlagKey =
   | "toastsFeature"
   | "announcements"
   | "onlinePlayerCount"
-  | "your_library"
   | "unified_homepage"
   | "map";
 

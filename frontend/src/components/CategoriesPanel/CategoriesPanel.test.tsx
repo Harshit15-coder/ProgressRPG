@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import CategoriesPage from "./CategoriesPage";
+import CategoriesPanel from "./CategoriesPanel";
 
 const mockUseCategories = vi.fn();
 const mockUseCreateCategory = vi.fn();
@@ -19,7 +19,7 @@ vi.mock("../../hooks/useCategories", () => ({
   useDeleteCategory: () => mockUseDeleteCategory(),
 }));
 
-describe("CategoriesPage", () => {
+describe("CategoriesPanel", () => {
   beforeEach(() => {
     createMutate.mockReset();
     updateMutate.mockReset();
@@ -38,7 +38,7 @@ describe("CategoriesPage", () => {
 
   it("edits and deletes categories through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<CategoriesPage />);
+    render(<CategoriesPanel />);
 
     await user.click(screen.getByRole("button", { name: "Open category Deep Work" }));
     const input = screen.getByLabelText("category name");

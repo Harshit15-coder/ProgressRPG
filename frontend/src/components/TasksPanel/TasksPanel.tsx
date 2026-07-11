@@ -1,17 +1,13 @@
 import React from "react";
 
-import EntitySearchInput from "../../components/EntitySearchInput/EntitySearchInput";
-import Button from "../../components/Button/Button";
-import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
-import Tooltip from "../../components/Tooltip/Tooltip";
-import { isTaskComplete, taskSortOptions, useTasksPage, type ItemRecord } from "./useTasksPage";
-import styles from "./TasksPage.module.scss";
+import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
+import Button from "../Button/Button";
+import PlayerItemList from "../PlayerItemList/PlayerItemList";
+import Tooltip from "../Tooltip/Tooltip";
+import { isTaskComplete, taskSortOptions, useTasksPanel, type ItemRecord } from "./useTasksPanel";
+import styles from "./TasksPanel.module.scss";
 
-interface TasksPageProps {
-  showHeading?: boolean;
-}
-
-export default function TasksPage({ showHeading = true }: TasksPageProps = {}): React.ReactElement | null {
+export default function TasksPanel(): React.ReactElement | null {
   const {
     isLoading,
     newName,
@@ -27,19 +23,13 @@ export default function TasksPage({ showHeading = true }: TasksPageProps = {}): 
     toggleHideCompleted,
     getTaskMeta,
     getTaskEditSummary,
-  } = useTasksPage();
+  } = useTasksPanel();
 
   if (isLoading) return <p>Loading tasks...</p>;
 
   return (
     <div className={styles.page}>
       <div className={styles.content}>
-      {showHeading && (
-        <div className={styles.header}>
-          <h1>Tasks</h1>
-        </div>
-      )}
-
       <form className={styles.addTaskForm} onSubmit={handleSubmitForm}>
         <EntitySearchInput
           type="task"

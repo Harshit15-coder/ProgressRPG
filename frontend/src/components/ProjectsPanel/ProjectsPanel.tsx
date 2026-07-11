@@ -1,20 +1,20 @@
 import React, { useCallback, useState } from "react";
 
-import Input from "../../components/Input/Input";
+import Input from "../Input/Input";
 import type { Project } from "../../types";
-import Button from "../../components/Button/Button";
-import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
+import Button from "../Button/Button";
+import PlayerItemList from "../PlayerItemList/PlayerItemList";
 import {
   useCreateProject,
   useDeleteProject,
   useProjects,
   useUpdateProject,
 } from "../../hooks/useProjects";
-import styles from "./ProjectsPage.module.scss";
+import styles from "./ProjectsPanel.module.scss";
 
 const isProjectComplete = (project: Project): boolean => Boolean(project?.completed_at ?? project?.is_complete);
 
-export default function ProjectsPage(): React.ReactElement | null {
+export default function ProjectsPanel(): React.ReactElement | null {
   const { data: projects, isLoading } = useProjects();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
@@ -66,10 +66,6 @@ export default function ProjectsPage(): React.ReactElement | null {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1>Projects</h1>
-      </div>
-
       <form className={styles.addProjectForm} onSubmit={handleCreateProject}>
         <Input
           id="new-project-name"

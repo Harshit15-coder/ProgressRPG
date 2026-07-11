@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import ActivitiesPage from "./ActivitiesPage";
+import ActivitiesPanel from "./ActivitiesPanel";
 
 const mockUseActivities = vi.fn();
 const mockUseDeleteActivity = vi.fn();
@@ -10,13 +10,13 @@ const mockUseUpdateActivity = vi.fn();
 const deleteMutate = vi.fn();
 const updateMutate = vi.fn();
 
-vi.mock("../hooks/useActivities", () => ({
+vi.mock("../../hooks/useActivities", () => ({
   useActivities: () => mockUseActivities(),
   useDeleteActivity: () => mockUseDeleteActivity(),
   useUpdateActivity: () => mockUseUpdateActivity(),
 }));
 
-describe("ActivitiesPage", () => {
+describe("ActivitiesPanel", () => {
   beforeEach(() => {
     deleteMutate.mockReset();
     updateMutate.mockReset();
@@ -39,7 +39,7 @@ describe("ActivitiesPage", () => {
 
   it("renders activities and delegates edit through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<ActivitiesPage />);
+    render(<ActivitiesPanel />);
 
     expect(screen.getByText("Write docs")).toBeInTheDocument();
 
@@ -59,7 +59,7 @@ describe("ActivitiesPage", () => {
 
   it("delegates delete confirmation through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<ActivitiesPage />);
+    render(<ActivitiesPanel />);
 
     await user.click(screen.getByRole("button", { name: "Open activity Write docs" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));

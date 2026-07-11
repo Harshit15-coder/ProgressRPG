@@ -2,12 +2,12 @@ import React, { useCallback, useState } from "react";
 
 import { useCategories, useCreateCategory, useUpdateCategory, useDeleteCategory } from "../../hooks/useCategories";
 import type { Category } from "../../types";
-import Input from "../../components/Input/Input";
-import Button from "../../components/Button/Button";
-import PlayerItemList from "../../components/PlayerItemList/PlayerItemList";
-import styles from "./CategoriesPage.module.scss";
+import Input from "../Input/Input";
+import Button from "../Button/Button";
+import PlayerItemList from "../PlayerItemList/PlayerItemList";
+import styles from "./CategoriesPanel.module.scss";
 
-export default function CategoriesPage(): React.ReactElement | null {
+export default function CategoriesPanel(): React.ReactElement | null {
   const { data: categories, isLoading } = useCategories();
   const createCategory = useCreateCategory();
   const updateCategory = useUpdateCategory();
@@ -44,10 +44,6 @@ export default function CategoriesPage(): React.ReactElement | null {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1>Categories</h1>
-      </div>
-
       <form className={styles.addCategoryForm} onSubmit={handleCreateCategory}>
         <Input
           id="new-category-name"

@@ -1,12 +1,11 @@
-// src/pages/ActivitiesPage.tsx
-import { useDeleteActivity, useUpdateActivity } from "../hooks/useActivities";
-import { useActivities } from "../hooks/useActivities";
+import { useDeleteActivity, useUpdateActivity } from "../../hooks/useActivities";
+import { useActivities } from "../../hooks/useActivities";
 import { useMemo, useCallback, useState } from "react";
-import type { PlayerActivity } from "../types";
+import type { PlayerActivity } from "../../types";
 
-import Button from "../components/Button/Button";
-import PlayerItemList from "../components/PlayerItemList/PlayerItemList";
-import styles from "./ActivitiesPage.module.scss";
+import Button from "../Button/Button";
+import PlayerItemList from "../PlayerItemList/PlayerItemList";
+import styles from "./ActivitiesPanel.module.scss";
 
 // Helper to format duration nicely
 const formatDuration = (seconds: number): string => {
@@ -73,11 +72,7 @@ const getActivityDateCategory = (dateString: string): "today" | "yesterday" | "o
   return "older";
 };
 
-interface ActivitiesPageProps {
-  showHeading?: boolean;
-}
-
-export default function ActivitiesPage({ showHeading = true }: ActivitiesPageProps = {}): React.ReactElement | null {
+export default function ActivitiesPanel(): React.ReactElement | null {
   const { data: activities, isLoading } = useActivities();
   const deleteActivity = useDeleteActivity();
   const updateActivity = useUpdateActivity();
@@ -151,12 +146,6 @@ export default function ActivitiesPage({ showHeading = true }: ActivitiesPagePro
   return (
     <div className={styles.page}>
       <div className={styles.content}>
-      {showHeading && (
-        <div className={styles.header}>
-          <h1>Activities</h1>
-        </div>
-      )}
-
       {hasActivities && (
         <>
           <div className={styles.dateTabs}>

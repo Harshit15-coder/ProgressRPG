@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import SkillsPage from "./SkillsPage";
+import SkillsPanel from "./SkillsPanel";
 
 const mockUseSkills = vi.fn();
 const mockUseCreateSkill = vi.fn();
@@ -19,7 +19,7 @@ vi.mock("../../hooks/useSkills", () => ({
   useDeleteSkill: () => mockUseDeleteSkill(),
 }));
 
-describe("SkillsPage", () => {
+describe("SkillsPanel", () => {
   beforeEach(() => {
     createMutate.mockReset();
     updateMutate.mockReset();
@@ -38,7 +38,7 @@ describe("SkillsPage", () => {
 
   it("edits a skill through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<SkillsPage />);
+    render(<SkillsPanel />);
 
     await user.click(screen.getByRole("button", { name: "Open skill Writing" }));
     const input = screen.getByLabelText("skill name");
@@ -56,7 +56,7 @@ describe("SkillsPage", () => {
 
   it("deletes a skill through PlayerItemList", async () => {
     const user = userEvent.setup();
-    render(<SkillsPage />);
+    render(<SkillsPanel />);
 
     await user.click(screen.getByRole("button", { name: "Open skill Writing" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Delete" }));

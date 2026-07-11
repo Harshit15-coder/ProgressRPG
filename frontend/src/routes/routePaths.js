@@ -16,8 +16,5 @@ export const routePaths = [
   "/payment-success",
   "/payment-cancelled",
   "/edit-account",
-  "/tasks",
-  "/projects",
   "/library",
-  "/activities",
 ];

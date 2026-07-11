@@ -1,12 +1,17 @@
 import React from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 
-import TasksPage from "../TasksPage/TasksPage";
-import ActivitiesPage from "../ActivitiesPage";
+import TasksPanel from "../../components/TasksPanel/TasksPanel";
+import ActivitiesPanel from "../../components/ActivitiesPanel/ActivitiesPanel";
+import SkillsPanel from "../../components/SkillsPanel/SkillsPanel";
 import ComingSoonPanel from "../../components/ComingSoonPanel/ComingSoonPanel";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import styles from "./LibraryPage.module.scss";
 
 export default function LibraryPage(): React.ReactElement {
+  const hasTasksFeature = useFeatureFlag("tasksFeature");
+  const hasSkillsFeature = useFeatureFlag("skillsPage");
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
@@ -27,15 +32,15 @@ export default function LibraryPage(): React.ReactElement {
         </Tabs.List>
 
         <Tabs.Content value="tasks" className={styles.tabContent}>
-          <TasksPage showHeading={false} />
+          {hasTasksFeature ? <TasksPanel /> : <ComingSoonPanel itemLabelPlural="tasks" />}
         </Tabs.Content>
 
         <Tabs.Content value="activities" className={styles.tabContent}>
-          <ActivitiesPage showHeading={false} />
+          <ActivitiesPanel />
         </Tabs.Content>
 
         <Tabs.Content value="skills" className={styles.tabContent}>
-          <ComingSoonPanel itemLabelPlural="skills" />
+          {hasSkillsFeature ? <SkillsPanel /> : <ComingSoonPanel itemLabelPlural="skills" />}
         </Tabs.Content>
       </Tabs.Root>
     </div>

@@ -13,10 +13,6 @@
   flex-direction: column;
 }
 
-.header {
-  @include lp.list-page-header;
-}
-
 .addTaskForm {
   @include lp.list-page-add-form;
 }

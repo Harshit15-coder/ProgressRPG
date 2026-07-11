@@ -1,7 +1,7 @@
-@use '../styles/utilities/mixins' as m;
-@use '../styles/base/variables' as v;
-@use '../styles/semantic/typography' as t;
-@use '../styles/semantic/colors' as c;
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
 @use 'sass:map';
 
 .page {
@@ -12,16 +12,6 @@
   width: min(100%, 720px);
   display: flex;
   flex-direction: column;
-}
-
-.header {
-  text-align: center;
-  margin-bottom: v.$spacing-lg;
-
-  h1 {
-    @include t.apply-text-style(t.$text-heading-1);
-    margin-bottom: v.$spacing-md;
-  }
 }
 
 .dateTabs {
