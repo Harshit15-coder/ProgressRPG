@@ -9,6 +9,7 @@ export function useActivities() {
   return useQuery({
     queryKey: ["activities"],
     queryFn: fetchActivities,
+    staleTime: 30_000,
   });
 }
 

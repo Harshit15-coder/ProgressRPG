@@ -4,7 +4,8 @@ import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
 import Button from "../Button/Button";
 import PlayerItemList from "../PlayerItemList/PlayerItemList";
 import Tooltip from "../Tooltip/Tooltip";
-import { isTaskComplete, taskSortOptions, useTasksPanel, type ItemRecord } from "./useTasksPanel";
+import { isTaskComplete, taskSortOptions, useTasksPanel } from "./useTasksPanel";
+import type { Task } from "../../types";
 import styles from "./TasksPanel.module.scss";
 
 export default function TasksPanel(): React.ReactElement | null {
@@ -46,11 +47,11 @@ export default function TasksPanel(): React.ReactElement | null {
       </form>
 
       <div className={styles.tasksList}>
-        <PlayerItemList<ItemRecord>
-          items={visibleTasks as ItemRecord[]}
+        <PlayerItemList<Task>
+          items={visibleTasks}
           itemLabel="task"
           ariaLabel="Tasks"
-          isItemComplete={isTaskComplete as (item: ItemRecord) => boolean}
+          isItemComplete={isTaskComplete}
           onToggleComplete={handleToggleComplete}
           renderItemMeta={(task) => {
             const meta = getTaskMeta(task);

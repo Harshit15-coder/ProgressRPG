@@ -1,4 +1,4 @@
-import React, { useCallback, useState } from "react";
+import React, { useCallback } from "react";
 
 import Input from "../Input/Input";
 import type { Project } from "../../types";
@@ -10,63 +10,43 @@ import {
   useProjects,
   useUpdateProject,
 } from "../../hooks/useProjects";
+import { useSimpleCrudPanel } from "../../hooks/useSimpleCrudPanel";
+import { isCompletable } from "../../utils/completable";
 import styles from "./ProjectsPanel.module.scss";
 
-const isProjectComplete = (project: Project): boolean => Boolean(project?.completed_at ?? project?.is_complete);
+const renderProjectMeta = (project: Project) => (
+  <>
+    {project.description ? `${project.description} • ` : ""}
+    Total time: {project.total_time} • Records: {project.total_records}
+  </>
+);
 
 export default function ProjectsPanel(): React.ReactElement | null {
-  const { data: projects, isLoading } = useProjects();
-  const createProject = useCreateProject();
-  const updateProject = useUpdateProject();
-  const deleteProject = useDeleteProject();
-
-  const [newName, setNewName] = useState("");
-  const safeProjects = Array.isArray(projects) ? projects : [];
-
-  const handleCreateProject = (event: React.FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-
-    const trimmedName = newName.trim();
-    if (!trimmedName) return;
-
-    createProject.mutate({ name: trimmedName });
-    setNewName("");
-  };
-
-  // Cast to satisfy PlayerItemList's generic index-signature constraint
-  type ItemRecord = Project & { [key: string]: unknown };
-
-  const handleEdit = useCallback(
-    (project: ItemRecord, name: string) => {
-      updateProject.mutate({ id: project.id, data: { name } });
-    },
-    [updateProject],
-  );
-
-  const handleDelete = useCallback(
-    (project: ItemRecord) => {
-      deleteProject.mutate(project.id);
-    },
-    [deleteProject],
-  );
+  const { isLoading, items, newName, setNewName, handleCreate, handleEdit, handleDelete, update } =
+    useSimpleCrudPanel<Project>({
+      useList: useProjects,
+      useCreate: useCreateProject,
+      useUpdate: useUpdateProject,
+      useDelete: useDeleteProject,
+    });
 
   const handleToggleComplete = useCallback(
-    (project: ItemRecord) => {
-      updateProject.mutate({
+    (project: Project) => {
+      update.mutate({
         id: project.id,
         data: {
-          completed_at: isProjectComplete(project) ? null : new Date().toISOString(),
+          completed_at: isCompletable(project) ? null : new Date().toISOString(),
         },
       });
     },
-    [updateProject],
+    [update],
   );
 
   if (isLoading) return <p>Loading projects...</p>;
 
   return (
     <div className={styles.page}>
-      <form className={styles.addProjectForm} onSubmit={handleCreateProject}>
+      <form className={styles.addProjectForm} onSubmit={handleCreate}>
         <Input
           id="new-project-name"
           value={newName}
@@ -80,25 +60,18 @@ export default function ProjectsPanel(): React.ReactElement | null {
         </Button>
       </form>
 
-      {safeProjects.length > 0 ? (
+      {items.length > 0 ? (
         <div className={styles.projectsList}>
-          <PlayerItemList<ItemRecord>
-            items={safeProjects as ItemRecord[]}
+          <PlayerItemList<Project>
+            items={items}
             itemLabel="project"
             ariaLabel="Projects"
-            isItemComplete={isProjectComplete as (item: ItemRecord) => boolean}
+            isItemComplete={isCompletable}
             onToggleComplete={handleToggleComplete}
-            renderItemMeta={(project) => (
-              <>
-                {(project as Project).description ? `${(project as Project).description} • ` : ""}
-                Total time: {(project as Project).total_time} • Records: {(project as Project).total_records}
-              </>
-            )}
+            renderItemMeta={renderProjectMeta}
             renderEditSummary={(project) => (
               <>
-                {isProjectComplete(project as Project) ? "Complete" : "Incomplete"} •{" "}
-                {(project as Project).description ? `${(project as Project).description} • ` : ""}
-                Total time: {(project as Project).total_time} • Records: {(project as Project).total_records}
+                {isCompletable(project) ? "Complete" : "Incomplete"} • {renderProjectMeta(project)}
               </>
             )}
             onEdit={handleEdit}
