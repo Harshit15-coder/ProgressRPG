@@ -1,10 +1,7 @@
 import type { CSSProperties } from "react";
 import classNames from "classnames";
 
-import {
-  useEntitySearchInput,
-  type SearchEntity,
-} from "./useEntitySearchInput";
+import { useEntitySearchInput, type SearchEntity } from "./useEntitySearchInput";
 import styles from "./EntitySearchInput.module.scss";
 
 interface EntitySearchInputProps {
@@ -49,7 +46,6 @@ export default function EntitySearchInput({
   const {
     rootRef,
     canSearch,
-    results,
     taskItems,
     activityItems,
     showGroupLabels,
@@ -71,6 +67,26 @@ export default function EntitySearchInput({
     alwaysOpen,
     maxVisibleRows,
   });
+
+  const renderOption = (entity: SearchEntity, index: number) => {
+    const isHighlighted = index === activeHighlightedIndex;
+    return (
+      <li key={`${entity.id}-${entity.name}`} className={styles.optionItem}>
+        <button
+          type="button"
+          role="option"
+          aria-selected={isHighlighted}
+          className={classNames(styles.optionButton, {
+            [styles.optionButtonActive]: isHighlighted,
+          })}
+          onMouseDown={(event) => event.preventDefault()}
+          onClick={() => commitSelection(entity)}
+        >
+          {entity.name}
+        </button>
+      </li>
+    );
+  };
 
   // Persistent mode reserves room for maxVisibleRows (worst case: both group
   // labels shown) so the list settling to fewer rows, or falling back to
@@ -108,48 +124,22 @@ export default function EntitySearchInput({
           aria-label={`${type} suggestions`}
           style={persistentMinHeightStyle}
         >
-          {(() => {
-            const renderItem = (entity: SearchEntity, index: number) => {
-              const isHighlighted = index === activeHighlightedIndex;
-              return (
-                <li key={`${entity.id}-${entity.name}`} className={styles.optionItem}>
-                  <button
-                    type="button"
-                    role="option"
-                    aria-selected={isHighlighted}
-                    className={classNames(styles.optionButton, {
-                      [styles.optionButtonActive]: isHighlighted,
-                    })}
-                    onMouseDown={(event) => event.preventDefault()}
-                    onClick={() => commitSelection(entity)}
-                  >
-                    {entity.name}
-                  </button>
-                </li>
-              );
-            };
-
-            return (
-              <>
-                {taskItems.length > 0 && (
-                  <>
-                    {showGroupLabels && (
-                      <li role="presentation" className={styles.groupLabel}>Tasks</li>
-                    )}
-                    {taskItems.map((entity) => renderItem(entity, results.indexOf(entity)))}
-                  </>
-                )}
-                {activityItems.length > 0 && (
-                  <>
-                    {showGroupLabels && (
-                      <li role="presentation" className={styles.groupLabel}>Activities</li>
-                    )}
-                    {activityItems.map((entity) => renderItem(entity, results.indexOf(entity)))}
-                  </>
-                )}
-              </>
-            );
-          })()}
+          {taskItems.length > 0 && (
+            <>
+              {showGroupLabels && (
+                <li role="presentation" className={styles.groupLabel}>Tasks</li>
+              )}
+              {taskItems.map(({ entity, index }) => renderOption(entity, index))}
+            </>
+          )}
+          {activityItems.length > 0 && (
+            <>
+              {showGroupLabels && (
+                <li role="presentation" className={styles.groupLabel}>Activities</li>
+              )}
+              {activityItems.map(({ entity, index }) => renderOption(entity, index))}
+            </>
+          )}
         </ul>
       )}
 

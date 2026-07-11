@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 
 import { useGame } from "../../hooks/useGame";
@@ -15,6 +15,8 @@ interface SelectedEntity {
   taskId?: number | null;
   source?: string;
 }
+
+type CacheEntry = string | (Partial<PlayerActivity> & { isOptimistic?: boolean; frequency?: number });
 
 function resolveSelectedTaskId(entity: SelectedEntity): number | null {
   if (entity?.source !== "task") return null;
@@ -91,18 +93,14 @@ function useWelcomeMessageEffect({
 function useAutoStopCompletionEffect({
   autoStopCompletion,
   clearAutoStopCompletion,
-  fetchPlayerAndCharacter,
-  fetchCharacterCurrent,
-  fetchActivities,
+  refreshAfterActivityChange,
   isPremium,
   openActivityReward,
   setName,
 }: {
   autoStopCompletion: ReturnType<typeof useGame>["activityTimer"]["autoStopCompletion"];
   clearAutoStopCompletion: ReturnType<typeof useGame>["activityTimer"]["clearAutoStopCompletion"];
-  fetchPlayerAndCharacter: ReturnType<typeof useGame>["fetchPlayerAndCharacter"];
-  fetchCharacterCurrent: ReturnType<typeof useGame>["fetchCharacterCurrent"];
-  fetchActivities: ReturnType<typeof useGame>["fetchActivities"];
+  refreshAfterActivityChange: (completedTaskId?: number | null) => Promise<void>;
   isPremium: boolean;
   openActivityReward: ReturnType<typeof useSupportFlow>["openActivityReward"];
   setName: (value: string) => void;
@@ -115,12 +113,7 @@ function useAutoStopCompletionEffect({
 
     async function handleAutoStopCompletion() {
       setName("");
-
-      try {
-        await Promise.all([fetchPlayerAndCharacter(), fetchCharacterCurrent(), fetchActivities()]);
-      } catch (err) {
-        console.error("[ActivityInput] Failed to refresh after auto-stop:", err);
-      }
+      await refreshAfterActivityChange();
 
       if (cancelled) return;
 
@@ -150,9 +143,7 @@ function useAutoStopCompletionEffect({
   }, [
     autoStopCompletion,
     clearAutoStopCompletion,
-    fetchPlayerAndCharacter,
-    fetchActivities,
-    fetchCharacterCurrent,
+    refreshAfterActivityChange,
     isPremium,
     openActivityReward,
     setName,
@@ -182,6 +173,14 @@ export function useActivityInput() {
 
   const [name, setName] = useState("");
   const [isEditingLabel, setIsEditingLabel] = useState(false);
+
+  // Escape-to-cancel calls `.blur()` synchronously (to move focus off the
+  // input immediately), but that fires before React flushes isEditingLabel's
+  // state update — so the blur handler's closure still sees the pre-cancel
+  // state and would wrongly treat the cancel as a commit. This flag records
+  // "the last exit from edit mode was a cancel" so the blur handler can
+  // distinguish it, without relying on state-update timing.
+  const justCancelledLabelEditRef = useRef(false);
 
   const {
     openWelcomeMessage,
@@ -240,16 +239,66 @@ export function useActivityInput() {
     }
   }, [isActive]);
 
+  // Shared by the manual stop, the "submit & open support" stop, and the
+  // auto-stop effect — all three stop or complete an activity and then need
+  // the same player/character/activity data refreshed before showing a
+  // reward or continuing the flow.
+  const refreshAfterActivityChange = useCallback(
+    async (completedTaskId: number | null = null) => {
+      try {
+        await Promise.all([
+          fetchPlayerAndCharacter(),
+          fetchCharacterCurrent(),
+          fetchActivities(),
+          completedTaskId ? queryClient.invalidateQueries({ queryKey: ["tasks"] }) : Promise.resolve(),
+        ]);
+      } catch (err) {
+        console.error("[ActivityInput] Failed to refresh activity state:", err);
+      }
+    },
+    [fetchActivities, fetchCharacterCurrent, fetchPlayerAndCharacter, queryClient],
+  );
+
   useAutoStopCompletionEffect({
     autoStopCompletion,
     clearAutoStopCompletion,
-    fetchPlayerAndCharacter,
-    fetchCharacterCurrent,
-    fetchActivities,
+    refreshAfterActivityChange,
     isPremium,
     openActivityReward,
     setName,
   });
+
+  // Starts a brand-new timer (no timer currently running). Shared by every
+  // "not active" branch below — selecting a suggestion, creating a new
+  // entry, submitting free text, or the blank-start button.
+  const startNewActivity = useCallback(
+    async (text: string, options?: { taskId?: number | null; cacheEntry?: CacheEntry; allowBlank?: boolean }) => {
+      setName(text);
+      if (options?.cacheEntry !== undefined) addEntityToCache(options.cacheEntry);
+
+      const payload: Parameters<typeof startActivity>[0] = {
+        text,
+        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+      };
+      if (options?.taskId !== undefined) payload.taskId = options.taskId;
+      if (options?.allowBlank !== undefined) payload.allowBlank = options.allowBlank;
+
+      await startActivity(payload);
+    },
+    [addEntityToCache, freeTimerLimitSeconds, isPremium, startActivity],
+  );
+
+  // Relabels the currently-running timer. Shared by the unified select/submit
+  // handlers' "already active" branch and by click-to-edit's commit path.
+  const labelRunningActivity = useCallback(
+    async (label: string, taskId: number | null, cacheEntry?: CacheEntry) => {
+      setName(label);
+      if (cacheEntry !== undefined) addEntityToCache(cacheEntry);
+      await labelActivity(label, taskId);
+      setIsEditingLabel(false);
+    },
+    [addEntityToCache, labelActivity],
+  );
 
   const handleToggle = useCallback(async () => {
     primeAudio();
@@ -276,17 +325,7 @@ export function useActivityInput() {
       } = parseCompletionResponse(completion, localElapsed);
 
       setName("");
-
-      try {
-        await Promise.all([
-          fetchPlayerAndCharacter(),
-          fetchCharacterCurrent(),
-          fetchActivities(),
-          completedTaskId ? queryClient.invalidateQueries({ queryKey: ["tasks"] }) : Promise.resolve(),
-        ]);
-      } catch (err) {
-        console.error("[ActivityInput] Failed to refresh after stop:", err);
-      }
+      await refreshAfterActivityChange(completedTaskId);
 
       playLimitReachedSound();
       openActivityReward({
@@ -305,60 +344,40 @@ export function useActivityInput() {
     }
 
     if (!name.trim()) return;
-
-    const nextName = name.trim();
-    addEntityToCache(nextName);
-    await startActivity({ text: nextName, limitSeconds: isPremium ? null : freeTimerLimitSeconds });
+    await startNewActivity(name.trim(), { cacheEntry: name.trim() });
   }, [
-    addEntityToCache,
     currentActivity?.name,
     currentActivity?.taskId,
     elapsed,
-    fetchActivities,
-    fetchCharacterCurrent,
-    fetchPlayerAndCharacter,
-    freeTimerLimitSeconds,
     isActive,
     isPremium,
     name,
     openActivityReward,
-    queryClient,
-    startActivity,
+    refreshAfterActivityChange,
+    startNewActivity,
     stop,
   ]);
 
   const handleBlankStart = useCallback(async () => {
     primeAudio();
-    await startActivity({
-      text: "",
-      allowBlank: true,
-      limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-    });
-  }, [freeTimerLimitSeconds, isPremium, startActivity]);
+    await startNewActivity("", { allowBlank: true });
+  }, [startNewActivity]);
 
   const handleSelectActivity = useCallback(
     async (activity: SelectedEntity) => {
-      setName(activity.name);
-      addEntityToCache(activity as unknown as Partial<PlayerActivity>);
-      await startActivity({
-        text: activity.name,
+      await startNewActivity(activity.name, {
         taskId: resolveSelectedTaskId(activity),
-        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
+        cacheEntry: activity as unknown as CacheEntry,
       });
     },
-    [addEntityToCache, freeTimerLimitSeconds, isPremium, startActivity]
+    [startNewActivity],
   );
 
   const handleCreateActivity = useCallback(
     async (activityName: string) => {
-      setName(activityName);
-      addEntityToCache(activityName);
-      await startActivity({
-        text: activityName,
-        limitSeconds: isPremium ? null : freeTimerLimitSeconds,
-      });
+      await startNewActivity(activityName, { cacheEntry: activityName });
     },
-    [addEntityToCache, freeTimerLimitSeconds, isPremium, startActivity]
+    [startNewActivity],
   );
 
   // Selecting a list item: starts a timer if none is running, otherwise
@@ -372,12 +391,9 @@ export function useActivityInput() {
         return;
       }
 
-      setName(activity.name);
-      addEntityToCache(activity as unknown as Partial<PlayerActivity>);
-      await labelActivity(activity.name, resolveSelectedTaskId(activity));
-      setIsEditingLabel(false);
+      await labelRunningActivity(activity.name, resolveSelectedTaskId(activity), activity as unknown as CacheEntry);
     },
-    [addEntityToCache, handleSelectActivity, isActive, labelActivity]
+    [handleSelectActivity, isActive, labelRunningActivity],
   );
 
   // Submitting free text: starts a timer if none is running, otherwise
@@ -393,12 +409,9 @@ export function useActivityInput() {
         return;
       }
 
-      setName(trimmedName);
-      if (trimmedName) addEntityToCache(trimmedName);
-      await labelActivity(trimmedName, null);
-      setIsEditingLabel(false);
+      await labelRunningActivity(trimmedName, null, trimmedName ? trimmedName : undefined);
     },
-    [addEntityToCache, handleCreateActivity, isActive, labelActivity]
+    [handleCreateActivity, isActive, labelRunningActivity],
   );
 
   // Click-to-edit: clicking the running-labelled activity name pre-fills
@@ -416,9 +429,18 @@ export function useActivityInput() {
   // Escape discards the edit — no labelActivity call, name reverts to
   // whatever the timer is currently actually labelled.
   const handleLabelCancel = useCallback(() => {
+    justCancelledLabelEditRef.current = true;
     setName(currentActivity?.name ?? currentActivity?.text ?? "");
     setIsEditingLabel(false);
   }, [currentActivity?.name, currentActivity?.text]);
+
+  // Consumed by the wrapper's blur handler to tell a genuine commit-blur
+  // apart from the blur that Escape-cancel triggers synchronously.
+  const consumeJustCancelledLabelEdit = useCallback(() => {
+    if (!justCancelledLabelEditRef.current) return false;
+    justCancelledLabelEditRef.current = false;
+    return true;
+  }, []);
 
   // Called when user confirms the "submit active timer?" AlertDialog in ActivityInput.
   const submitAndOpenSupport = useCallback(async () => {
@@ -432,22 +454,15 @@ export function useActivityInput() {
     }
 
     setName("");
-
-    try {
-      await Promise.all([fetchPlayerAndCharacter(), fetchCharacterCurrent(), fetchActivities()]);
-    } catch (err) {
-      console.error("[ActivityInput] Failed to refresh after Task Support submit:", err);
-    }
+    await refreshAfterActivityChange();
 
     openSupportMode();
   }, [
     currentActivity?.name,
     currentActivity?.text,
-    fetchActivities,
-    fetchCharacterCurrent,
-    fetchPlayerAndCharacter,
     name,
     openSupportMode,
+    refreshAfterActivityChange,
     stop,
   ]);
 
@@ -463,17 +478,10 @@ export function useActivityInput() {
   }, [limitSeconds]);
 
   const showAutoStopWarning = useMemo(() => {
-    const warningThresholdSeconds =
-      typeof limitSeconds === "number" && limitSeconds > 0 ? limitSeconds * 0.9 : null;
+    if (typeof limitSeconds !== "number" || limitSeconds <= 0) return false;
 
-    return (
-      isActive &&
-      typeof limitSeconds === "number" &&
-      limitSeconds > 0 &&
-      warningThresholdSeconds !== null &&
-      elapsed >= warningThresholdSeconds &&
-      elapsed < limitSeconds
-    );
+    const warningThresholdSeconds = limitSeconds * 0.9;
+    return isActive && elapsed >= warningThresholdSeconds && elapsed < limitSeconds;
   }, [elapsed, isActive, limitSeconds]);
 
   return {
@@ -499,6 +507,7 @@ export function useActivityInput() {
     startEditingLabel,
     handleLabelBlur,
     handleLabelCancel,
+    consumeJustCancelledLabelEdit,
     submitAndOpenSupport,
     openSupportMode,
     isPremium,
