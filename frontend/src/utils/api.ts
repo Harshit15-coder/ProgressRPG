@@ -50,6 +50,22 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
   }
 }
 
+// Callers of apiFetch can fire concurrently (e.g. several components mounting
+// at once). Without this, each one independently notices the token is
+// expiring and starts its own refresh request. Sharing the in-flight promise
+// means only the first caller actually hits the network; the rest await the
+// same result.
+let inFlightRefresh: Promise<string | false> | null = null;
+
+function refreshAccessTokenOnce(refreshToken: string): Promise<string | false> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessToken(refreshToken).finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+}
+
 export async function getValidAccessToken(): Promise<string> {
   const { accessToken, refreshToken } = getStoredAuthTokens();
   if (!accessToken || !refreshToken) {
@@ -58,7 +74,7 @@ export async function getValidAccessToken(): Promise<string> {
   }
 
   if (isTokenExpiringSoon(accessToken)) {
-    const newAccess = await refreshAccessToken(refreshToken);
+    const newAccess = await refreshAccessTokenOnce(refreshToken);
     if (!newAccess) {
       clearAuthAndRedirect();
       throw new Error("Token refresh failed");
@@ -84,10 +100,6 @@ export async function apiFetch<T = unknown>(
     const { responseType = "json", ...fetchOptions } = options;
     const accessToken = explicitAccessToken || (await getValidAccessToken());
 
-    if (!accessToken) {
-      throw new Error("No access token available for request");
-    }
-
     const headers: Record<string, string> = {
       ...(fetchOptions.headers || {}),
       Authorization: `Bearer ${accessToken}`,
@@ -105,11 +117,8 @@ export async function apiFetch<T = unknown>(
     }
 
     if (response.status === 503) {
-      // optionally parse JSON if included
-      const data: { detail?: string } = await response.json().catch(() => ({}));
-      // redirect or show toast
       window.location.href = "/maintenance";
-      return Promise.reject(new Error(data.detail || "Maintenance mode"));
+      return Promise.reject(new Error("Maintenance mode"));
     }
 
     if (!response.ok) {

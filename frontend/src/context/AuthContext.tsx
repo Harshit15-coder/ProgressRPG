@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { Dispatch, ReactElement, ReactNode, SetStateAction } from 'react';
 import { apiFetch } from "../utils/api";
 import { clearAuthStorage, getStoredAuthTokens, storeAuthTokens } from '../utils/authStorage';
@@ -40,8 +40,16 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   const [accessToken, setAccessToken] = useState<string | null>(() => getStoredAuthTokens().accessToken);
   const [refreshToken, setRefreshToken] = useState<string | null>(() => getStoredAuthTokens().refreshToken);
   const [user, setUser] = useState<User | null>(null);
-  const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
+
+  const isAuthenticated = user !== null;
+
+  // Set by login() right before it updates accessToken/refreshToken, so the
+  // verifyUser effect below (which reacts to those same tokens) can tell
+  // "tokens just changed because login() already fetched /me/ itself" apart
+  // from "tokens changed for some other reason and still need verifying" —
+  // without this, every login fires the /me/ request twice.
+  const justLoggedInRef = useRef(false);
 
   // Thin wrapper around apiFetch. Typed as a generic fn rather than `typeof apiFetch`
   // because the overloaded signature doesn't unify to a single assignable type.
@@ -49,36 +57,54 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
     return apiFetch<T>(path, options);
   };
 
+  const logout = useCallback((): void => {
+    clearAuthStorage();
+    clearUserPreferences();
+    setAccessToken(null);
+    setRefreshToken(null);
+    setUser(null);
+  }, []);
+
   useEffect(() => {
     const handleAuthExpired = () => logout();
     window.addEventListener("auth:expired", handleAuthExpired);
     return () => window.removeEventListener("auth:expired", handleAuthExpired);
-  // logout is defined in the same render scope and only uses stable state setters
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [logout]);
+
+  // Fetches the current user and applies it to state. Shared by the
+  // initial-load/token-change verification below and by login(), so there's
+  // one "did this session actually resolve to a user" path instead of two
+  // that can drift apart.
+  const loadCurrentUser = useCallback(async (onFailure: () => void): Promise<User | null> => {
+    try {
+      const data = await apiFetch<User>('/me/');
+      setUser(data);
+      return data;
+    } catch {
+      onFailure();
+      return null;
+    }
   }, []);
 
   useEffect(() => {
     async function verifyUser(): Promise<void> {
-      if (!accessToken || !refreshToken) {
-        setLoading(false);
-        setIsAuthenticated(false);
+      if (justLoggedInRef.current) {
+        justLoggedInRef.current = false;
         return;
       }
 
-      try {
-        const data = await apiFetch<User>('/me/');
-        setUser(data);
-        setIsAuthenticated(true);
-      } catch {
-        logout();
-      } finally {
+      if (!accessToken || !refreshToken) {
         setLoading(false);
+        return;
       }
+
+      setLoading(true);
+      await loadCurrentUser(logout);
+      setLoading(false);
     }
 
     verifyUser();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [accessToken, refreshToken]);
+  }, [accessToken, refreshToken, loadCurrentUser, logout]);
 
   const login = async (
     accessToken: string,
@@ -87,31 +113,14 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   ): Promise<unknown> => {
     const { rememberMe = false } = options;
     storeAuthTokens(accessToken, refreshToken, rememberMe);
+    justLoggedInRef.current = true;
     setAccessToken(accessToken);
     setRefreshToken(refreshToken);
     setLoading(true);
 
-    // Fetch user info after login
-    try {
-      const data = await apiFetch<User>('/me/');
-      setUser(data);
-      setIsAuthenticated(true);
-      return data;
-    } catch {
-      setUser(null);
-      setIsAuthenticated(false);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const logout = (): void => {
-    clearAuthStorage();
-    clearUserPreferences();
-    setAccessToken(null);
-    setRefreshToken(null);
-    setUser(null);
-    setIsAuthenticated(false);
+    const data = await loadCurrentUser(() => setUser(null));
+    setLoading(false);
+    return data;
   };
 
   const value: AuthContextValue = {

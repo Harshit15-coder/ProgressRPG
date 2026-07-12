@@ -43,6 +43,11 @@ export function getStoredAuthTokens(): TokenBundle {
   return getTokenBundle(active) || getTokenBundle(getInactiveStorage(active)) || empty;
 }
 
+function writeTokenPair(storage: Storage, accessToken: string, refreshToken: string): void {
+  storage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  storage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+}
+
 export function storeAuthTokens(accessToken: string, refreshToken: string, rememberMe = true): void {
   if (rememberMe) {
     // Clearing sessionStorage here only affects this tab, so it can't clobber a
@@ -50,16 +55,14 @@ export function storeAuthTokens(accessToken: string, refreshToken: string, remem
     sessionStorage.removeItem(ACCESS_TOKEN_KEY);
     sessionStorage.removeItem(REFRESH_TOKEN_KEY);
     sessionStorage.removeItem(SESSION_MODE_KEY);
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    writeTokenPair(localStorage, accessToken, refreshToken);
     return;
   }
 
   // Deliberately leave localStorage untouched — another tab may hold a valid
   // remembered session there. The mode marker makes this tab prefer its own
   // sessionStorage bundle regardless of what's in localStorage.
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  writeTokenPair(sessionStorage, accessToken, refreshToken);
   sessionStorage.setItem(SESSION_MODE_KEY, 'session');
 }
 
