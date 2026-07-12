@@ -142,6 +142,9 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 
 db = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
 db["ENGINE"] = "django.contrib.gis.db.backends.postgis"
+# Required when connecting through pgbouncer in transaction pooling mode;
+# harmless on direct connections.
+db["DISABLE_SERVER_SIDE_CURSORS"] = True
 DATABASES = {"default": db}
 
 

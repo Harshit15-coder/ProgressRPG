@@ -143,4 +143,128 @@ describe('useActivityTimer', () => {
 
     expect(mockPlayActivityStartedSound).toHaveBeenCalledTimes(1);
   });
+
+  it('rejects a blank start without allowBlank', async () => {
+    const { result } = renderHook(() => useActivityTimer());
+
+    await act(async () => {
+      const outcome = await result.current.startActivity({ text: '' });
+      expect(outcome).toBeNull();
+    });
+
+    expect(mockApiFetch).not.toHaveBeenCalled();
+    expect(result.current.status).toBe('empty');
+  });
+
+  it('starts an unlabelled timer when allowBlank is set', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url === '/activity_timers/set_activity/') {
+        return Promise.resolve({
+          activity_timer: { activity: { id: 1, name: '' } },
+        });
+      }
+
+      if (url === '/activity_timers/start/') {
+        return Promise.resolve({ success: true });
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+
+    const { result } = renderHook(() => useActivityTimer());
+
+    await act(async () => {
+      await result.current.startActivity({ text: '', allowBlank: true });
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      '/activity_timers/set_activity/',
+      expect.objectContaining({
+        body: JSON.stringify({ activityName: '', task_id: null, duration: 0 }),
+      })
+    );
+    expect(result.current.status).toBe('active');
+    expect(result.current.currentActivity?.name).toBe('');
+  });
+
+  it('labelActivity renames the running activity without resetting elapsed time', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url === '/activity_timers/set_activity/') {
+        return Promise.resolve({
+          activity_timer: { activity: { id: 1, name: '' } },
+        });
+      }
+
+      if (url === '/activity_timers/start/') {
+        return Promise.resolve({ success: true });
+      }
+
+      if (url === '/activity_timers/label_activity/') {
+        return Promise.resolve({
+          activity_timer: { activity: { id: 1, name: 'Deep work' } },
+        });
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+
+    const { result } = renderHook(() => useActivityTimer());
+
+    await act(async () => {
+      await result.current.startActivity({ text: '', allowBlank: true });
+    });
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(5_000);
+    });
+
+    const elapsedBeforeLabel = result.current.elapsed;
+    expect(elapsedBeforeLabel).toBeGreaterThan(0);
+
+    await act(async () => {
+      await result.current.labelActivity('Deep work');
+    });
+
+    expect(mockApiFetch).toHaveBeenCalledWith(
+      '/activity_timers/label_activity/',
+      expect.objectContaining({
+        body: JSON.stringify({ activityName: 'Deep work', task_id: null }),
+      })
+    );
+    expect(result.current.currentActivity?.name).toBe('Deep work');
+    expect(result.current.status).toBe('active');
+    expect(result.current.elapsed).toBe(elapsedBeforeLabel);
+  });
+
+  it('labelActivity rolls back the optimistic name on failure', async () => {
+    mockApiFetch.mockImplementation((url: string) => {
+      if (url === '/activity_timers/set_activity/') {
+        return Promise.resolve({
+          activity_timer: { activity: { id: 1, name: 'Original' } },
+        });
+      }
+
+      if (url === '/activity_timers/start/') {
+        return Promise.resolve({ success: true });
+      }
+
+      if (url === '/activity_timers/label_activity/') {
+        return Promise.reject(new Error('network error'));
+      }
+
+      return Promise.reject(new Error(`Unexpected URL: ${url}`));
+    });
+
+    const { result } = renderHook(() => useActivityTimer());
+
+    await act(async () => {
+      await result.current.startActivity({ text: 'Original' });
+    });
+
+    await act(async () => {
+      await expect(result.current.labelActivity('New name')).rejects.toThrow('network error');
+    });
+
+    expect(result.current.currentActivity?.name).toBe('Original');
+  });
 });

@@ -75,7 +75,7 @@ function withSettledTimerBootstrap(payload: unknown): unknown {
   };
 }
 
-function withStableAppConfig(payload: unknown): unknown {
+function withStableAppConfig(payload: unknown, opts: { unifiedHomepage?: boolean } = {}): unknown {
   if (!isJsonRecord(payload)) {
     return payload;
   }
@@ -101,6 +101,7 @@ function withStableAppConfig(payload: unknown): unknown {
       categoriesPage: ['all'],
       skillsPage: ['all'],
       activityList: ['all'],
+      unified_homepage: opts.unifiedHomepage ? ['all'] : [],
     },
   };
 }
@@ -145,7 +146,7 @@ export async function stabilizeAuthenticatedPlayer(page: Page) {
   });
 }
 
-export async function stabilizeTimerPage(page: Page) {
+export async function stabilizeTimerPage(page: Page, opts: { unifiedHomepage?: boolean } = {}) {
   await page.route('**/fetch_info/', async (route) => {
     await fulfillPatchedRoute(route, withSettledTimerBootstrap);
   });
@@ -155,7 +156,7 @@ export async function stabilizeTimerPage(page: Page) {
   });
 
   await page.route('**/app_config/', async (route) => {
-    await fulfillPatchedRoute(route, withStableAppConfig);
+    await fulfillPatchedRoute(route, (payload) => withStableAppConfig(payload, opts));
   });
 }
 

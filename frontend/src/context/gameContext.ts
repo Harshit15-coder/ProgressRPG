@@ -33,6 +33,8 @@ export interface GameContextValue {
   loginStreak: number;
   loginEventAt: string | null;
   loginRewardXp: number;
+  announcementUnreadCount: number;
+  setAnnouncementUnreadCount: Dispatch<SetStateAction<number>>;
   loading: boolean;
   buildNumber: string | boolean;
   freeTimerLimitSeconds: number;

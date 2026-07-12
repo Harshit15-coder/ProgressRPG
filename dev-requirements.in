@@ -4,10 +4,12 @@ build<2
 django-stubs<6
 django-stubs-ext<7
 freezegun<2
+locust
 mypy<3
 pip-review
 pip-tools
 pipdeptree
 pre_commit
 types-PyYAML
+websocket-client
 wheel

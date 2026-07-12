@@ -43,6 +43,7 @@ class UserSubscription(models.Model):
     active = models.BooleanField(default=False)
     start_date = models.DateTimeField(auto_now_add=True)
     end_date = models.DateTimeField(blank=True, null=True)
+    trial_end = models.DateTimeField(blank=True, null=True)
 
     @classmethod
     def current_for_user(cls, user):
@@ -98,6 +99,14 @@ class UserSubscription(models.Model):
     @property
     def is_active_premium(self):
         return self.active
+
+    @property
+    def is_trialing(self):
+        return (
+            self.active
+            and self.trial_end is not None
+            and self.trial_end > timezone.now()
+        )
 
     class Meta:
         constraints = [

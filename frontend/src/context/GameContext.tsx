@@ -1,4 +1,3 @@
-/* eslint-disable react-hooks/set-state-in-effect */
 // GameContext.tsx
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
@@ -60,6 +59,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
     loginStreak,
     loginEventAt,
     loginRewardXp,
+    announcementUnreadCount: announcementUnreadCountOnload,
     loading,
     error,
     buildNumber,
@@ -76,6 +76,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
   const [characterActivities, setCharacterActivities] = useState<CharacterActivity[]>([]);
   const [characterCurrentActivity, setCharacterCurrentActivity] = useState<CharacterActivity | null>(null);
   const [populationCentre, setPopulationCentre] = useState<PopulationCentre | null>(populationCentreInfo);
+  const [announcementUnreadCount, setAnnouncementUnreadCount] = useState<number>(announcementUnreadCountOnload);
 
   const activityTimer = useActivityTimer();
   const { loadFromServer } = activityTimer;
@@ -156,6 +157,10 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
     }
   }, [xpModsOnload]);
 
+  useEffect(() => {
+    setAnnouncementUnreadCount(announcementUnreadCountOnload);
+  }, [announcementUnreadCountOnload]);
+
 
   // ----------------------------------------
   //  STABLE PROVIDER VALUE
@@ -184,6 +189,8 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       loginStreak,
       loginEventAt,
       loginRewardXp,
+      announcementUnreadCount,
+      setAnnouncementUnreadCount,
       loading,
       buildNumber,
       freeTimerLimitSeconds,
@@ -212,6 +219,7 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
       loginStreak,
       loginEventAt,
       loginRewardXp,
+      announcementUnreadCount,
     ]
   );
 

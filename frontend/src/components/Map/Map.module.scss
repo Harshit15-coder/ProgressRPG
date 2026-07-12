@@ -2,6 +2,11 @@
 .mapWrapper {
   width: 100%;
   max-width: 1200px;
+  // Keep the box square and derived from its own (responsive) width,
+  // instead of a fixed height set independently of it - a mismatched
+  // box/content aspect ratio is what left a large letterboxed gap above
+  // the map when the rendered width shrank below the fixed height.
+  aspect-ratio: 1 / 1;
 }
 
 .mapSvg {
@@ -9,4 +14,25 @@
   width: 100%;
   height: 100%;
   background: white;
+}
+
+.characterMarker {
+  // Positioned via inline transform (translate); animate position changes
+  // between polls so wandering reads as a slow drift, not a teleport.
+  transition: transform 4s linear;
+
+  // No visible focus ring on click/selection - only show one for keyboard
+  // navigation, where a visible indicator is actually needed.
+  outline: none;
+
+  &:focus-visible {
+    outline: 2px solid #3d5a80;
+    outline-offset: 2px;
+  }
+}
+
+.noTransition {
+  // Applied while the window is resizing (including browser page zoom) -
+  // see Map.tsx for why.
+  transition: none;
 }

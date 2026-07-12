@@ -5,6 +5,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
 from users.models import TutorialStep
+from users.services.registration_services import ensure_player_setup_for_user
 
 
 DEFAULT_PLAYWRIGHT_EMAIL = "playwright@example.com"
@@ -70,7 +71,7 @@ class Command(BaseCommand):
         if user_updates:
             user.save(update_fields=user_updates)
 
-        player = user.player
+        player = ensure_player_setup_for_user(user)
         player_updates = []
         if player.name != player_name:
             player.name = player_name

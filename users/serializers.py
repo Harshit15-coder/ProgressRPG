@@ -41,6 +41,8 @@ class PlayerSerializer(serializers.ModelSerializer):
     has_previous_subscription = serializers.BooleanField(
         source="user.has_previous_subscription", read_only=True
     )
+    is_trialing = serializers.BooleanField(source="user.is_trialing", read_only=True)
+    trial_end = serializers.DateTimeField(source="user.trial_end", read_only=True)
     login_streak = serializers.IntegerField(
         source="user.current_login_streak", read_only=True
     )
@@ -78,6 +80,8 @@ class PlayerSerializer(serializers.ModelSerializer):
             "is_premium",
             "is_tester",
             "has_previous_subscription",
+            "is_trialing",
+            "trial_end",
             "onboarding_step",
             "onboarding_completed",
             "login_streak",
@@ -95,6 +99,8 @@ class PlayerSerializer(serializers.ModelSerializer):
             "is_premium",
             "is_tester",
             "has_previous_subscription",
+            "is_trialing",
+            "trial_end",
             "login_streak",
             "unseen_tutorial_step_ids",
         ]

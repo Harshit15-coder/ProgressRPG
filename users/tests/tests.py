@@ -236,6 +236,43 @@ class PlayerAchievementGoalsTest(TestCase):
         self.assertIn("achievements", data)
         self.assertEqual(len(data["achievements"]), 3)
 
+    def test_player_serializer_reflects_trial_status(self):
+        user = get_user_model().objects.create_user(
+            email="trial-serializer@example.com",
+            password="testpassword123",
+        )
+        plan = SubscriptionPlan.objects.create(
+            name="Premium Monthly",
+            description="",
+            price="9.99",
+            interval="monthly",
+            stripe_price_id="price_serializer_trial",
+        )
+        future = timezone.now() + timedelta(days=5)
+        UserSubscription.objects.create(
+            user=user,
+            plan=plan,
+            active=True,
+            stripe_subscription_id="sub_serializer_trial",
+            trial_end=future,
+        )
+
+        data = PlayerSerializer(user.player).data
+
+        self.assertTrue(data["is_trialing"])
+        self.assertEqual(data["trial_end"], future.isoformat().replace("+00:00", "Z"))
+
+    def test_player_serializer_not_trialing_without_subscription(self):
+        user = get_user_model().objects.create_user(
+            email="no-trial-serializer@example.com",
+            password="testpassword123",
+        )
+
+        data = PlayerSerializer(user.player).data
+
+        self.assertFalse(data["is_trialing"])
+        self.assertIsNone(data["trial_end"])
+
 
 class OnboardingTest(TestCase):
     def setUp(self):

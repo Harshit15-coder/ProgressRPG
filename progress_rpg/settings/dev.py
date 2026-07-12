@@ -154,8 +154,11 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 #     DATABASE_URL = f"postgres://{DB_USER}:{quote(DB_PASSWORD, safe='')}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
 if DATABASE_URL:
-    db = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
+    db = dj_database_url.parse(DATABASE_URL, conn_max_age=0)
     db["ENGINE"] = "django.contrib.gis.db.backends.postgis"
+    # Required when connecting through pgbouncer in transaction pooling mode;
+    # harmless on direct connections.
+    db["DISABLE_SERVER_SIDE_CURSORS"] = True
     DATABASES = {"default": db}
 else:
     # Safe fallback for build-time collectstatic

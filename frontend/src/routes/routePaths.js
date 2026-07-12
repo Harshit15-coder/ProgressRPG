@@ -18,5 +18,6 @@ export const routePaths = [
   "/edit-account",
   "/tasks",
   "/projects",
+  "/library",
   "/activities",
 ];

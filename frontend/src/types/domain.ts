@@ -52,10 +52,22 @@ export interface Player {
   is_premium: boolean;
   is_tester: boolean;
   has_previous_subscription: boolean;
+  is_trialing: boolean;
+  trial_end: string | null;
   onboarding_step: number;
   onboarding_completed: boolean;
   login_streak: number;
   unseen_tutorial_step_ids: number[];
+}
+
+export interface Announcement {
+  id: number;
+  title: string;
+  summary: string;
+  body: string;
+  published_at: string | null;
+  created_at: string;
+  is_read: boolean;
 }
 
 // ---------------------------------------------------------------------------

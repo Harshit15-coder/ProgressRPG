@@ -38,6 +38,18 @@ export default defineConfig(() => {
             name: 'unit',
             globals: true,
             environment: 'happy-dom',
+            // Iframes (e.g. YouTube embeds in TutorialModal) otherwise attempt a
+            // real network navigation in happy-dom, which aborts on test cleanup
+            // and logs noisy DOMException stack traces with no effect on results.
+            environmentOptions: {
+              happyDOM: {
+                settings: {
+                  navigation: {
+                    disableChildFrameNavigation: true,
+                  },
+                },
+              },
+            },
             setupFiles: './src/test/setup.js',
             css: true,
             exclude: ['node_modules', 'dist', 'tests/**', '**/*.spec.{js,jsx,ts,tsx}'],
