@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import type { Dispatch, ReactElement, ReactNode, SetStateAction } from 'react';
-import { apiFetch } from "../utils/api";
+import { apiFetch, ApiFetchError, setUnauthorizedHandler } from "../utils/api";
 import { clearAuthStorage, getStoredAuthTokens, storeAuthTokens } from '../utils/authStorage';
 import { clearUserPreferences } from '../utils/userPreferences';
 import type { User } from '../types';
@@ -66,9 +66,11 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
   }, []);
 
   useEffect(() => {
-    const handleAuthExpired = () => logout();
-    window.addEventListener("auth:expired", handleAuthExpired);
-    return () => window.removeEventListener("auth:expired", handleAuthExpired);
+    // api.ts is a plain module with no direct line into React state, so it
+    // can't call logout() itself — it invokes whatever's registered here
+    // instead of broadcasting a DOM CustomEvent.
+    setUnauthorizedHandler(logout);
+    return () => setUnauthorizedHandler(null);
   }, [logout]);
 
   // Fetches the current user and applies it to state. Shared by the
@@ -80,7 +82,15 @@ export function AuthProvider({ children }: ProviderProps): ReactElement {
       const data = await apiFetch<User>('/me/');
       setUser(data);
       return data;
-    } catch {
+    } catch (err) {
+      // A 401 already ran the registered unauthorized handler (logout) from
+      // inside apiFetch — calling onFailure again here is a harmless no-op
+      // in that case. A service-unavailable/network error is not evidence
+      // the session itself is invalid (apiFetch is already navigating away
+      // for those), so don't treat it as one.
+      if (err instanceof ApiFetchError && err.kind !== "unauthorized") {
+        return null;
+      }
       onFailure();
       return null;
     }

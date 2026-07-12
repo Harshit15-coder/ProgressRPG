@@ -23,9 +23,36 @@ function isTokenExpiringSoon(token: string, bufferSeconds = 60): boolean {
   }
 }
 
-function clearAuthAndRedirect(): void {
+export type ApiFetchErrorKind = "unauthorized" | "service_unavailable" | "network";
+
+export class ApiFetchError extends Error {
+  readonly kind: ApiFetchErrorKind;
+
+  constructor(kind: ApiFetchErrorKind, message: string) {
+    super(message);
+    this.name = "ApiFetchError";
+    this.kind = kind;
+  }
+}
+
+// api.ts is a plain module with no direct line into React state, so it can't
+// call AuthContext's logout() itself. AuthProvider registers logout here once
+// on mount instead of api.ts broadcasting a DOM CustomEvent that AuthContext
+// happens to listen for — an explicit, typed callback instead of an implicit
+// global side channel.
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+function handleUnauthorized(): void {
+  // Cleared here (not left solely to the registered handler) so a request
+  // firing before AuthProvider has mounted — or in a context with no
+  // AuthProvider at all, e.g. a test — still can't leave stale tokens behind.
   clearAuthStorage();
-  window.dispatchEvent(new CustomEvent("auth:expired"));
+  unauthorizedHandler?.();
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<string | false> {
@@ -69,15 +96,15 @@ function refreshAccessTokenOnce(refreshToken: string): Promise<string | false> {
 export async function getValidAccessToken(): Promise<string> {
   const { accessToken, refreshToken } = getStoredAuthTokens();
   if (!accessToken || !refreshToken) {
-    clearAuthAndRedirect();
-    throw new Error("Missing tokens");
+    handleUnauthorized();
+    throw new ApiFetchError("unauthorized", "Missing tokens");
   }
 
   if (isTokenExpiringSoon(accessToken)) {
     const newAccess = await refreshAccessTokenOnce(refreshToken);
     if (!newAccess) {
-      clearAuthAndRedirect();
-      throw new Error("Token refresh failed");
+      handleUnauthorized();
+      throw new ApiFetchError("unauthorized", "Token refresh failed");
     }
     return newAccess;
   }
@@ -112,13 +139,13 @@ export async function apiFetch<T = unknown>(
     });
 
     if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Unauthorized");
+      handleUnauthorized();
+      throw new ApiFetchError("unauthorized", "Unauthorized");
     }
 
     if (response.status === 503) {
       window.location.href = "/maintenance";
-      return Promise.reject(new Error("Maintenance mode"));
+      return Promise.reject(new ApiFetchError("service_unavailable", "Maintenance mode"));
     }
 
     if (!response.ok) {
@@ -140,7 +167,7 @@ export async function apiFetch<T = unknown>(
   } catch (err) {
     if (err instanceof TypeError) {
       window.location.href = "/unavailable";
-      return Promise.reject(err);
+      return Promise.reject(new ApiFetchError("network", err.message));
     }
     console.error("apiFetch error:", err);
     throw err;
