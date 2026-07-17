@@ -14,7 +14,6 @@ interface ListItem {
   character?: unknown;
   /** When true, item is visually hidden */
   isHidden?: boolean;
-  [key: string]: unknown;
 }
 
 interface ListProps<T extends ListItem> {

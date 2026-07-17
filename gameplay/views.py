@@ -15,9 +15,6 @@ from .serializers import (
     QuestTimerSerializer,
 )
 from .filters import QuestFilter
-from .utils import check_quest_eligibility
-
-from character.models import PlayerCharacterLink
 
 from progression.models import Task
 
@@ -49,26 +46,7 @@ class QuestViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"])
     def eligible(self, request):
-        # check_quest_eligibility is not called at this time.
-        # The character link and eligibility logic below is kept for future use:
-        #
-        #   player = request.user.player
-        #   try:
-        #       character = PlayerCharacterLink.get_character(player)
-        #   except ValueError as e:
-        #       logger.warning(
-        #           "Failed to get character for player %s: %s",
-        #           player.id if hasattr(player, "id") else player,
-        #           e,
-        #       )
-        #       return Response(
-        #           {"error": "Unable to determine eligible quests for your character."},
-        #           status=400,
-        #       )
-        #   eligible_quests = check_quest_eligibility(character, player)
-        #   serializer = self.get_serializer(eligible_quests, many=True)
-        #   return Response({"eligible_quests": serializer.data})
-
+        # Eligibility logic is not wired up yet; endpoint always returns empty.
         return Response({"eligible_quests": []})
 
 
@@ -104,10 +82,9 @@ class BaseTimerViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"])
     def complete(self, request):
         timer = self.get_timer(request)
-        print("datadata:", request.data)
         name = request.data.get("activityName")
 
-        result = timer.complete(newName=name)
+        timer.complete(newName=name)
         return Response(self.serialize(timer))
 
 

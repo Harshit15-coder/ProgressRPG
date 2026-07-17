@@ -152,19 +152,6 @@ export const routes = [
       </PrivateRoute>
     ),
   },
-  // Premium-only route pattern:
-  // {
-  //   path: "/premium-example",
-  //   element: (
-  //     <PrivateRoute>
-  //       <RequireOnboardingComplete>
-  //         <RequirePremium>
-  //           <SomePremiumPage />
-  //         </RequirePremium>
-  //       </RequireOnboardingComplete>
-  //     </PrivateRoute>
-  //   ),
-  // },
   {
     path: "*",
     element: <NotFoundPage />,

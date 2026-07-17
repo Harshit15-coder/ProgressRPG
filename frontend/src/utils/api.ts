@@ -48,9 +48,12 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): voi
 }
 
 function handleUnauthorized(): void {
-  // Cleared here (not left solely to the registered handler) so a request
-  // firing before AuthProvider has mounted — or in a context with no
-  // AuthProvider at all, e.g. a test — still can't leave stale tokens behind.
+  // Cleared here unconditionally, not left solely to the registered handler:
+  // this covers a request firing before AuthProvider has mounted, or in a
+  // context with no AuthProvider at all (e.g. a test), and it doesn't rely on
+  // whatever handler ends up registered also clearing storage itself. That
+  // makes AuthProvider's logout() clearing storage too a deliberate, harmless
+  // overlap (defense in depth) rather than a bug to dedupe away.
   clearAuthStorage();
   unauthorizedHandler?.();
 }
