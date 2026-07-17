@@ -13,36 +13,9 @@ import ActivityInputScreen from "./screens/ActivityInputScreen";
 import NotReadyMenuScreen from "./screens/NotReadyMenuScreen";
 import SupportDetailScreen from "./screens/SupportDetailScreen";
 import PostSupportMenuScreen from "./screens/PostSupportMenuScreen";
+import type { FlowAction, FlowState } from "./supportFlowTypes";
 
-// Loose flow action type — reducer handles narrowing internally
-type FlowAction = { type: string; [key: string]: unknown };
-
-// Flow context as it exists in useSupportFlow's FlowState
-interface FlowCtx {
-  activityText?: string;
-  durationSeconds?: number | null;
-  activityPresetId?: string | null;
-  supportMenuOrigin?: string | null;
-  supportActionId?: string | null;
-  welcomeMessageLoginState?: string;
-  welcomeMessageLoginStreak?: number;
-  welcomeMessageRewardXp?: number;
-  xpGained?: number | null;
-  rewardBaseXp?: number | null;
-  rewardXpMultiplier?: number | null;
-  rewardTaskXpMultiplier?: number | null;
-  rewardLevelUps?: number[];
-  rewardIsAutoStopped?: boolean;
-  rewardShowUpgradePrompt?: boolean;
-  completedActivityName?: string | null;
-  completedActivityElapsedSeconds?: number | null;
-  completedActivityTaskId?: number | null;
-  [key: string]: unknown;
-}
-
-export type FlowState =
-  | { isOpen: false }
-  | { isOpen: true; screen: string; ctx: FlowCtx };
+export type { FlowState };
 
 // Screen title lookup – keeps JSX clean
 const SCREEN_TITLES: Record<string, string> = {

@@ -5,10 +5,10 @@ import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hoo
 import { useGame } from "../../hooks/useGame";
 import type { Task } from "../../types";
 import type { SortOption } from "../PlayerItemList/PlayerItemList";
+import { asArray } from "../../utils/arrayUtils";
+import { isCompletable } from "../../utils/completable";
 import { formatRewardDuration } from "../../utils/formatUtils";
 import { TASKS_HIDE_COMPLETED_KEY } from "../../utils/userPreferences";
-
-export type ItemRecord = Task & { [key: string]: unknown };
 
 export interface TaskEditSummary {
   created: string;
@@ -17,11 +17,9 @@ export interface TaskEditSummary {
   totalTime: string;
 }
 
-export function isTaskComplete(task: Task): boolean {
-  return Boolean(task?.completed_at ?? task?.is_complete);
-}
+export const isTaskComplete = isCompletable;
 
-export const taskSortOptions: SortOption<ItemRecord>[] = [
+export const taskSortOptions: SortOption<Task>[] = [
   {
     key: "last-worked",
     label: "Last worked",
@@ -106,7 +104,7 @@ export function useTasksPanel() {
     return () => clearTimeout(timer);
   }, [completionReward]);
 
-  const safeTasks = useMemo(() => (Array.isArray(tasks) ? tasks : []), [tasks]);
+  const safeTasks = useMemo(() => asArray(tasks), [tasks]);
 
   const visibleTasks = useMemo(
     () => (hideCompleted ? safeTasks.filter((task) => !isTaskComplete(task)) : safeTasks),
@@ -144,21 +142,21 @@ export function useTasksPanel() {
   );
 
   const handleEdit = useCallback(
-    (task: ItemRecord, name: string) => {
+    (task: Task, name: string) => {
       updateTask.mutate({ id: task.id, data: { name } });
     },
     [updateTask]
   );
 
   const handleDelete = useCallback(
-    (task: ItemRecord) => {
+    (task: Task) => {
       deleteTask.mutate(task.id);
     },
     [deleteTask]
   );
 
   const handleToggleComplete = useCallback(
-    (task: ItemRecord) => {
+    (task: Task) => {
       const completing = !isTaskComplete(task);
       updateTask.mutate(
         {
@@ -182,7 +180,7 @@ export function useTasksPanel() {
   );
 
   const handleStartTask = useCallback(
-    async (task: ItemRecord) => {
+    async (task: Task) => {
       const name = task.name;
       if (!name || activityTimer?.status === "active") return;
 
@@ -206,16 +204,14 @@ export function useTasksPanel() {
 
   const getTaskEditSummary = useCallback((task: Task): TaskEditSummary => {
     const complete = isTaskComplete(task);
-    const modifiedTs =
-      task.last_updated &&
-      task.created_at &&
-      Math.abs(new Date(task.last_updated).getTime() - new Date(task.created_at).getTime()) > 2000
-        ? formatTimestamp(task.last_updated)
-        : "-";
+    const wasModified =
+      Boolean(task.last_updated) &&
+      Boolean(task.created_at) &&
+      Math.abs(new Date(task.last_updated).getTime() - new Date(task.created_at).getTime()) > 2000;
 
     return {
       created: formatTimestamp(task.created_at),
-      modified: modifiedTs,
+      modified: wasModified ? formatTimestamp(task.last_updated) : "-",
       completed: complete ? formatTimestamp(task.completed_at) : "-",
       totalTime: formatRewardDuration(task.total_time),
     };

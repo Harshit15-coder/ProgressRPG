@@ -11,6 +11,7 @@ export function useTasks(options?: { enabled?: boolean }) {
     queryKey: ["tasks"],
     queryFn: fetchTasks,
     enabled: options?.enabled ?? true,
+    staleTime: 30_000,
   });
 }
 

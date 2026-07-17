@@ -1,10 +1,9 @@
 // hooks/usePasswordReset.ts
 import { useCallback } from 'react';
 import { API_BASE_URL } from '../config';
+import { extractApiMessage, readJsonSafe, type ApiData } from '../utils/apiErrors';
 
 const API_URL = `${API_BASE_URL}/api/v1/auth`;
-
-type ApiData = Record<string, unknown> | null;
 
 type RequestResetResult =
   | { success: true; message: string }
@@ -13,31 +12,6 @@ type RequestResetResult =
 type ConfirmResetResult =
   | { success: true; message: string }
   | { success: false; errors: ApiData; errorMessage: string };
-
-async function readResponseJson(response: Response): Promise<ApiData> {
-  try {
-    return await response.json() as ApiData;
-  } catch {
-    return null;
-  }
-}
-
-function getErrorMessage(data: ApiData, fallback: string): string {
-  if (!data || typeof data !== 'object') {
-    return fallback;
-  }
-
-  const firstEntry = Object.values(data)[0];
-  if (Array.isArray(firstEntry) && firstEntry[0]) {
-    return String(firstEntry[0]);
-  }
-
-  if (typeof data.detail === 'string' && data.detail) {
-    return data.detail;
-  }
-
-  return fallback;
-}
 
 export default function usePasswordReset() {
   const requestPasswordReset = useCallback(async (email: string): Promise<RequestResetResult> => {
@@ -50,13 +24,13 @@ export default function usePasswordReset() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await readResponseJson(response);
+      const data = await readJsonSafe(response);
 
       if (!response.ok) {
         return {
           success: false,
           errors: data,
-          errorMessage: getErrorMessage(data, 'Unable to send a reset link right now.'),
+          errorMessage: extractApiMessage(data, 'Unable to send a reset link right now.'),
         };
       }
 
@@ -91,13 +65,13 @@ export default function usePasswordReset() {
         }),
       });
 
-      const data = await readResponseJson(response);
+      const data = await readJsonSafe(response);
 
       if (!response.ok) {
         return {
           success: false,
           errors: data,
-          errorMessage: getErrorMessage(data, 'Unable to reset your password.'),
+          errorMessage: extractApiMessage(data, 'Unable to reset your password.'),
         };
       }
 

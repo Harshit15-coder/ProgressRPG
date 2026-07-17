@@ -2,39 +2,13 @@
 import { useCallback } from 'react';
 
 import { API_BASE_URL } from '../config';
+import { extractApiMessage, readJsonSafe } from '../utils/apiErrors';
 
 const API_URL = `${API_BASE_URL}/api/v1/waitlist_join/`;
-
-type ApiData = Record<string, unknown> | null;
 
 type WaitlistJoinResult =
   | { success: true; message: string }
   | { success: false; errorMessage: string };
-
-async function readResponseJson(response: Response): Promise<ApiData> {
-  try {
-    return await response.json() as ApiData;
-  } catch {
-    return null;
-  }
-}
-
-function getMessage(data: ApiData, fallback: string): string {
-  if (!data || typeof data !== 'object') {
-    return fallback;
-  }
-
-  if (typeof data.detail === 'string' && data.detail) {
-    return data.detail;
-  }
-
-  const firstEntry = Object.values(data)[0];
-  if (Array.isArray(firstEntry) && firstEntry[0]) {
-    return String(firstEntry[0]);
-  }
-
-  return fallback;
-}
 
 export default function useWaitlistJoin() {
   const joinWaitlist = useCallback(async (email: string): Promise<WaitlistJoinResult> => {
@@ -47,12 +21,12 @@ export default function useWaitlistJoin() {
         body: JSON.stringify({ email }),
       });
 
-      const data = await readResponseJson(response);
+      const data = await readJsonSafe(response);
 
       if (!response.ok) {
         return {
           success: false,
-          errorMessage: getMessage(
+          errorMessage: extractApiMessage(
             data,
             'Unable to join the waitlist right now. Please try again later.'
           ),
@@ -61,7 +35,7 @@ export default function useWaitlistJoin() {
 
       return {
         success: true,
-        message: getMessage(data, "You're on the waitlist."),
+        message: extractApiMessage(data, "You're on the waitlist."),
       };
     } catch (error) {
       console.error('[useWaitlistJoin] Unexpected request error:', error);

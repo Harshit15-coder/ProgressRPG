@@ -1,35 +1,45 @@
-const ACCESS_TOKEN_KEY = 'accessToken';
-const REFRESH_TOKEN_KEY = 'refreshToken';
-// sessionStorage is inherently per-tab and survives reloads within that tab, so it's a
-// safe place to record "this tab logged in without remember me" without leaking the
-// preference to other tabs sharing the same localStorage.
-const SESSION_MODE_KEY = 'authStorageMode';
+const AUTH_SESSION_KEY = 'authSession';
+
+type Persistence = 'local' | 'session';
+
+interface SessionDescriptor {
+  accessToken: string;
+  refreshToken: string;
+  persistence: Persistence;
+}
 
 interface TokenBundle {
   accessToken: string | null;
   refreshToken: string | null;
 }
 
-function getTokenBundle(storage: Storage): { accessToken: string; refreshToken: string } | null {
-  const accessToken = storage.getItem(ACCESS_TOKEN_KEY);
-  const refreshToken = storage.getItem(REFRESH_TOKEN_KEY);
+function readDescriptor(storage: Storage): SessionDescriptor | null {
+  const raw = storage.getItem(AUTH_SESSION_KEY);
+  if (!raw) return null;
 
-  if (!accessToken || !refreshToken) {
+  try {
+    const parsed = JSON.parse(raw) as Partial<SessionDescriptor>;
+    if (!parsed.accessToken || !parsed.refreshToken) return null;
+
+    return {
+      accessToken: parsed.accessToken,
+      refreshToken: parsed.refreshToken,
+      persistence: parsed.persistence === 'local' ? 'local' : 'session',
+    };
+  } catch {
     return null;
   }
-
-  return { accessToken, refreshToken };
 }
 
-function prefersSessionStorage(): boolean {
-  return sessionStorage.getItem(SESSION_MODE_KEY) === 'session';
+function writeDescriptor(storage: Storage, descriptor: SessionDescriptor): void {
+  storage.setItem(AUTH_SESSION_KEY, JSON.stringify(descriptor));
 }
 
-// The storage this tab currently reads/writes its own tokens from. The other
-// storage may still hold a different tab's session and must be touched only
-// as an explicit fallback, never treated as this tab's own bundle.
+// The storage this tab currently reads/writes its own session from. A
+// descriptor in sessionStorage (inherently per-tab) means this tab explicitly
+// chose a session-scoped login; otherwise it defers to localStorage.
 function getActiveStorage(): Storage {
-  return prefersSessionStorage() ? sessionStorage : localStorage;
+  return readDescriptor(sessionStorage) ? sessionStorage : localStorage;
 }
 
 function getInactiveStorage(storage: Storage): Storage {
@@ -39,40 +49,38 @@ function getInactiveStorage(storage: Storage): Storage {
 export function getStoredAuthTokens(): TokenBundle {
   const empty = { accessToken: null, refreshToken: null };
   const active = getActiveStorage();
+  const descriptor = readDescriptor(active) ?? readDescriptor(getInactiveStorage(active));
 
-  return getTokenBundle(active) || getTokenBundle(getInactiveStorage(active)) || empty;
+  return descriptor ? { accessToken: descriptor.accessToken, refreshToken: descriptor.refreshToken } : empty;
 }
 
 export function storeAuthTokens(accessToken: string, refreshToken: string, rememberMe = true): void {
   if (rememberMe) {
-    // Clearing sessionStorage here only affects this tab, so it can't clobber a
-    // remembered session another tab is relying on.
-    sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-    sessionStorage.removeItem(REFRESH_TOKEN_KEY);
-    sessionStorage.removeItem(SESSION_MODE_KEY);
-    localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-    localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+    // Clearing this tab's sessionStorage descriptor only affects this tab, so
+    // it can't clobber a remembered session another tab is relying on.
+    sessionStorage.removeItem(AUTH_SESSION_KEY);
+    writeDescriptor(localStorage, { accessToken, refreshToken, persistence: 'local' });
     return;
   }
 
   // Deliberately leave localStorage untouched — another tab may hold a valid
-  // remembered session there. The mode marker makes this tab prefer its own
-  // sessionStorage bundle regardless of what's in localStorage.
-  sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
-  sessionStorage.setItem(SESSION_MODE_KEY, 'session');
+  // remembered session there. This tab's own sessionStorage descriptor makes
+  // it read back its own bundle regardless of what's in localStorage.
+  writeDescriptor(sessionStorage, { accessToken, refreshToken, persistence: 'session' });
 }
 
 export function updateStoredAccessToken(accessToken: string): void {
   const active = getActiveStorage();
-  if (active.getItem(REFRESH_TOKEN_KEY)) {
-    active.setItem(ACCESS_TOKEN_KEY, accessToken);
+  const activeDescriptor = readDescriptor(active);
+  if (activeDescriptor) {
+    writeDescriptor(active, { ...activeDescriptor, accessToken });
     return;
   }
 
   const inactive = getInactiveStorage(active);
-  if (inactive.getItem(REFRESH_TOKEN_KEY)) {
-    inactive.setItem(ACCESS_TOKEN_KEY, accessToken);
+  const inactiveDescriptor = readDescriptor(inactive);
+  if (inactiveDescriptor) {
+    writeDescriptor(inactive, { ...inactiveDescriptor, accessToken });
   }
 }
 
@@ -84,11 +92,5 @@ export function clearAuthStorage(): void {
   // Only clear the storage this tab is actually using. A session-scoped tab
   // must never touch localStorage — another tab may hold a valid remembered
   // session there that this tab's logout/expiry has nothing to do with.
-  const active = getActiveStorage();
-  active.removeItem(ACCESS_TOKEN_KEY);
-  active.removeItem(REFRESH_TOKEN_KEY);
-
-  if (active === sessionStorage) {
-    sessionStorage.removeItem(SESSION_MODE_KEY);
-  }
+  getActiveStorage().removeItem(AUTH_SESSION_KEY);
 }

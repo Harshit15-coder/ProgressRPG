@@ -2,29 +2,13 @@ import { useDeleteActivity, useUpdateActivity } from "../../hooks/useActivities"
 import { useActivities } from "../../hooks/useActivities";
 import { useMemo, useCallback, useState } from "react";
 import type { PlayerActivity } from "../../types";
+import { formatDurationShort, pluralize } from "../../utils/formatUtils";
 
 import Button from "../Button/Button";
 import PlayerItemList from "../PlayerItemList/PlayerItemList";
 import styles from "./ActivitiesPanel.module.scss";
 
-// Helper to format duration nicely
-const formatDuration = (seconds: number): string => {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
-};
+type DateCategory = "today" | "yesterday" | "older";
 
 // Helper to format date for display
 const formatDate = (date: Date): string => {
@@ -42,90 +26,84 @@ const formatDate = (date: Date): string => {
   });
 };
 
-// Helper to get date key for grouping
-const getDateKey = (dateString: string): string => {
-  const date = new Date(dateString);
-  if (isNaN(date.getTime())) {
-    // Return a fallback key for invalid dates
-    return "invalid";
-  }
-  return date.toISOString().split('T')[0];
-};
+interface BucketedActivity {
+  activity: PlayerActivity;
+  category: DateCategory;
+  dateKey: string;
+  timestamp: number;
+}
 
-// Helper to check if activity is from today, yesterday, or older
-const getActivityDateCategory = (dateString: string): "today" | "yesterday" | "older" => {
-  const activityDate = new Date(dateString);
-
-  // Handle invalid dates
-  if (isNaN(activityDate.getTime())) {
-    return "older";
-  }
-
-  const today = new Date();
-  const yesterday = new Date(today);
+// Bucket every activity by date category (today/yesterday/older) and day key in a single pass,
+// parsing each activity's completed_at exactly once.
+const bucketActivities = (activities: PlayerActivity[]): BucketedActivity[] => {
+  const today = new Date().toDateString();
+  const yesterday = new Date();
   yesterday.setDate(yesterday.getDate() - 1);
+  const yesterdayString = yesterday.toDateString();
 
-  const activityDateOnly = activityDate.toDateString();
+  return activities.map((activity) => {
+    const date = new Date(activity.completed_at ?? "");
+    const valid = !isNaN(date.getTime());
+    const dateOnly = valid ? date.toDateString() : "";
 
-  if (activityDateOnly === today.toDateString()) return "today";
-  if (activityDateOnly === yesterday.toDateString()) return "yesterday";
-  return "older";
+    const category: DateCategory = !valid
+      ? "older"
+      : dateOnly === today
+        ? "today"
+        : dateOnly === yesterdayString
+          ? "yesterday"
+          : "older";
+
+    return {
+      activity,
+      category,
+      dateKey: valid ? date.toISOString().split("T")[0] : "invalid",
+      timestamp: valid ? date.getTime() : 0,
+    };
+  });
 };
 
 export default function ActivitiesPanel(): React.ReactElement | null {
   const { data: activities, isLoading } = useActivities();
   const deleteActivity = useDeleteActivity();
   const updateActivity = useUpdateActivity();
-  const [activeTab, setActiveTab] = useState("today");
+  const [activeTab, setActiveTab] = useState<DateCategory>("today");
 
-  // Group activities by date
-  const groupedActivities = useMemo((): Record<"today" | "yesterday" | "older", PlayerActivity[]> => {
-    if (!activities) return { today: [], yesterday: [], older: [] };
+  const bucketed = useMemo(() => bucketActivities(activities ?? []), [activities]);
 
-    const grouped: Record<"today" | "yesterday" | "older", PlayerActivity[]> = { today: [], yesterday: [], older: [] };
-
-    activities.forEach((activity) => {
-      const category = getActivityDateCategory(activity.completed_at ?? "");
-      grouped[category].push(activity);
+  const groupedByCategory = useMemo(() => {
+    const grouped: Record<DateCategory, BucketedActivity[]> = { today: [], yesterday: [], older: [] };
+    bucketed.forEach((entry) => grouped[entry.category].push(entry));
+    (Object.keys(grouped) as DateCategory[]).forEach((key) => {
+      grouped[key].sort((a, b) => b.timestamp - a.timestamp);
     });
-
-    // Sort each group by date (newest first)
-    (Object.keys(grouped) as Array<"today" | "yesterday" | "older">).forEach((key) => {
-      grouped[key].sort((a, b) => {
-        const dateA = new Date(a.completed_at ?? 0).getTime();
-        const dateB = new Date(b.completed_at ?? 0).getTime();
-        return dateB - dateA;
-      });
-    });
-
     return grouped;
-  }, [activities]);
+  }, [bucketed]);
 
-  // Get activities for active tab, grouped by date
-  const activitiesByTab = useMemo((): Record<string, PlayerActivity[]> => {
-    const tabActivities = groupedActivities[activeTab as "today" | "yesterday" | "older"];
+  // Group the active tab's activities by day key, reusing the category/date-key computed above.
+  const activitiesByDay = useMemo(() => {
     const byDate: Record<string, PlayerActivity[]> = {};
-
-    tabActivities.forEach((activity) => {
-      const dateKey = getDateKey(activity.completed_at ?? "");
-      if (!byDate[dateKey]) {
-        byDate[dateKey] = [];
-      }
+    groupedByCategory[activeTab].forEach(({ activity, dateKey }) => {
+      if (!byDate[dateKey]) byDate[dateKey] = [];
       byDate[dateKey].push(activity);
     });
-
     return byDate;
-  }, [groupedActivities, activeTab]);
+  }, [groupedByCategory, activeTab]);
 
-  const hasActivities = activities && activities.length > 0;
-  const currentTabActivities = groupedActivities[activeTab];
-  const hasTabActivities = currentTabActivities && currentTabActivities.length > 0;
+  const dateTabs = useMemo(
+    () => [
+      { key: "older" as const, label: `Older (${groupedByCategory.older.length})` },
+      { key: "yesterday" as const, label: `Yesterday (${groupedByCategory.yesterday.length})` },
+      { key: "today" as const, label: `Today (${groupedByCategory.today.length})` },
+    ],
+    [groupedByCategory],
+  );
 
-  // Cast handlers to match PlayerItemList's loose generic constraint
-  type ItemRecord = PlayerActivity & { [key: string]: unknown };
+  const hasActivities = bucketed.length > 0;
+  const hasTabActivities = groupedByCategory[activeTab].length > 0;
 
   const handleEdit = useCallback(
-    (activity: ItemRecord, name: string) => {
+    (activity: PlayerActivity, name: string) => {
       updateActivity.mutate({
         activityId: activity.id,
         data: { name },
@@ -135,7 +113,7 @@ export default function ActivitiesPanel(): React.ReactElement | null {
   );
 
   const handleDelete = useCallback(
-    (activity: ItemRecord) => {
+    (activity: PlayerActivity) => {
       deleteActivity.mutate(activity.id);
     },
     [deleteActivity],
@@ -149,11 +127,7 @@ export default function ActivitiesPanel(): React.ReactElement | null {
       {hasActivities && (
         <>
           <div className={styles.dateTabs}>
-            {[
-              { key: "older", label: `Older (${groupedActivities.older.length})` },
-              { key: "yesterday", label: `Yesterday (${groupedActivities.yesterday.length})` },
-              { key: "today", label: `Today (${groupedActivities.today.length})` },
-            ].map(({ key, label }) => (
+            {dateTabs.map(({ key, label }) => (
               <Button
                 key={key}
                 variant={activeTab === key ? "primary" : "secondary"}
@@ -167,7 +141,7 @@ export default function ActivitiesPanel(): React.ReactElement | null {
 
           {hasTabActivities ? (
             <div className={styles.activitiesList}>
-              {Object.entries(activitiesByTab).map(([dateKey, dayActivities]) => {
+              {Object.entries(activitiesByDay).map(([dateKey, dayActivities]) => {
                 const dayDurationTotalSeconds = dayActivities.reduce(
                   (sum, activity) => sum + (Number(activity.duration) || 0),
                   0,
@@ -180,16 +154,16 @@ export default function ActivitiesPanel(): React.ReactElement | null {
 
                 return (
                   <div key={dateKey}>
-                    <h2 style={{ margin: "1em 0 0.5em", fontSize: "0.95em", opacity: 0.7 }}>
-                      {headingLabel} ({dayActivities.length} {dayActivities.length === 1 ? 'activity' : 'activities'}, {formatDuration(dayDurationTotalSeconds)}, {dayXpTotal} XP)
+                    <h2 className={styles.dayHeading}>
+                      {headingLabel} ({dayActivities.length} {pluralize(dayActivities.length, "activity", "activities")}, {formatDurationShort(dayDurationTotalSeconds)}, {dayXpTotal} XP)
                     </h2>
-                    <PlayerItemList<ItemRecord>
-                      items={dayActivities as ItemRecord[]}
+                    <PlayerItemList<PlayerActivity>
+                      items={dayActivities}
                       itemLabel="activity"
                       ariaLabel={`Activities for ${headingLabel}`}
                       renderItemMeta={(activity) => (
                         <>
-                          Duration: {formatDuration(Number(activity.duration) || 0)} •{" "}
+                          Duration: {formatDurationShort(Number(activity.duration) || 0)} •{" "}
                           {Number(activity.xp_gained) || 0} XP gained •{" "}
                           {new Date(activity.completed_at ?? 0).toLocaleTimeString("en-US", {
                             hour: "2-digit",
@@ -199,7 +173,7 @@ export default function ActivitiesPanel(): React.ReactElement | null {
                       )}
                       renderEditSummary={(activity) => (
                         <>
-                          Duration: {formatDuration(Number(activity.duration) || 0)} • Completed:{" "}
+                          Duration: {formatDurationShort(Number(activity.duration) || 0)} • Completed:{" "}
                           {activity?.completed_at
                             ? new Date(activity.completed_at).toLocaleTimeString("en-US", {
                                 hour: "2-digit",

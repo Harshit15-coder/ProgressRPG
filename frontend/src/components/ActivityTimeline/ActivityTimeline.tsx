@@ -4,34 +4,15 @@ import { useTasks } from "../../hooks/useTasks";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import List from "../List/List";
 import Tooltip from "../Tooltip/Tooltip";
+import { isCompletable } from "../../utils/completable";
+import { formatDurationShort } from "../../utils/formatUtils";
 import styles from "./ActivityTimeline.module.scss";
 import type { PlayerActivity, CharacterActivity } from "../../types";
 
 // Unified activity type used in the timeline list.
-// The index signature is required by the List component's generic constraint.
 type UnifiedActivity = (PlayerActivity | CharacterActivity) & {
   // CharacterActivity has kind; PlayerActivity has player
   kind?: string;
-  [key: string]: unknown;
-};
-
-// Helper to format duration nicely
-const formatDuration = (seconds: number): string => {
-  if (seconds < 60) {
-    return `${seconds}s`;
-  }
-
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-
-  if (minutes < 60) {
-    return remainingSeconds > 0 ? `${minutes}m ${remainingSeconds}s` : `${minutes}m`;
-  }
-
-  const hours = Math.floor(minutes / 60);
-  const remainingMinutes = minutes % 60;
-
-  return remainingMinutes > 0 ? `${hours}h ${remainingMinutes}m` : `${hours}h`;
 };
 
 export default function ActivityTimeline() {
@@ -51,7 +32,7 @@ export default function ActivityTimeline() {
 
   const completedTaskIds = useMemo(() => {
     if (!tasks) return new Set<number>();
-    return new Set(tasks.filter(t => Boolean(t.completed_at ?? t.is_complete)).map(t => t.id));
+    return new Set(tasks.filter(isCompletable).map(t => t.id));
   }, [tasks]);
 
   useEffect(() => {
@@ -103,7 +84,7 @@ export default function ActivityTimeline() {
               <div className={styles.line}>
                 <span className={styles.lineText}>
                   <strong>{act.name || act.kind || "an activity"}</strong> —{" "}
-                  {formatDuration(act.duration)}
+                  {formatDurationShort(act.duration)}
                 </span>
                 {linkedTaskIsComplete ? (
                   <Tooltip content="Task complete — activity will start unlinked">

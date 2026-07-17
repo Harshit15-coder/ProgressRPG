@@ -40,6 +40,7 @@ export default function UnifiedTimerHome() {
     startEditingLabel,
     handleLabelBlur,
     handleLabelCancel,
+    consumeJustCancelledLabelEdit,
     submitAndOpenSupport,
     openSupportMode,
   } = useActivityInput();
@@ -79,26 +80,15 @@ export default function UnifiedTimerHome() {
     containerRef.current?.querySelector("input")?.focus();
   };
 
-  // The blur fired by `.blur()` below happens synchronously, before the
-  // setIsEditingLabel(false) from handleLabelCancel has flushed — so
-  // handleWrapperBlur's `isEditingLabel` closure would still read `true`
-  // and wrongly commit the cancelled edit. This ref sidesteps the stale
-  // closure without waiting on a render.
-  const justCancelledRef = useRef(false);
-
   const handleWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
     if (event.key === "Escape" && isEditingLabel) {
-      justCancelledRef.current = true;
       handleLabelCancel();
       (event.target as HTMLElement).blur();
     }
   };
 
   const handleWrapperBlur = (event: React.FocusEvent<HTMLDivElement>) => {
-    if (justCancelledRef.current) {
-      justCancelledRef.current = false;
-      return;
-    }
+    if (consumeJustCancelledLabelEdit()) return;
     if (!isEditingLabel) return;
     if (containerRef.current?.contains(event.relatedTarget as Node)) return;
     handleLabelBlur();
