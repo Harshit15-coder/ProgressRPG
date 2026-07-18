@@ -95,8 +95,12 @@ village granary's storage as a pool (no per-character carrying).
    `advance_field_economy_tick`), run once daily. Per `FieldCrop`:
    - Skip entirely if `last_processed_on == today` (idempotency guard - see
      Edge cases).
-   - `fallow` → `growing`: set `planted_at = now`, stage = `growing`
-     (immediate replant; see Design decisions for why no fallow gap yet).
+   - `fallow` → `growing`: only if `today.month` falls within
+     `SOWING_WINDOW_MONTHS` (spring wheat: Feb-Apr) - set `planted_at =
+     now`, stage = `growing`. Outside the window the crop simply stays
+     `fallow` until the window comes back around next year (see Design
+     decisions for why this replaced the earlier immediate-replant
+     placeholder).
    - `growing` → `ready`: if `now - planted_at >= GROWTH_DURATION`, compute
      `ready_yield = subzone.boundary.area * YIELD_PER_AREA`, stage =
      `ready`, `harvested_amount = 0`.
@@ -115,8 +119,11 @@ village granary's storage as a pool (no per-character carrying).
    - 5 minutes after `WORK_END`, so the day's final commute has settled and
    presence counts are stable.
 7. **Constants**: module-level in `economy/models.py` or a small
-   `economy/constants.py` - `YIELD_PER_AREA` (wheat units per crop-`Subzone`
-   area unit at full maturity), `GROWTH_DURATION` (timedelta, e.g. 5 days),
+   `economy/constants.py` - `SOWING_WINDOW_MONTHS` (frozenset of calendar
+   months a crop can be planted in - spring wheat: `{2, 3, 4}`),
+   `GROWTH_DURATION` (timedelta from planting to ready - spring wheat:
+   ~150 days, landing readiness around Jul-Sep), `YIELD_PER_AREA` (wheat
+   units per crop-`Subzone` area unit at full maturity),
    `PER_WORKER_DAILY_CAPACITY` (wheat units one worker can harvest per day),
    `STORAGE_CAPACITY_PER_AREA` (goods units per storage-interior-space area
    unit).
@@ -163,12 +170,21 @@ shouldn't change once placed, but snapshotting is defensive against a
 future re-seed/edit mid-cycle silently changing an in-progress harvest's
 total, which would be a confusing bug to chase.
 
-**Immediate replant (no fallow gap) for the first version.** Chosen: `fallow`
-transitions straight back to `growing` on the very next tick. Alternative:
-add a `FALLOW_DURATION` gap for realism - deferred rather than rejected;
-it's a one-constant addition once the base loop is proven, and starting
-without it avoids a field sitting idle (and looking "broken") during initial
-testing/demoing of the feature.
+**Real calendar-driven sowing window (spring wheat) vs. immediate replant.**
+Chosen: spring wheat, sown Feb-Apr, ready ~150 days later (Jul-Sep) -
+`fallow` only transitions to `growing` if the current month falls in
+`SOWING_WINDOW_MONTHS`; otherwise it stays `fallow` until the window comes
+back around next year. This replaces the original placeholder ("immediate
+replant, no fallow gap, deferred for realism") once the user asked for
+realistic growing seasons - a multi-month growth duration makes year-round
+instant replanting look wrong (a field harvested in August immediately
+resprouting), and a real fallow gap is expected, correct behaviour rather
+than something to avoid. Winter wheat (sown Sep-Nov, ~10-11 month cycle) and
+per-field variety (spring vs. winter, randomly assigned) were both
+considered and rejected for the first version - winter wheat's cycle is
+long enough to make the feature hard to observe/tune in-game, and mixed
+varieties are a straightforward follow-up (a `variety` field driving which
+constants apply) once the single-variety loop is proven.
 
 **Capacity computed from `InteriorSpace` area vs. a stored field on
 `GoodsStock`.** Chosen: computed on read from summed `storage`-usage
@@ -261,12 +277,16 @@ cosmetic one. A cheap per-`FieldCrop` date check is worth the extra field.
 
 ## 8. Open questions
 
-- `YIELD_PER_AREA`, `GROWTH_DURATION`, `PER_WORKER_DAILY_CAPACITY`, and
-  `STORAGE_CAPACITY_PER_AREA` are all placeholder constants that need real
-  starting values - proposing round numbers during implementation (e.g. 5
-  days to grow, capacity such that one worker roughly clears an average
-  field in a few days) and tuning by feel once it's visible in the browser,
-  rather than trying to derive "correct" numbers up front.
+- `SOWING_WINDOW_MONTHS` and `GROWTH_DURATION` are now grounded in a real
+  spring wheat calendar (Feb-Apr sowing, ~150 days to ready), so they're
+  settled rather than placeholders. `YIELD_PER_AREA`,
+  `PER_WORKER_DAILY_CAPACITY`, and `STORAGE_CAPACITY_PER_AREA` remain
+  placeholder starting values - tuning by feel once it's visible in the
+  browser, rather than trying to derive "correct" numbers up front.
+- Winter wheat and per-field crop variety were deferred (see Design
+  decisions) - worth a follow-up once the single spring-wheat loop is
+  proven and villages have more than one crop field to make variety
+  visible.
 - Should `GoodsStock`/`FieldCrop` be exposed on the map view (e.g. a
   granary's fill level, a field's growth stage as a tooltip/colour) as part
   of this piece, or is that purely a follow-up once wheat exists at all?

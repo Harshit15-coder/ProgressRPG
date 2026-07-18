@@ -16,6 +16,7 @@ from .services.schedule import sync_character_location, target_role_for
 from .services.wander import wander
 from .tasks import commute_tick, move_characters_tick, wander_tick
 from character.models import Character, CharacterLocation, PlayerCharacterLink
+from economy.models import FieldCrop
 
 
 class LocationsModelsTestCase(TestCase):
@@ -616,6 +617,10 @@ class GenerateFieldsCommandTest(TestCase):
         # boundary line.
         self.assertFalse(centre.boundary.intersects(subzone.boundary))
         self.assertEqual(centre.boundary.area, original_boundary.area)
+
+        crop = FieldCrop.objects.get(subzone=subzone)
+        self.assertEqual(crop.shelter_building, shelter)
+        self.assertEqual(crop.stage, FieldCrop.Stage.FALLOW)
 
     def test_skips_centre_that_already_has_a_crops_subzone(self):
         centre = _make_centre_with_building(

@@ -5,6 +5,7 @@ from django.contrib.gis.geos import Point
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
+from economy.models import FieldCrop
 from locations.models import Building, LandArea, Node, PopulationCentre, Subzone
 from locations.management.commands.spawn_villages import (
     compute_building_entrance_point,
@@ -32,8 +33,9 @@ class Command(BaseCommand):
         "Building on its edge for characters to work at (avoiding overlap with "
         "other centres' boundaries). The crop area is deliberately left outside "
         "the boundary polygon - the map view's bbox is computed from all "
-        "buildings/subzones, not just the boundary, so it still renders. Skips "
-        "centres that already have a crops Subzone."
+        "buildings/subzones, not just the boundary, so it still renders. Each "
+        "new crop Subzone gets an economy.FieldCrop record automatically. "
+        "Skips centres that already have a crops Subzone."
     )
 
     @transaction.atomic
@@ -80,7 +82,7 @@ class Command(BaseCommand):
                 boundary=crop_polygon,
                 size=area_ha,
             )
-            Subzone.objects.create(
+            subzone = Subzone.objects.create(
                 land_area=land_area,
                 name=f"{centre.name} Farmland - Crops",
                 usage="crops",
@@ -122,6 +124,12 @@ class Command(BaseCommand):
                     "name": f"Entrance for {shelter.name}",
                     "location": entrance_point,
                 },
+            )
+
+            FieldCrop.objects.create(
+                subzone=subzone,
+                shelter_building=shelter,
+                stage=FieldCrop.Stage.FALLOW,
             )
 
             self.stdout.write(

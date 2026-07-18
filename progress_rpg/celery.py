@@ -74,6 +74,10 @@ app.conf.beat_schedule = {
         "task": "locations.tasks.commute_tick",
         "schedule": 60.0,  # every 60 seconds
     },
+    "advance_field_economy": {
+        "task": "economy.tasks.advance_field_economy_tick",
+        "schedule": crontab(hour=18, minute=5),  # 5 min after WORK_END
+    },
     # "precompute-sun-times-daily": {
     #     "task": "gameworld.tasks.precompute_sun_times",
     #     "schedule": crontab(hour=0, minute=0),
