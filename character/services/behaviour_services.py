@@ -6,7 +6,7 @@ from datetime import datetime, time, timedelta
 from django.db import transaction
 from django.utils import timezone
 
-from character.utils import WORK_ACTIVITIES
+from character.utils import work_activities_for
 from progression.models import CharacterActivity
 
 
@@ -71,7 +71,7 @@ def generate_day(behaviour, date, replace_future=True):
     sleep_start = aware(date, time(23, 0))
     sleep_end = next_wake
 
-    activities = random.sample(WORK_ACTIVITIES, 2)
+    activities = rng.sample(work_activities_for(behaviour.character), 2)
     blocks = [
         ("sleep", "Sleeping", aware(date, time(0, 0)), morning_start),
         ("morning", "Waking up", morning_start, morning_end),
