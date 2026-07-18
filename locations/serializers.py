@@ -140,6 +140,18 @@ class BoundaryFeatureSerializer(PolygonFeatureSerializer):
         return {"feature_type": "boundary"}
 
 
+class SubzoneFeatureSerializer(PolygonFeatureSerializer):
+    feature_type = "subzone"
+    polygon_attr = "boundary"
+
+    def get_properties(self, obj):
+        return {
+            "id": obj.id,
+            "name": obj.name,
+            "usage": obj.usage,
+        }
+
+
 class FeatureCollectionSerializer(serializers.Serializer):
     """
     Wraps a list of GeoJSON Feature dicts into a GeoJSON FeatureCollection.

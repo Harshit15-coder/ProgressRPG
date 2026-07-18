@@ -37,6 +37,10 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "kitchen": 0.30,
         "storage": 0.20,
     },
+    "field_shelter": {
+        "other": 0.70,
+        "storage": 0.30,
+    },
 }
 
 VILLAGE_SPECIAL_BUILDINGS = ["granary", "inn", "mill", "bakery", "communal"]

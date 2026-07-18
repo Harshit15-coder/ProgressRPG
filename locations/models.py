@@ -335,6 +335,7 @@ class Building(models.Model):
         ("mill", "Mill"),
         ("bakery", "Bakery"),
         ("communal", "Communal"),
+        ("field_shelter", "Field Shelter"),
     ]
 
     name = models.CharField(max_length=255, unique=True)
