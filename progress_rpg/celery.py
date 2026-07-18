@@ -70,9 +70,9 @@ app.conf.beat_schedule = {
     #     "task": "locations.tasks.move_characters_tick",
     #     "schedule": 5.0,  # every 5 seconds
     # },
-    "wander_tick": {
-        "task": "locations.tasks.wander_tick",
-        "schedule": 10.0,  # every 10 seconds
+    "commute_tick": {
+        "task": "locations.tasks.commute_tick",
+        "schedule": 60.0,  # every 60 seconds
     },
     # "precompute-sun-times-daily": {
     #     "task": "gameworld.tasks.precompute_sun_times",
