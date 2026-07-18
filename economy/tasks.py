@@ -6,10 +6,14 @@ from django.utils import timezone
 from .constants import (
     GROWTH_DURATION,
     PER_WORKER_DAILY_CAPACITY,
+    PER_WORKER_DAILY_MILLING_CAPACITY,
     SOWING_WINDOW_MONTHS,
+    WHEAT_TO_FLOUR_RATIO,
     YIELD_PER_AREA,
 )
-from .models import FieldCrop, GoodsStock
+from .conversion import convert_goods
+from .models import FieldCrop, GoodsConversionState, GoodsStock
+from locations.models import Building
 
 logger = logging.getLogger("general")
 
@@ -134,3 +138,42 @@ def _deposit_into_granary(shelter_building, amount):
 
     stock.quantity += deposit
     stock.save(update_fields=["quantity"])
+
+
+@shared_task
+def advance_mill_economy_tick(today=None):
+    """
+    Daily economy step: each mill converts granary wheat into flour stored
+    at itself, capped by how many workers are physically present at the
+    mill (same "must actually show up" premise as the field harvest).
+    """
+    today = today or timezone.localdate()
+
+    for mill in Building.objects.filter(building_type="mill").select_related(
+        "population_centre"
+    ):
+        state, _ = GoodsConversionState.objects.get_or_create(building=mill)
+        if state.last_processed_on == today:
+            continue
+
+        granary = _find_granary(mill.population_centre)
+        if granary is not None:
+            workers_present = _workers_present(mill)
+            convert_goods(
+                granary,
+                mill,
+                input_good=GoodsStock.GoodType.WHEAT,
+                output_good=GoodsStock.GoodType.FLOUR,
+                workers_present=workers_present,
+                per_worker_capacity=PER_WORKER_DAILY_MILLING_CAPACITY,
+                conversion_ratio=WHEAT_TO_FLOUR_RATIO,
+            )
+        else:
+            logger.warning(
+                "No granary for mill %s (%s) - nothing to mill",
+                mill.id,
+                mill.population_centre,
+            )
+
+        state.last_processed_on = today
+        state.save(update_fields=["last_processed_on"])

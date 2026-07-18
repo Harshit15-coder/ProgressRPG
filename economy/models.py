@@ -1,6 +1,6 @@
 from django.db import models
 
-from .constants import STORAGE_CAPACITY_PER_AREA
+from .constants import GOOD_TYPE_STORAGE_USAGE, STORAGE_CAPACITY_PER_AREA
 
 
 class FieldCrop(models.Model):
@@ -39,6 +39,7 @@ class FieldCrop(models.Model):
 class GoodsStock(models.Model):
     class GoodType(models.TextChoices):
         WHEAT = "wheat", "Wheat"
+        FLOUR = "flour", "Flour"
 
     building = models.ForeignKey(
         "locations.Building", on_delete=models.CASCADE, related_name="goods_stocks"
@@ -61,10 +62,31 @@ class GoodsStock(models.Model):
         # Computed on read, not stored: populate_interiors deletes and
         # regenerates all InteriorSpace rows on every run, so a stored
         # capacity would go stale the next time interiors are reseeded.
+        # Each good_type is capped by its own InteriorSpace usage (grain and
+        # flour don't share one pool), falling back to the generic "storage"
+        # usage for any good_type not in the mapping.
+        usage = GOOD_TYPE_STORAGE_USAGE.get(self.good_type, "storage")
         storage_area = (
-            self.building.interiorspaces.filter(usage="storage").aggregate(
+            self.building.interiorspaces.filter(usage=usage).aggregate(
                 total=models.Sum("area")
             )["total"]
             or 0
         )
         return storage_area * STORAGE_CAPACITY_PER_AREA
+
+
+class GoodsConversionState(models.Model):
+    """
+    Per-building idempotency guard for a daily goods-conversion task (e.g.
+    milling). Deliberately thin - unlike FieldCrop, conversion has no growth
+    stages, just a daily "did we already process this building today" check
+    - kept generic so bakery can reuse it unmodified later.
+    """
+
+    building = models.OneToOneField(
+        "locations.Building", on_delete=models.CASCADE, related_name="conversion_state"
+    )
+    last_processed_on = models.DateField(null=True, blank=True)
+
+    def __str__(self):
+        return f"GoodsConversionState({self.building_id}, {self.last_processed_on})"

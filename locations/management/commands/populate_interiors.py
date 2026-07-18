@@ -15,7 +15,7 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "storage": 0.05,
     },
     "granary": {
-        "storage": 1.0,
+        "grain_storage": 1.0,
     },
     "inn": {
         "sleeping": 0.50,
@@ -24,8 +24,9 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "storage": 0.15,
     },
     "mill": {
-        "workshop": 0.70,
-        "storage": 0.30,
+        "workshop": 0.50,
+        "grain_storage": 0.25,
+        "flour_storage": 0.25,
     },
     "bakery": {
         "workshop": 0.50,

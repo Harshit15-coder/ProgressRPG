@@ -17,3 +17,18 @@ PER_WORKER_DAILY_CAPACITY = 20.0
 # Goods units of storage capacity per unit of storage-usage InteriorSpace
 # area.
 STORAGE_CAPACITY_PER_AREA = 5.0
+
+# Which InteriorSpace usage stores a given good - grain and flour are kept
+# separate (different spoilage/pest risk, historically different rooms),
+# rather than sharing one generic "storage" bucket. Falls back to the
+# generic "storage" usage for any good_type not listed here.
+GOOD_TYPE_STORAGE_USAGE = {
+    "wheat": "grain_storage",
+    "flour": "flour_storage",
+}
+
+# Grain units one physically-present worker can mill per day.
+PER_WORKER_DAILY_MILLING_CAPACITY = 20.0
+
+# Flour units produced per grain unit milled.
+WHEAT_TO_FLOUR_RATIO = 0.75

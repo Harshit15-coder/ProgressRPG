@@ -78,6 +78,10 @@ app.conf.beat_schedule = {
         "task": "economy.tasks.advance_field_economy_tick",
         "schedule": crontab(hour=18, minute=5),  # 5 min after WORK_END
     },
+    "advance_mill_economy": {
+        "task": "economy.tasks.advance_mill_economy_tick",
+        "schedule": crontab(hour=18, minute=10),  # after advance_field_economy
+    },
     # "precompute-sun-times-daily": {
     #     "task": "gameworld.tasks.precompute_sun_times",
     #     "schedule": crontab(hour=0, minute=0),

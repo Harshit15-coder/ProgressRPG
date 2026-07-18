@@ -377,6 +377,8 @@ class InteriorSpace(models.Model):
         HYGIENE = "hygiene", "Hygiene"
         KITCHEN = "kitchen", "Kitchen"
         STORAGE = "storage", "Storage"
+        GRAIN_STORAGE = "grain_storage", "Grain Storage"
+        FLOUR_STORAGE = "flour_storage", "Flour Storage"
         WORKSHOP = "workshop", "Workshop"
         ANIMALS = "animals", "Animals"
         MEETING = "meeting", "Meeting"

@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import FieldCrop, GoodsStock
+from .models import FieldCrop, GoodsConversionState, GoodsStock
 
 
 @admin.register(FieldCrop)
@@ -27,3 +27,9 @@ class GoodsStockAdmin(admin.ModelAdmin):
 
     def capacity(self, obj):
         return obj.capacity
+
+
+@admin.register(GoodsConversionState)
+class GoodsConversionStateAdmin(admin.ModelAdmin):
+    list_display = ["id", "building", "last_processed_on"]
+    readonly_fields = ["building"]

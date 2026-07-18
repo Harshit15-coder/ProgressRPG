@@ -5,9 +5,15 @@ from django.test import TestCase
 from django.utils import timezone
 
 from character.models import Character
-from economy.constants import GROWTH_DURATION, PER_WORKER_DAILY_CAPACITY, YIELD_PER_AREA
-from economy.models import FieldCrop, GoodsStock
-from economy.tasks import advance_field_economy_tick
+from economy.constants import (
+    GROWTH_DURATION,
+    PER_WORKER_DAILY_CAPACITY,
+    PER_WORKER_DAILY_MILLING_CAPACITY,
+    WHEAT_TO_FLOUR_RATIO,
+    YIELD_PER_AREA,
+)
+from economy.models import FieldCrop, GoodsConversionState, GoodsStock
+from economy.tasks import advance_field_economy_tick, advance_mill_economy_tick
 from locations.models import (
     Building,
     InteriorSpace,
@@ -88,9 +94,34 @@ def _make_granary(centre, storage_area=100.0):
         population_centre=centre,
     )
     InteriorSpace.objects.create(
-        building=granary, name="Storage", usage="storage", area=storage_area
+        building=granary, name="Storage", usage="grain_storage", area=storage_area
     )
     return granary
+
+
+def _make_mill(centre, grain_area=1000.0, flour_area=1000.0):
+    mill = Building.objects.create(
+        name=f"Mill of ({centre.name})",
+        building_type="mill",
+        location=Point(80, 0, srid=3857),
+        footprint=_square(80, 0, 5),
+        population_centre=centre,
+    )
+    mill_node = Node.objects.create(
+        name=f"Node for {mill.name}",
+        location=mill.location,
+        kind=Node.Kind.BUILDING,
+        building=mill,
+    )
+    if grain_area:
+        InteriorSpace.objects.create(
+            building=mill, name="Grain store", usage="grain_storage", area=grain_area
+        )
+    if flour_area:
+        InteriorSpace.objects.create(
+            building=mill, name="Flour store", usage="flour_storage", area=flour_area
+        )
+    return mill, mill_node
 
 
 class GenerateFieldsEconomyTickTests(TestCase):
@@ -268,3 +299,138 @@ class GenerateFieldsEconomyTickTests(TestCase):
 
         stock = GoodsStock.objects.get(building__building_type="granary")
         self.assertEqual(stock.quantity, PER_WORKER_DAILY_CAPACITY)
+
+
+class AdvanceMillEconomyTickTests(TestCase):
+    def _make_centre_with_wheat(self, wheat_quantity=500.0, granary_area=10000.0):
+        centre_point = Point(0, 0, srid=3857)
+        centre = PopulationCentre.objects.create(
+            name="Millville", location=centre_point, boundary=_square(0, 0, 50)
+        )
+        granary = _make_granary(centre, storage_area=granary_area)
+        GoodsStock.objects.create(
+            building=granary,
+            good_type=GoodsStock.GoodType.WHEAT,
+            quantity=wheat_quantity,
+        )
+        return centre, granary
+
+    def test_mill_converts_wheat_to_flour_capped_by_workers_present(self):
+        centre, granary = self._make_centre_with_wheat()
+        mill, mill_node = _make_mill(centre)
+
+        Character.objects.create(
+            first_name="Miller1",
+            location=mill.location,
+            current_node=mill_node,
+            is_moving=False,
+        )
+        Character.objects.create(
+            first_name="Miller2",
+            location=mill.location,
+            current_node=mill_node,
+            is_moving=False,
+        )
+
+        advance_mill_economy_tick()
+
+        expected_input = 2 * PER_WORKER_DAILY_MILLING_CAPACITY
+        wheat = GoodsStock.objects.get(building=granary, good_type="wheat")
+        flour = GoodsStock.objects.get(building=mill, good_type="flour")
+        self.assertEqual(wheat.quantity, 500.0 - expected_input)
+        self.assertEqual(flour.quantity, expected_input * WHEAT_TO_FLOUR_RATIO)
+
+        state = GoodsConversionState.objects.get(building=mill)
+        self.assertEqual(state.last_processed_on, timezone.localdate())
+
+    def test_no_granary_does_not_raise(self):
+        centre = PopulationCentre.objects.create(
+            name="Granaryless village",
+            location=Point(0, 0, srid=3857),
+            boundary=_square(0, 0, 50),
+        )
+        mill, mill_node = _make_mill(centre)
+        Character.objects.create(
+            first_name="Miller1",
+            location=mill.location,
+            current_node=mill_node,
+            is_moving=False,
+        )
+
+        advance_mill_economy_tick()
+
+        self.assertFalse(GoodsStock.objects.exists())
+        state = GoodsConversionState.objects.get(building=mill)
+        self.assertEqual(state.last_processed_on, timezone.localdate())
+
+    def test_running_twice_in_the_same_day_only_processes_once(self):
+        centre, granary = self._make_centre_with_wheat()
+        mill, mill_node = _make_mill(centre)
+        Character.objects.create(
+            first_name="Miller1",
+            location=mill.location,
+            current_node=mill_node,
+            is_moving=False,
+        )
+
+        advance_mill_economy_tick()
+        advance_mill_economy_tick()
+
+        expected_input = PER_WORKER_DAILY_MILLING_CAPACITY
+        wheat = GoodsStock.objects.get(building=granary, good_type="wheat")
+        self.assertEqual(wheat.quantity, 500.0 - expected_input)
+
+    def test_multiple_mills_in_one_centre_are_both_processed(self):
+        centre, granary = self._make_centre_with_wheat(wheat_quantity=1000.0)
+        mill_a, node_a = _make_mill(centre)
+        mill_b_building = Building.objects.create(
+            name="Second Mill",
+            building_type="mill",
+            location=Point(70, 0, srid=3857),
+            footprint=_square(70, 0, 5),
+            population_centre=centre,
+        )
+        node_b = Node.objects.create(
+            name="Node for Second Mill",
+            location=mill_b_building.location,
+            kind=Node.Kind.BUILDING,
+            building=mill_b_building,
+        )
+        InteriorSpace.objects.create(
+            building=mill_b_building,
+            name="Grain store",
+            usage="grain_storage",
+            area=1000.0,
+        )
+        InteriorSpace.objects.create(
+            building=mill_b_building,
+            name="Flour store",
+            usage="flour_storage",
+            area=1000.0,
+        )
+
+        Character.objects.create(
+            first_name="MillerA",
+            location=mill_a.location,
+            current_node=node_a,
+            is_moving=False,
+        )
+        Character.objects.create(
+            first_name="MillerB",
+            location=mill_b_building.location,
+            current_node=node_b,
+            is_moving=False,
+        )
+
+        advance_mill_economy_tick()
+
+        self.assertTrue(
+            GoodsStock.objects.filter(
+                building=mill_a, good_type="flour", quantity__gt=0
+            ).exists()
+        )
+        self.assertTrue(
+            GoodsStock.objects.filter(
+                building=mill_b_building, good_type="flour", quantity__gt=0
+            ).exists()
+        )
