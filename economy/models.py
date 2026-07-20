@@ -37,14 +37,21 @@ class FieldCrop(models.Model):
 
 
 class GoodsStock(models.Model):
+    # A plain string namespace, not wired into the model field's `choices`
+    # (see below) - that way adding a new good type never needs a
+    # migration, since Django would otherwise emit a no-op AlterField for
+    # every addition just to keep migration state in sync. GoodsStock is
+    # server-written economy state, not user-facing input, so no real
+    # validation is lost.
     class GoodType(models.TextChoices):
         WHEAT = "wheat", "Wheat"
         FLOUR = "flour", "Flour"
+        BREAD = "bread", "Bread"
 
     building = models.ForeignKey(
         "locations.Building", on_delete=models.CASCADE, related_name="goods_stocks"
     )
-    good_type = models.CharField(max_length=20, choices=GoodType.choices)
+    good_type = models.CharField(max_length=20)
     quantity = models.FloatField(default=0)
 
     class Meta:

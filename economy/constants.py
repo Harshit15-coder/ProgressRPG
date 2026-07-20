@@ -32,3 +32,9 @@ PER_WORKER_DAILY_MILLING_CAPACITY = 20.0
 
 # Flour units produced per grain unit milled.
 WHEAT_TO_FLOUR_RATIO = 0.75
+
+# Flour units one physically-present worker can bake per day.
+PER_WORKER_DAILY_BAKING_CAPACITY = 20.0
+
+# Bread units produced per flour unit baked.
+FLOUR_TO_BREAD_RATIO = 0.8

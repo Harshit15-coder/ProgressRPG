@@ -4,7 +4,9 @@ from celery import shared_task
 from django.utils import timezone
 
 from .constants import (
+    FLOUR_TO_BREAD_RATIO,
     GROWTH_DURATION,
+    PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
     SOWING_WINDOW_MONTHS,
@@ -113,6 +115,14 @@ def _find_granary(population_centre):
     )
 
 
+def _find_mill(population_centre):
+    if population_centre is None:
+        return None
+    return (
+        population_centre.buildings.filter(building_type="mill").order_by("id").first()
+    )
+
+
 def _deposit_into_granary(shelter_building, amount):
     population_centre = shelter_building.population_centre
     if population_centre is None:
@@ -173,6 +183,45 @@ def advance_mill_economy_tick(today=None):
                 "No granary for mill %s (%s) - nothing to mill",
                 mill.id,
                 mill.population_centre,
+            )
+
+        state.last_processed_on = today
+        state.save(update_fields=["last_processed_on"])
+
+
+@shared_task
+def advance_bakery_economy_tick(today=None):
+    """
+    Daily economy step: each bakery converts mill flour into bread stored
+    at itself, capped by how many workers are physically present at the
+    bakery (same premise as milling).
+    """
+    today = today or timezone.localdate()
+
+    for bakery in Building.objects.filter(building_type="bakery").select_related(
+        "population_centre"
+    ):
+        state, _ = GoodsConversionState.objects.get_or_create(building=bakery)
+        if state.last_processed_on == today:
+            continue
+
+        mill = _find_mill(bakery.population_centre)
+        if mill is not None:
+            workers_present = _workers_present(bakery)
+            convert_goods(
+                mill,
+                bakery,
+                input_good=GoodsStock.GoodType.FLOUR,
+                output_good=GoodsStock.GoodType.BREAD,
+                workers_present=workers_present,
+                per_worker_capacity=PER_WORKER_DAILY_BAKING_CAPACITY,
+                conversion_ratio=FLOUR_TO_BREAD_RATIO,
+            )
+        else:
+            logger.warning(
+                "No mill for bakery %s (%s) - nothing to bake",
+                bakery.id,
+                bakery.population_centre,
             )
 
         state.last_processed_on = today

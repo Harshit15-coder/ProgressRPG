@@ -6,14 +6,20 @@ from django.utils import timezone
 
 from character.models import Character
 from economy.constants import (
+    FLOUR_TO_BREAD_RATIO,
     GROWTH_DURATION,
+    PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
     WHEAT_TO_FLOUR_RATIO,
     YIELD_PER_AREA,
 )
 from economy.models import FieldCrop, GoodsConversionState, GoodsStock
-from economy.tasks import advance_field_economy_tick, advance_mill_economy_tick
+from economy.tasks import (
+    advance_bakery_economy_tick,
+    advance_field_economy_tick,
+    advance_mill_economy_tick,
+)
 from locations.models import (
     Building,
     InteriorSpace,
@@ -122,6 +128,27 @@ def _make_mill(centre, grain_area=1000.0, flour_area=1000.0):
             building=mill, name="Flour store", usage="flour_storage", area=flour_area
         )
     return mill, mill_node
+
+
+def _make_bakery(centre, storage_area=1000.0):
+    bakery = Building.objects.create(
+        name=f"Bakery of ({centre.name})",
+        building_type="bakery",
+        location=Point(60, 0, srid=3857),
+        footprint=_square(60, 0, 5),
+        population_centre=centre,
+    )
+    bakery_node = Node.objects.create(
+        name=f"Node for {bakery.name}",
+        location=bakery.location,
+        kind=Node.Kind.BUILDING,
+        building=bakery,
+    )
+    if storage_area:
+        InteriorSpace.objects.create(
+            building=bakery, name="Storage", usage="storage", area=storage_area
+        )
+    return bakery, bakery_node
 
 
 class GenerateFieldsEconomyTickTests(TestCase):
@@ -432,5 +459,131 @@ class AdvanceMillEconomyTickTests(TestCase):
         self.assertTrue(
             GoodsStock.objects.filter(
                 building=mill_b_building, good_type="flour", quantity__gt=0
+            ).exists()
+        )
+
+
+class AdvanceBakeryEconomyTickTests(TestCase):
+    def _make_centre_with_flour(self, flour_quantity=500.0):
+        centre_point = Point(0, 0, srid=3857)
+        centre = PopulationCentre.objects.create(
+            name="Bakeville", location=centre_point, boundary=_square(0, 0, 50)
+        )
+        mill, mill_node = _make_mill(centre)
+        GoodsStock.objects.create(
+            building=mill,
+            good_type=GoodsStock.GoodType.FLOUR,
+            quantity=flour_quantity,
+        )
+        return centre, mill
+
+    def test_bakery_converts_flour_to_bread_capped_by_workers_present(self):
+        centre, mill = self._make_centre_with_flour()
+        bakery, bakery_node = _make_bakery(centre)
+
+        Character.objects.create(
+            first_name="Baker1",
+            location=bakery.location,
+            current_node=bakery_node,
+            is_moving=False,
+        )
+        Character.objects.create(
+            first_name="Baker2",
+            location=bakery.location,
+            current_node=bakery_node,
+            is_moving=False,
+        )
+
+        advance_bakery_economy_tick()
+
+        expected_input = 2 * PER_WORKER_DAILY_BAKING_CAPACITY
+        flour = GoodsStock.objects.get(building=mill, good_type="flour")
+        bread = GoodsStock.objects.get(building=bakery, good_type="bread")
+        self.assertEqual(flour.quantity, 500.0 - expected_input)
+        self.assertEqual(bread.quantity, expected_input * FLOUR_TO_BREAD_RATIO)
+
+        state = GoodsConversionState.objects.get(building=bakery)
+        self.assertEqual(state.last_processed_on, timezone.localdate())
+
+    def test_no_mill_does_not_raise(self):
+        centre = PopulationCentre.objects.create(
+            name="Millless village",
+            location=Point(0, 0, srid=3857),
+            boundary=_square(0, 0, 50),
+        )
+        bakery, bakery_node = _make_bakery(centre)
+        Character.objects.create(
+            first_name="Baker1",
+            location=bakery.location,
+            current_node=bakery_node,
+            is_moving=False,
+        )
+
+        advance_bakery_economy_tick()
+
+        self.assertFalse(GoodsStock.objects.exists())
+        state = GoodsConversionState.objects.get(building=bakery)
+        self.assertEqual(state.last_processed_on, timezone.localdate())
+
+    def test_running_twice_in_the_same_day_only_processes_once(self):
+        centre, mill = self._make_centre_with_flour()
+        bakery, bakery_node = _make_bakery(centre)
+        Character.objects.create(
+            first_name="Baker1",
+            location=bakery.location,
+            current_node=bakery_node,
+            is_moving=False,
+        )
+
+        advance_bakery_economy_tick()
+        advance_bakery_economy_tick()
+
+        expected_input = PER_WORKER_DAILY_BAKING_CAPACITY
+        flour = GoodsStock.objects.get(building=mill, good_type="flour")
+        self.assertEqual(flour.quantity, 500.0 - expected_input)
+
+    def test_multiple_bakeries_in_one_centre_are_both_processed(self):
+        centre, mill = self._make_centre_with_flour(flour_quantity=1000.0)
+        bakery_a, node_a = _make_bakery(centre)
+        bakery_b = Building.objects.create(
+            name="Second Bakery",
+            building_type="bakery",
+            location=Point(50, 0, srid=3857),
+            footprint=_square(50, 0, 5),
+            population_centre=centre,
+        )
+        node_b = Node.objects.create(
+            name="Node for Second Bakery",
+            location=bakery_b.location,
+            kind=Node.Kind.BUILDING,
+            building=bakery_b,
+        )
+        InteriorSpace.objects.create(
+            building=bakery_b, name="Storage", usage="storage", area=1000.0
+        )
+
+        Character.objects.create(
+            first_name="BakerA",
+            location=bakery_a.location,
+            current_node=node_a,
+            is_moving=False,
+        )
+        Character.objects.create(
+            first_name="BakerB",
+            location=bakery_b.location,
+            current_node=node_b,
+            is_moving=False,
+        )
+
+        advance_bakery_economy_tick()
+
+        self.assertTrue(
+            GoodsStock.objects.filter(
+                building=bakery_a, good_type="bread", quantity__gt=0
+            ).exists()
+        )
+        self.assertTrue(
+            GoodsStock.objects.filter(
+                building=bakery_b, good_type="bread", quantity__gt=0
             ).exists()
         )
