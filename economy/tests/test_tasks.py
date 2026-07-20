@@ -4,10 +4,13 @@ from django.contrib.gis.geos import Point, Polygon
 from django.test import TestCase
 from django.utils import timezone
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from economy.constants import (
+    BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
     FLOUR_TO_BREAD_RATIO,
     GROWTH_DURATION,
+    HUNGER_MAX,
+    HUNGER_PER_MISSED_MEAL,
     PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
@@ -17,6 +20,7 @@ from economy.constants import (
 from economy.models import FieldCrop, GoodsConversionState, GoodsStock
 from economy.tasks import (
     advance_bakery_economy_tick,
+    advance_bread_consumption_tick,
     advance_field_economy_tick,
     advance_mill_economy_tick,
 )
@@ -149,6 +153,19 @@ def _make_bakery(centre, storage_area=1000.0):
             building=bakery, name="Storage", usage="storage", area=storage_area
         )
     return bakery, bakery_node
+
+
+def _make_resident(centre, home_building, name, hunger=0.0):
+    character = Character.objects.create(first_name=name, location=home_building.location)
+    CharacterLocation.objects.create(
+        character=character,
+        location=home_building,
+        role=CharacterLocation.Role.HOME,
+        is_primary=True,
+    )
+    character.needs.hunger = hunger
+    character.needs.save(update_fields=["hunger"])
+    return character
 
 
 class GenerateFieldsEconomyTickTests(TestCase):
@@ -587,3 +604,100 @@ class AdvanceBakeryEconomyTickTests(TestCase):
                 building=bakery_b, good_type="bread", quantity__gt=0
             ).exists()
         )
+
+
+class AdvanceBreadConsumptionTickTests(TestCase):
+    def _make_centre_with_home(self, name="Eatville"):
+        centre_point = Point(0, 0, srid=3857)
+        centre = PopulationCentre.objects.create(
+            name=name, location=centre_point, boundary=_square(0, 0, 50)
+        )
+        home = Building.objects.create(
+            name=f"Home of ({name})",
+            building_type="residential",
+            location=Point(-60, 0, srid=3857),
+            footprint=_square(-60, 0, 5),
+            population_centre=centre,
+        )
+        return centre, home
+
+    def test_character_with_bread_available_is_fed_and_hunger_drops(self):
+        centre, home = self._make_centre_with_home()
+        bakery, _ = _make_bakery(centre)
+        GoodsStock.objects.create(
+            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=10.0
+        )
+        character = _make_resident(centre, home, "Eater1", hunger=5.0)
+
+        advance_bread_consumption_tick()
+
+        bread = GoodsStock.objects.get(building=bakery, good_type="bread")
+        self.assertEqual(bread.quantity, 10.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION)
+
+        character.needs.refresh_from_db()
+        self.assertEqual(character.needs.hunger, max(0.0, 5.0 - HUNGER_PER_MISSED_MEAL))
+        self.assertEqual(character.needs.last_fed_on, timezone.localdate())
+
+    def test_no_bakery_increases_hunger(self):
+        centre, home = self._make_centre_with_home()
+        character = _make_resident(centre, home, "Eater1", hunger=5.0)
+
+        advance_bread_consumption_tick()
+
+        character.needs.refresh_from_db()
+        self.assertEqual(character.needs.hunger, 5.0 + HUNGER_PER_MISSED_MEAL)
+        self.assertEqual(character.needs.last_fed_on, timezone.localdate())
+
+    def test_empty_bread_stock_increases_hunger(self):
+        centre, home = self._make_centre_with_home()
+        _make_bakery(centre)
+        character = _make_resident(centre, home, "Eater1", hunger=0.0)
+
+        advance_bread_consumption_tick()
+
+        character.needs.refresh_from_db()
+        self.assertEqual(character.needs.hunger, HUNGER_PER_MISSED_MEAL)
+
+    def test_hunger_clamped_at_max(self):
+        centre, home = self._make_centre_with_home()
+        character = _make_resident(centre, home, "Eater1", hunger=HUNGER_MAX - 1)
+
+        advance_bread_consumption_tick()
+
+        character.needs.refresh_from_db()
+        self.assertEqual(character.needs.hunger, HUNGER_MAX)
+
+    def test_running_twice_in_the_same_day_only_processes_once(self):
+        centre, home = self._make_centre_with_home()
+        bakery, _ = _make_bakery(centre)
+        GoodsStock.objects.create(
+            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=10.0
+        )
+        _make_resident(centre, home, "Eater1", hunger=5.0)
+
+        advance_bread_consumption_tick()
+        advance_bread_consumption_tick()
+
+        bread = GoodsStock.objects.get(building=bakery, good_type="bread")
+        self.assertEqual(bread.quantity, 10.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION)
+
+    def test_two_characters_share_bakery_stock_first_come_first_served(self):
+        centre, home = self._make_centre_with_home()
+        bakery, _ = _make_bakery(centre)
+        GoodsStock.objects.create(
+            building=bakery,
+            good_type=GoodsStock.GoodType.BREAD,
+            quantity=BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
+        )
+        first = _make_resident(centre, home, "Eater1", hunger=0.0)
+        second = _make_resident(centre, home, "Eater2", hunger=0.0)
+
+        advance_bread_consumption_tick()
+
+        bread = GoodsStock.objects.get(building=bakery, good_type="bread")
+        self.assertEqual(bread.quantity, 0.0)
+
+        first.needs.refresh_from_db()
+        second.needs.refresh_from_db()
+        self.assertEqual(first.needs.hunger, 0.0)
+        self.assertEqual(second.needs.hunger, HUNGER_PER_MISSED_MEAL)

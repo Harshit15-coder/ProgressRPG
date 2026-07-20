@@ -38,3 +38,14 @@ PER_WORKER_DAILY_BAKING_CAPACITY = 20.0
 
 # Bread units produced per flour unit baked.
 FLOUR_TO_BREAD_RATIO = 0.8
+
+# Bread units one character eats per day.
+BREAD_PER_CHARACTER_DAILY_CONSUMPTION = 1.0
+
+# Hunger added for each day a character goes unfed.
+HUNGER_PER_MISSED_MEAL = 10.0
+
+# Hunger is clamped at this value - consequences of sustained high hunger
+# are deliberately not modelled yet, this just stops the stat growing
+# unbounded.
+HUNGER_MAX = 100.0

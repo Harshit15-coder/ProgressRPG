@@ -4,8 +4,11 @@ from celery import shared_task
 from django.utils import timezone
 
 from .constants import (
+    BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
     FLOUR_TO_BREAD_RATIO,
     GROWTH_DURATION,
+    HUNGER_MAX,
+    HUNGER_PER_MISSED_MEAL,
     PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
@@ -123,6 +126,16 @@ def _find_mill(population_centre):
     )
 
 
+def _find_bakery(population_centre):
+    if population_centre is None:
+        return None
+    return (
+        population_centre.buildings.filter(building_type="bakery")
+        .order_by("id")
+        .first()
+    )
+
+
 def _deposit_into_granary(shelter_building, amount):
     population_centre = shelter_building.population_centre
     if population_centre is None:
@@ -226,3 +239,60 @@ def advance_bakery_economy_tick(today=None):
 
         state.last_processed_on = today
         state.save(update_fields=["last_processed_on"])
+
+
+@shared_task
+def advance_bread_consumption_tick(today=None):
+    """
+    Daily economy step: each character eats from their home population
+    centre's bakery bread stock. No presence check - unlike harvesting,
+    milling and baking, eating isn't labor, so it doesn't require the
+    character to be standing at the bakery.
+    """
+    from character.models import CharacterLocation
+
+    today = today or timezone.localdate()
+    bakery_cache = {}
+
+    homes = (
+        CharacterLocation.objects.filter(role=CharacterLocation.Role.HOME, is_primary=True)
+        .select_related("character__needs", "location__population_centre")
+        .order_by("character_id")
+    )
+
+    for home in homes:
+        character = home.character
+        needs = getattr(character, "needs", None)
+        if needs is None:
+            continue
+        if needs.last_fed_on == today:
+            continue
+
+        population_centre = home.location.population_centre
+        centre_id = population_centre.id if population_centre else None
+        if centre_id not in bakery_cache:
+            bakery_cache[centre_id] = _find_bakery(population_centre)
+        bakery = bakery_cache[centre_id]
+
+        fed = False
+        if bakery is not None:
+            stock, _ = GoodsStock.objects.get_or_create(
+                building=bakery, good_type=GoodsStock.GoodType.BREAD
+            )
+            if stock.quantity >= BREAD_PER_CHARACTER_DAILY_CONSUMPTION:
+                stock.quantity -= BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+                stock.save(update_fields=["quantity"])
+                fed = True
+
+        if fed:
+            needs.hunger = max(0.0, needs.hunger - HUNGER_PER_MISSED_MEAL)
+        else:
+            needs.hunger = min(HUNGER_MAX, needs.hunger + HUNGER_PER_MISSED_MEAL)
+            logger.warning(
+                "Character %s not fed for %s - no bread available",
+                character.id,
+                today,
+            )
+
+        needs.last_fed_on = today
+        needs.save(update_fields=["hunger", "last_fed_on"])

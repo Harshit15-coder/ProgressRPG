@@ -7,7 +7,7 @@ from django.utils import timezone
 
 import logging
 
-from .models import Character, PlayerCharacterLink, Behaviour
+from .models import Character, PlayerCharacterLink, Behaviour, CharacterNeeds
 
 from gameplay.models import QuestTimer
 from progression.models import CharacterActivity
@@ -26,6 +26,12 @@ def create_timer(sender, instance, created, **kwargs):
 def create_behaviour(sender, instance, created, **kwargs):
     """Ensure every Character has a behaviour instance."""
     Behaviour.objects.get_or_create(character=instance)
+
+
+@receiver(post_save, sender=Character)
+def create_needs(sender, instance, created, **kwargs):
+    """Ensure every Character has a needs instance."""
+    CharacterNeeds.objects.get_or_create(character=instance)
 
 
 @receiver(pre_delete, sender=PlayerCharacterLink)

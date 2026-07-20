@@ -86,6 +86,10 @@ app.conf.beat_schedule = {
         "task": "economy.tasks.advance_bakery_economy_tick",
         "schedule": crontab(hour=18, minute=15),  # after advance_mill_economy
     },
+    "advance_bread_consumption": {
+        "task": "economy.tasks.advance_bread_consumption_tick",
+        "schedule": crontab(hour=18, minute=20),  # after advance_bakery_economy
+    },
     # "precompute-sun-times-daily": {
     #     "task": "gameworld.tasks.precompute_sun_times",
     #     "schedule": crontab(hour=0, minute=0),
