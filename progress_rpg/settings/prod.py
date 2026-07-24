@@ -93,6 +93,9 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_HOST_USER = "resend"  # Resend SMTP requires this literal string as the username
+# Validated by core.checks.check_required_prod_settings (manage.py check --deploy);
+# an unset key here just means Django skips SMTP auth and Resend rejects every
+# email with '530 authentication Required'.
 EMAIL_HOST_PASSWORD = os.environ.get("RESEND_API_KEY", "")
 
 print("DEBUG:", DEBUG, file=sys.stderr)

@@ -5,6 +5,7 @@ from django.http import HttpResponse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
+from drf_spectacular.utils import extend_schema
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.views import APIView
 from rest_framework.response import Response
@@ -14,6 +15,8 @@ from .serializers import (
     StripeWebhookResponseSerializer,
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
+    ErrorResponseSerializer,
+    SyncSubscriptionResponseSerializer,
 )
 from core.models import GameSettings
 from .models import StripeEvent, SubscriptionPlan, UserSubscription
@@ -251,7 +254,14 @@ class CreateCheckoutSessionView(APIView):
 
 class SyncSubscriptionView(APIView):
     permission_classes = [IsAuthenticated]
+    serializer_class = SyncSubscriptionResponseSerializer
 
+    @extend_schema(
+        responses={
+            200: SyncSubscriptionResponseSerializer,
+            502: ErrorResponseSerializer,
+        }
+    )
     def post(self, request):
         try:
             result = sync_subscription_from_stripe(request.user)

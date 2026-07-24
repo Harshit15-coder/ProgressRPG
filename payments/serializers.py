@@ -15,3 +15,8 @@ class CreateCheckoutSessionResponseSerializer(serializers.Serializer):
 
 class ErrorResponseSerializer(serializers.Serializer):
     error = serializers.CharField()
+
+
+class SyncSubscriptionResponseSerializer(serializers.Serializer):
+    status = serializers.CharField()
+    synced = serializers.BooleanField()
