@@ -1,4 +1,6 @@
 # api/views.py
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth import login, logout
@@ -263,6 +265,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     @csrf_exempt
     @api_view(["POST"])
+    @staticmethod
     def test_post_view(request):
         permission_classes = [IsAuthenticated]
         return Response(
@@ -369,7 +372,7 @@ class MeViewSet(viewsets.ViewSet):
     def announcements(self, request):
         player = request.user.player
 
-        published_announcements = list(Announcement.objects.published())
+        published_announcements = list(Announcement.objects.filter(is_published=True))
         read_ids = set(
             PlayerAnnouncementState.objects.filter(
                 player=player,
@@ -410,7 +413,7 @@ class MeViewSet(viewsets.ViewSet):
 
         player = request.user.player
         announcement = get_object_or_404(
-            Announcement.objects.published(),
+            Announcement.objects.filter(is_published=True),
             id=serializer.validated_data["announcement_id"],
         )
 
@@ -435,7 +438,7 @@ class MeViewSet(viewsets.ViewSet):
         player = request.user.player
         now = timezone.now()
 
-        published = Announcement.objects.published()
+        published = Announcement.objects.filter(is_published=True)
         existing_states = PlayerAnnouncementState.objects.filter(
             player=player,
             announcement__in=published,
@@ -785,7 +788,7 @@ class DeleteAccountAPIView(APIView):
         logger.info(f"User {user.username} (ID: {user.id}) initiated account deletion.")
 
         user.pending_deletion = True
-        user.delete_at = timezone.now() + timezone.timedelta(days=14)
+        user.delete_at = timezone.now() + timedelta(days=14)
         user.save()
 
         send_mail(

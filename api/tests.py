@@ -15,14 +15,27 @@ from core.models import Announcement, PlayerAnnouncementState
 from gameplay.models import Quest
 from progression.models import CharacterQuest, PlayerActivity
 from server_management.models import FeatureFlag
+from users.models import CustomUserManager, Player
 
 User = get_user_model()
+
+
+def create_test_user(*, email: str, password: str):
+    manager = User.objects
+    assert isinstance(manager, CustomUserManager)
+    return manager.create_user(email=email, password=password)
+
+
+def player_for(user) -> Player:
+    player = getattr(user, "player", None)
+    assert isinstance(player, Player)
+    return player
 
 
 class TestMeViewSet(APITestCase):
     def setUp(self):
         self.character = Character.objects.create(name="Hero", can_link=True)
-        self.user = User.objects.create_user(
+        self.user = create_test_user(
             email="duncan@example.com",
             password="pass12345",
         )
@@ -95,16 +108,16 @@ class TestMeViewSet(APITestCase):
 
         res_read = self.client.post(
             reverse("me-mark-announcement-read"),
-            {"announcement_id": announcement.id},
+            {"announcement_id": announcement.pk},
             format="json",
         )
         self.assertEqual(res_read.status_code, status.HTTP_200_OK)
         self.assertEqual(res_read.data["unread_count"], 0)
 
-        self.user.player.refresh_from_db()
+        player_for(self.user).refresh_from_db()
         self.assertTrue(
             PlayerAnnouncementState.objects.filter(
-                player=self.user.player,
+                player=player_for(self.user),
                 announcement=announcement,
                 read_at__isnull=False,
             ).exists()
@@ -141,59 +154,59 @@ class TestMeViewSet(APITestCase):
         )
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.user.player.refresh_from_db()
-        self.assertEqual(self.user.player.name, "Red Fox")
+        player_for(self.user).refresh_from_db()
+        self.assertEqual(player_for(self.user).name, "Red Fox")
         self.assertEqual(res.data["name"], "Red Fox")
 
     def test_me_player_patch_rejects_invalid_name(self):
         self.authenticate()
-        original_name = self.user.player.name
+        original_name = player_for(self.user).name
 
         res = self.client.patch(
             self.me_player_url, {"name": "bad!!name"}, format="json"
         )
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.user.player.refresh_from_db()
-        self.assertEqual(self.user.player.name, original_name)
+        player_for(self.user).refresh_from_db()
+        self.assertEqual(player_for(self.user).name, original_name)
         self.assertIn("name", res.data)
 
     def test_me_player_patch_rejects_profane_name(self):
         self.authenticate()
-        original_name = self.user.player.name
+        original_name = player_for(self.user).name
 
         res = self.client.patch(
             self.me_player_url, {"name": "b1tch-mage"}, format="json"
         )
 
         self.assertEqual(res.status_code, status.HTTP_400_BAD_REQUEST)
-        self.user.player.refresh_from_db()
-        self.assertEqual(self.user.player.name, original_name)
+        player_for(self.user).refresh_from_db()
+        self.assertEqual(player_for(self.user).name, original_name)
         self.assertIn("name", res.data)
 
     def test_complete_onboarding_sets_flag(self):
         self.authenticate()
-        self.user.player.onboarding_completed = False
-        self.user.player.save(update_fields=["onboarding_completed"])
+        player_for(self.user).onboarding_completed = False
+        player_for(self.user).save(update_fields=["onboarding_completed"])
 
         res = self.client.post(self.me_complete_onboarding_url)
 
         self.assertEqual(res.status_code, status.HTTP_200_OK)
-        self.user.player.refresh_from_db()
-        self.assertTrue(self.user.player.onboarding_completed)
+        player_for(self.user).refresh_from_db()
+        self.assertTrue(player_for(self.user).onboarding_completed)
         self.assertEqual(res.data, {"onboarding_completed": True})
 
 
 class CustomTokenObtainPairViewTests(APITestCase):
     def setUp(self):
         self.url = reverse("jwt_create")
-        self.user = User.objects.create_user(
+        self.user = create_test_user(
             email="rememberme@example.com",
             password="pass12345",
         )
 
     def _refresh_expiry(self, refresh_token):
-        exp_timestamp = RefreshToken(refresh_token)["exp"]
+        exp_timestamp = float(RefreshToken(refresh_token)["exp"])
         return datetime.fromtimestamp(exp_timestamp, tz=timezone.utc)
 
     def test_login_uses_short_session_refresh_lifetime_by_default(self):
@@ -392,7 +405,7 @@ class AppConfigViewTests(APITestCase):
 
 class PlayerActivityGroupKeyAPITests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
+        self.user = create_test_user(
             email="activity-groups@example.com",
             password="pass12345",
         )
@@ -401,12 +414,12 @@ class PlayerActivityGroupKeyAPITests(APITestCase):
 
     def test_create_reuses_dominant_exact_match_group_key(self):
         PlayerActivity.objects.create(
-            player=self.user.player,
+            player=player_for(self.user),
             name="Morning planning",
             group_key="morning-planning",
         )
         PlayerActivity.objects.create(
-            player=self.user.player,
+            player=player_for(self.user),
             name="morning planning",
             group_key="morning-planning",
         )
