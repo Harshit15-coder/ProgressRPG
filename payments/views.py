@@ -10,10 +10,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 import logging
 
+from drf_spectacular.utils import extend_schema
+
 from .serializers import (
     StripeWebhookResponseSerializer,
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
+    SyncSubscriptionResponseSerializer,
+    ErrorResponseSerializer,
 )
 from core.models import GameSettings
 from .models import StripeEvent, SubscriptionPlan, UserSubscription
@@ -252,6 +256,13 @@ class CreateCheckoutSessionView(APIView):
 class SyncSubscriptionView(APIView):
     permission_classes = [IsAuthenticated]
 
+    @extend_schema(
+        request=None,
+        responses={
+            200: SyncSubscriptionResponseSerializer,
+            502: ErrorResponseSerializer,
+        },
+    )
     def post(self, request):
         try:
             result = sync_subscription_from_stripe(request.user)
