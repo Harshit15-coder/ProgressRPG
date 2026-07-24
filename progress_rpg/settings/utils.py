@@ -1,4 +1,5 @@
 from django.conf import settings
+from django.core.exceptions import ImproperlyConfigured
 import os
 
 
@@ -30,6 +31,22 @@ def get_redis_url(default_db="0"):
 
 def get_dev_email_backend():
     return os.getenv("EMAIL_BACKEND", "django.core.mail.backends.console.EmailBackend")
+
+
+def get_required_env(name, hint=""):
+    """
+    Read an env var that must be non-empty, failing at settings import so a
+    missing secret breaks the deploy instead of surfacing later at runtime
+    (e.g. an unset RESEND_API_KEY makes Django skip SMTP auth and every
+    outbound email fails with '530 authentication Required').
+    """
+    value = os.environ.get(name, "")
+    if not value:
+        message = f"{name} environment variable is not set"
+        if hint:
+            message = f"{message}. {hint}"
+        raise ImproperlyConfigured(message)
+    return value
 
 
 def get_build_number():
