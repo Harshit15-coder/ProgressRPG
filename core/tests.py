@@ -2,11 +2,12 @@ from decimal import Decimal
 from unittest.mock import patch, PropertyMock
 
 from django.core.exceptions import ValidationError
-from django.test import TestCase
+from django.test import SimpleTestCase, TestCase, override_settings
 from django.contrib.auth import get_user_model
 from rest_framework import status
 from rest_framework.test import APITestCase
 
+from core.checks import REQUIRED_PROD_SETTINGS, check_required_prod_settings
 from core.models import GameSettings
 from users.services.login_services import (
     calculate_daily_login_reward,
@@ -231,3 +232,30 @@ class GameSettingsAPITest(APITestCase):
         self.client.force_authenticate(user=None)
         res = self.client.get("/api/v1/game_settings/")
         self.assertEqual(res.status_code, status.HTTP_401_UNAUTHORIZED)
+
+
+class RequiredProdSettingsCheckTest(SimpleTestCase):
+    def all_settings_present(self):
+        return {name: "set" for name, _hint in REQUIRED_PROD_SETTINGS}
+
+    def test_passes_when_all_settings_present(self):
+        with override_settings(**self.all_settings_present()):
+            errors = check_required_prod_settings(app_configs=None)
+        self.assertEqual(errors, [])
+
+    def test_reports_error_for_each_missing_setting(self):
+        overrides = self.all_settings_present()
+        overrides.update(SECRET_KEY="", STRIPE_SECRET_KEY="")
+        with override_settings(**overrides):
+            errors = check_required_prod_settings(app_configs=None)
+        messages = [error.msg for error in errors]
+        self.assertEqual(len(errors), 2)
+        self.assertIn("settings.SECRET_KEY is not set.", messages)
+        self.assertIn("settings.STRIPE_SECRET_KEY is not set.", messages)
+
+    def test_error_ids_are_scoped_to_core(self):
+        overrides = self.all_settings_present()
+        overrides.update(DATABASE_URL="")
+        with override_settings(**overrides):
+            errors = check_required_prod_settings(app_configs=None)
+        self.assertEqual(errors[0].id, "core.E001")
