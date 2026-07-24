@@ -100,6 +100,17 @@ logger_general = logging.getLogger("general")
 class AppConfigView(APIView):
     permission_classes = []
 
+    @extend_schema(
+        responses=inline_serializer(
+            name="AppConfigResponseSerializer",
+            fields={
+                "stripe_live_mode": drf_serializers.BooleanField(),
+                "stripe_billing_portal_url": drf_serializers.CharField(),
+                "feature_flags": drf_serializers.JSONField(),
+                "trial_period_days": drf_serializers.IntegerField(),
+            },
+        )
+    )
     def get(self, request):
         from core.models import GameSettings
 
