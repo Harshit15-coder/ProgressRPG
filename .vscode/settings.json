@@ -9,7 +9,7 @@
     "python.testing.pytestEnabled": false,
     "python.testing.unittestEnabled": true,
     "makefile.configureOnOpen": false,
-    "python.analysis.typeCheckingMode": "basic",
+    "python.analysis.typeCheckingMode": "off",
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "chat.tools.terminal.autoApprove": {
         "git -C /home/gaidheal/repos/progressrpg status": true,
@@ -64,7 +64,6 @@
         "**/media": true,
         "**/staticfiles": true
     },
-    "python.analysis.diagnosticMode": "workspace",
     "python.terminal.activateEnvInCurrentTerminal": true,
     "python.analysis.inlayHints.callArgumentNames": "partial",
 }
