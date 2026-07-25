@@ -74,6 +74,9 @@ class Command(BaseCommand):
         if N == 0:
             return
 
+        assert (
+            landarea.boundary is not None
+        ), "assign_subzone_geometry requires assign_landarea_geometry to have run first"
         # Bounding box of landarea
         min_x, min_y, max_x, max_y = landarea.boundary.extent
         width = (max_x - min_x) / N

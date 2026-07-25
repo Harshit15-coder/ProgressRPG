@@ -22,7 +22,7 @@ class GeoJSONFeatureSerializer(serializers.Serializer):
     Base helper: subclasses implement get_geometry() and get_properties().
     """
 
-    feature_type = None  # optional string, e.g. "building", "path"
+    feature_type: str | None = None  # optional string, e.g. "building", "path"
 
     def get_geometry(self, obj):
         raise NotImplementedError
@@ -105,9 +105,10 @@ class PathFeatureSerializer(LineStringFeatureSerializer):
 class PolygonFeatureSerializer(GeoJSONFeatureSerializer):
     feature_type = "polygon"
 
-    polygon_attr = None  # e.g. "footprint" or "boundary"
+    polygon_attr: str | None = None  # e.g. "footprint" or "boundary"
 
     def get_geometry(self, obj):
+        assert self.polygon_attr is not None
         geom = getattr(obj, self.polygon_attr)
         outer_ring = geom.coords[0]
         coords = [[list(map(float, pt)) for pt in outer_ring]]

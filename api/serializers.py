@@ -54,6 +54,7 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         attrs["username"] = attrs.get("email")
 
         data = super().validate(attrs)
+        assert self.user is not None
         UserLogin.objects.create(user=self.user)
 
         if remember_me:

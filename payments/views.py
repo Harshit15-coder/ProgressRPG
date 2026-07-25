@@ -1,5 +1,9 @@
 import json
 import stripe
+from stripe.params.checkout import (
+    SessionCreateParams,
+    SessionCreateParamsSubscriptionData,
+)
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
@@ -175,7 +179,7 @@ class CreateCheckoutSessionView(APIView):
         offer_trial = offer_trial and not request.user.has_previous_subscription
 
         try:
-            subscription_data = {
+            subscription_data: SessionCreateParamsSubscriptionData = {
                 "metadata": {
                     "user_id": str(request.user.id),
                     "billing_plan": "annual" if interval == "annual" else "monthly",
@@ -189,7 +193,7 @@ class CreateCheckoutSessionView(APIView):
             if offer_trial:
                 subscription_data["trial_period_days"] = trial_period_days
 
-            session_kwargs = {
+            session_kwargs: SessionCreateParams = {
                 "mode": "subscription",
                 "payment_method_types": ["card"],
                 "payment_method_collection": "if_required",

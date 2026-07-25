@@ -63,6 +63,9 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
     def schedule_tasks(self, request, maintenancewindow_id):
         logger.info(f"[ADMIN - SCHEDULE TASKS]")
         window = self.get_object(request, maintenancewindow_id)
+        if window is None:
+            self.message_user(request, "Maintenance window not found.")
+            return redirect("/admin/server_management/maintenancewindow/")
 
         success = window.schedule_tasks()
 
@@ -77,6 +80,9 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
     def delete_tasks(self, request, maintenancewindow_id):
         logger.info(f"[ADMIN - DELETE TASKS]")
         window = self.get_object(request, maintenancewindow_id)
+        if window is None:
+            self.message_user(request, "Maintenance window not found.")
+            return redirect("/admin/server_management/maintenancewindow/")
 
         success = window.delete_scheduled_tasks()
 
@@ -94,6 +100,9 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
 
     def activate_maintenance(self, request, maintenancewindow_id):
         window = self.get_object(request, maintenancewindow_id)
+        if window is None:
+            self.message_user(request, "Maintenance window not found.")
+            return redirect("/admin/server_management/maintenancewindow/")
         if not window.is_active:
             window.activate_maintenance()
             player = request.user.player
@@ -113,6 +122,9 @@ class MaintenanceWindowAdmin(admin.ModelAdmin):
 
     def deactivate_maintenance(self, request, maintenancewindow_id):
         window = self.get_object(request, maintenancewindow_id)
+        if window is None:
+            self.message_user(request, "Maintenance window not found.")
+            return redirect("/admin/server_management/maintenancewindow/")
         if window.is_active:
             window.deactivate_maintenance()
             player = request.user.player

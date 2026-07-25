@@ -56,7 +56,7 @@ class Command(BaseCommand):
 
         buildings = Building.objects.all()
         if centre_name:
-            buildings = buildings.filter(centre__name=centre_name)
+            buildings = buildings.filter(population_centre__name=centre_name)
 
         self.stdout.write(
             self.style.SUCCESS(f"Processing {buildings.count()} buildings...")

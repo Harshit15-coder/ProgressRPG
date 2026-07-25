@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
@@ -9,6 +10,9 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from .services import movement as movement_service
 from .utils import relative_distance_direction
+
+if TYPE_CHECKING:
+    from django.db.models import Manager
 
 ##########################################################
 ##### MOVABLE OBJECTS/BEINGS
@@ -47,6 +51,13 @@ class Movable(models.Model):
     @property
     def is_inside(self):
         return bool(self.current_node and self.current_node.building)
+
+    if TYPE_CHECKING:
+        # Provided by the concrete subclass (Character), via Journey's
+        # `related_name="journeys"`. `_journey` is a transient per-request
+        # cache set by movement services/tasks to avoid a repeat query.
+        journeys: "Manager[Journey]"
+        _journey: "Journey | None"
 
     @property
     def current_journey(self):
@@ -275,7 +286,7 @@ class Journey(models.Model):
         if self.status != "active":
             return False
 
-        if self.current_index < len(self.path_nodes) - 1:
+        if self.path_nodes and self.current_index < len(self.path_nodes) - 1:
             self.current_index += 1
             self.save(update_fields=["current_index"])
             return True

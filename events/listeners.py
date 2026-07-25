@@ -1,4 +1,4 @@
-activity_listeners = []
+activity_listeners: list[type] = []
 
 
 def listen_for_events(model):

@@ -64,4 +64,7 @@
         "**/media": true,
         "**/staticfiles": true
     },
+    "python.analysis.diagnosticMode": "workspace",
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.inlayHints.callArgumentNames": "partial",
 }

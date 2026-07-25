@@ -84,7 +84,7 @@ class Quest(models.Model):
     intro_text = models.TextField(max_length=2000, blank=True)
     outro_text = models.TextField(max_length=2000, blank=True)
 
-    def default_duration_choices():
+    def default_duration_choices():  # type: ignore[misc]
         return [300 * i for i in range(1, 7)]
 
     duration_choices: Any = models.JSONField(default=default_duration_choices)
@@ -137,7 +137,7 @@ class Quest(models.Model):
 
         """
         if self.results:
-            self.results.apply(character)
+            self.results.apply(character)  # type: ignore[attr-defined]
             character.save()
 
     def requirements_met(self, completed_quests):
@@ -168,6 +168,7 @@ class Quest(models.Model):
                         if completion.times_completed >= 1:
                             return False
             return True
+        return True
 
     def frequency_eligible(self, character: "Character"):
         """
@@ -300,6 +301,11 @@ class Timer(models.Model):
         ("empty", "Empty"),
     ]
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="empty")
+
+    if TYPE_CHECKING:
+        # Django adds this implicit PK on concrete subclasses; not visible
+        # on the abstract base itself.
+        id: int
 
     class Meta:
         abstract = True
@@ -458,6 +464,7 @@ class ActivityTimer(Timer):
         return self
 
     def change_task(self, new_task):
+        assert self.activity is not None, "change_task requires an assigned activity"
         self.activity.task = new_task
         self.activity.save(update_fields=["task"])
         return self
@@ -528,6 +535,8 @@ class ActivityTimer(Timer):
 
         if completion_source == "auto":
             try:
+                if client_elapsed_seconds is None:
+                    raise TypeError
                 parsed_client_elapsed = int(client_elapsed_seconds)
             except (TypeError, ValueError):
                 parsed_client_elapsed = None
@@ -781,7 +790,7 @@ class ServerMessage(models.Model):
         Delete server messages that are older than the specified number of days.
 
         """
-        cutoff_date = timezone.now() - timezone.timedelta(days=days)
+        cutoff_date = timezone.now() - timedelta(days=days)
         cls.objects.filter(created_at__lt=cutoff_date).delete()
 
 

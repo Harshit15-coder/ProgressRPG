@@ -3,6 +3,7 @@
 build<2
 django-stubs<6
 django-stubs-ext<7
+djangorestframework-stubs<3.17
 freezegun<2
 locust
 mypy<3
