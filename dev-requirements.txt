@@ -161,9 +161,9 @@ django-ratelimit==4.1.0
     # via -r requirements.in
 django-redis==7.0.0
     # via -r requirements.in
-django-stubs==6.0.6
+django-stubs==5.2.9
     # via -r dev-requirements.in
-django-stubs-ext==6.0.6
+django-stubs-ext==5.2.9
     # via
     #   -r dev-requirements.in
     #   django-stubs
@@ -179,6 +179,8 @@ djangorestframework==3.17.1
     #   dj-rest-auth
     #   djangorestframework-simplejwt
     #   drf-spectacular
+djangorestframework-stubs==3.16.9
+    # via -r dev-requirements.in
 djangorestframework-simplejwt==5.5.1
     # via -r requirements.in
 drf-spectacular==0.29.0

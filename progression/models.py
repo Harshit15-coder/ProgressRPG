@@ -1,12 +1,15 @@
 # progression/models.py
 from decimal import Decimal
-from datetime import timedelta
+from datetime import datetime, timedelta
 from django.apps import apps
 from django.db import models, transaction
 from django.db.models import CheckConstraint, Q, Sum
 from django.utils import timezone
-from typing import Dict, Any, cast
+from typing import Dict, Any, cast, TYPE_CHECKING
 import logging
+
+if TYPE_CHECKING:
+    from django.db.models import Manager
 
 from .mixins import PlayerOwnedMixin
 from character.phrases import generate_phrase
@@ -28,6 +31,11 @@ class Group(models.Model):
     description = models.TextField(max_length=2000, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
+
+    if TYPE_CHECKING:
+        # Reverse FK added by concrete subclasses (Category, Role) via each
+        # Skill subclass's `related_name="skills"`.
+        skills: "Manager[Any]"
 
     @property
     def total_time(self):
@@ -93,6 +101,11 @@ class Skill(models.Model):
     level = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
+
+    if TYPE_CHECKING:
+        # Reverse FK added by concrete subclasses (PlayerSkill, CharacterSkill)
+        # via each TimeRecord subclass's `related_name="records"`.
+        records: "Manager[Any]"
 
     @property
     def total_time(self):
@@ -371,7 +384,7 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
             return None
 
         top_candidate = similar_candidates[0]
-        top_last_seen = cast(timezone.datetime, top_candidate["last_seen"])
+        top_last_seen = cast(datetime, top_candidate["last_seen"])
         if top_candidate["count"] < 3 or timezone.now() - top_last_seen > timedelta(
             days=120
         ):
@@ -492,10 +505,10 @@ class CharacterActivity(TimeRecord):
         """
         Mark the activity as completed at the current time.
         """
-        if self.started_at is None:
-            self.started_at = self.scheduled_start
-
         now = timezone.now()
+        if self.started_at is None:
+            self.started_at = self.scheduled_start or now
+
         self.completed_at = now
         self.is_complete = True
 
@@ -542,12 +555,13 @@ class CharacterActivity(TimeRecord):
         """
         Mark the activity as completed at the scheduled end time.
         """
+        now = timezone.now()
         if self.started_at is None:
-            self.started_at = self.scheduled_start
+            self.started_at = self.scheduled_start or now
 
-        self.completed_at = self.scheduled_end
+        self.completed_at = self.scheduled_end or now
         self.is_complete = True
-        duration = max(0, int((self.scheduled_end - self.started_at).total_seconds()))
+        duration = max(0, int((self.completed_at - self.started_at).total_seconds()))
         self.duration = duration
         self.xp_gained = self.calculate_base_xp(duration)
         self.save(
@@ -610,7 +624,7 @@ class CharacterQuest(TimeRecord):
 #########################################
 
 
-class Project(models.Model, PlayerOwnedMixin):
+class Project(PlayerOwnedMixin):
     player = models.ForeignKey(
         "users.Player", on_delete=models.CASCADE, related_name="projects"
     )
@@ -645,7 +659,7 @@ class Project(models.Model, PlayerOwnedMixin):
         return self.name
 
 
-class Task(models.Model, PlayerOwnedMixin):
+class Task(PlayerOwnedMixin):
     player = models.ForeignKey(
         "users.Player", on_delete=models.CASCADE, related_name="tasks"
     )

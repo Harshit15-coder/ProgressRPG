@@ -102,10 +102,9 @@ class PopulationCentreAdmin(admin.ModelAdmin):
         "building_count",
     ]
 
+    @admin.display(description="Buildings")
     def building_count(self, obj):
         return obj.buildings.count()
-
-    building_count.short_description = "Buildings"
 
 
 class SubzoneInline(admin.TabularInline):

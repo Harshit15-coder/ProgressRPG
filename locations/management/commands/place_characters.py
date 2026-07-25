@@ -40,7 +40,7 @@ class Command(BaseCommand):
             char.assign_home(building)
 
             node = None
-            rooms = list(char.building.interiorspaces.all())
+            rooms = list(building.interiorspaces.all())
 
             if rooms:
                 room = random.choice(rooms)

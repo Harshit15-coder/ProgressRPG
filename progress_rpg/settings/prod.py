@@ -144,6 +144,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 #     DB_PORT = os.environ.get("DB_PORT", 5432)
 #     DATABASE_URL = f"postgres://{DB_USER}:{quote(DB_PASSWORD, safe='')}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+assert DATABASE_URL is not None, "DATABASE_URL is required in production"
 db = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
 db["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 # Required when connecting through pgbouncer in transaction pooling mode;
@@ -202,7 +203,7 @@ CSRF_COOKIE_SECURE = True
 
 # Security settings
 SECURE_SSL_REDIRECT = "test" not in sys.argv
-SECURE_REDIRECT_EXEMPT = []
+SECURE_REDIRECT_EXEMPT: list[str] = []
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True

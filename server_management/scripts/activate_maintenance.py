@@ -21,10 +21,11 @@ def activate_maintenance():
         start_time__lte=now, end_time__gte=now
     ).first()
 
-    if window.exists():
+    if window is not None:
         print("Activating maintenance mode...")
         subprocess.run(["python", "manage.py", "pause_timers"])
         window.is_active = True
+        window.save(update_fields=["is_active"])
         # Add any additional activation logic here.
 
 

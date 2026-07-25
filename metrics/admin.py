@@ -36,13 +36,12 @@ class GlobalMetricsAdmin(admin.ModelAdmin):
         "created_at",
     ]
 
+    @admin.display(description="Week/Week Retention")
     def week_over_week_retention_display(self, obj):
         """Display retention as percentage with % sign."""
         if obj.week_over_week_retention is not None:
             return f"{obj.week_over_week_retention:.2f}%"
         return "-"
-
-    week_over_week_retention_display.short_description = "Week/Week Retention"
 
     def has_add_permission(self, request):
         return False

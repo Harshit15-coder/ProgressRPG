@@ -7,4 +7,7 @@ class Command(BaseCommand):
 
     def handle(self, *args, **kwargs):
         window = MaintenanceWindow.objects.first()  # Example logic
+        if window is None:
+            print("No maintenance window found.")
+            return
         print(f"Activating maintenance for: {window.name}")

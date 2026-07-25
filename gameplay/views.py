@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.serializers import BaseSerializer
 import logging
 
 from .models import Quest
@@ -56,9 +57,13 @@ class BaseTimerViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [IsAuthenticated]
-    serializer_class = None
+    serializer_class: type[BaseSerializer] | None = None
+
+    def get_timer(self, request):
+        raise NotImplementedError
 
     def serialize(self, timer):
+        assert self.serializer_class is not None
         return self.serializer_class(timer).data
 
     @action(detail=False, methods=["post"])
@@ -99,7 +104,7 @@ class ActivityTimerViewSet(BaseTimerViewSet):
         return timer
 
     @action(detail=False, methods=["post"])
-    def complete(self, request):
+    def complete(self, request):  # type: ignore[override]
         timer = self.get_timer(request)
         name = request.data.get("activityName")
         raw_elapsed_seconds = request.data.get("elapsedSeconds")

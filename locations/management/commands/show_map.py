@@ -54,10 +54,10 @@ class Command(BaseCommand):
 
         all_points = self.collect_all_points(buildings, characters, selected_centre)
         if show_landarea:
-            landareas = LandArea.objects.filter(population_centre=selected_centre)
+            landareas = list(LandArea.objects.filter(population_centre=selected_centre))
             for la in landareas:
-                if getattr(la, "area_polygon", None):
-                    minx, miny, maxx, maxy = la.area_polygon.extent
+                if la.boundary is not None:
+                    minx, miny, maxx, maxy = la.boundary.extent
                     all_points.extend(
                         [Point(minx, miny, srid=3857), Point(maxx, maxy, srid=3857)]
                     )
@@ -79,10 +79,10 @@ class Command(BaseCommand):
         # Plot land areas first so buildings/characters overwrite them
         if show_landarea:
             for la in landareas:
-                if getattr(la, "area_polygon", None):
+                if getattr(la, "boundary", None):
                     self.plot_polygon(
                         grid,
-                        la.area_polygon,
+                        la.boundary,
                         min_x,
                         min_y,
                         scale_x,

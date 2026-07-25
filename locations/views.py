@@ -63,7 +63,11 @@ class PopulationCentreMapView(APIView):
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
         features.extend(PathFeatureSerializer(paths, many=True).data)
 
-        bbox = list(population_centre.boundary.extent)
+        bbox = (
+            list(population_centre.boundary.extent)
+            if population_centre.boundary
+            else None
+        )
         meta = {
             "population_centre_id": population_centre.id,
             "feature_count": len(features),
