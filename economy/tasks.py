@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from .constants import (
     BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
+    FLOUR_BUFFER_DAYS,
     FLOUR_TO_BREAD_RATIO,
     GROWTH_DURATION,
     HUNGER_MAX,
@@ -77,7 +78,9 @@ def _maybe_ripen(crop, now):
     if now - crop.planted_at < GROWTH_DURATION:
         return
 
-    crop.ready_yield = crop.subzone.boundary.area * YIELD_PER_AREA
+    # Wheat is a weight-kind good (whole grams, see GOOD_TYPE_UNIT) - no
+    # meaningful sub-gram precision, so round the area-derived yield.
+    crop.ready_yield = round(crop.subzone.boundary.area * YIELD_PER_AREA)
     crop.harvested_amount = 0
     crop.stage = FieldCrop.Stage.READY
 
@@ -126,6 +129,16 @@ def _find_mill(population_centre):
     )
 
 
+def _daily_bread_demand(population_centre):
+    if population_centre is None:
+        return 0.0
+    return population_centre.resident_count * BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+
+
+def _daily_flour_demand(population_centre):
+    return _daily_bread_demand(population_centre) / FLOUR_TO_BREAD_RATIO
+
+
 def _find_bakery(population_centre):
     if population_centre is None:
         return None
@@ -168,7 +181,10 @@ def advance_mill_economy_tick(today=None):
     """
     Daily economy step: each mill converts granary wheat into flour stored
     at itself, capped by how many workers are physically present at the
-    mill (same "must actually show up" premise as the field harvest).
+    mill (same "must actually show up" premise as the field harvest),
+    storage capacity, and FLOUR_BUFFER_DAYS' worth of flour demand - flour
+    keeps (unlike bread, see advance_bakery_economy_tick), so it's fine to
+    mill a buffer ahead rather than only a day's worth.
     """
     today = today or timezone.localdate()
 
@@ -182,6 +198,15 @@ def advance_mill_economy_tick(today=None):
         granary = _find_granary(mill.population_centre)
         if granary is not None:
             workers_present = _workers_present(mill)
+            flour_buffer_target = (
+                _daily_flour_demand(mill.population_centre) * FLOUR_BUFFER_DAYS
+            )
+            flour_stock = GoodsStock.objects.filter(
+                building=mill, good_type=GoodsStock.GoodType.FLOUR
+            ).first()
+            current_flour = flour_stock.quantity if flour_stock else 0
+            mill_target = max(0.0, flour_buffer_target - current_flour)
+
             convert_goods(
                 granary,
                 mill,
@@ -190,6 +215,7 @@ def advance_mill_economy_tick(today=None):
                 workers_present=workers_present,
                 per_worker_capacity=PER_WORKER_DAILY_MILLING_CAPACITY,
                 conversion_ratio=WHEAT_TO_FLOUR_RATIO,
+                max_output=mill_target,
             )
         else:
             logger.warning(
@@ -207,7 +233,9 @@ def advance_bakery_economy_tick(today=None):
     """
     Daily economy step: each bakery converts mill flour into bread stored
     at itself, capped by how many workers are physically present at the
-    bakery (same premise as milling).
+    bakery (same premise as milling), and by today's expected consumption -
+    bread goes stale, so a bakery only bakes enough to cover its village's
+    daily demand rather than baking up to its full storage/labor limit.
     """
     today = today or timezone.localdate()
 
@@ -221,6 +249,13 @@ def advance_bakery_economy_tick(today=None):
         mill = _find_mill(bakery.population_centre)
         if mill is not None:
             workers_present = _workers_present(bakery)
+            daily_demand = _daily_bread_demand(bakery.population_centre)
+            bread_stock = GoodsStock.objects.filter(
+                building=bakery, good_type=GoodsStock.GoodType.BREAD
+            ).first()
+            current_bread = bread_stock.quantity if bread_stock else 0
+            bake_target = max(0.0, daily_demand - current_bread)
+
             convert_goods(
                 mill,
                 bakery,
@@ -229,6 +264,7 @@ def advance_bakery_economy_tick(today=None):
                 workers_present=workers_present,
                 per_worker_capacity=PER_WORKER_DAILY_BAKING_CAPACITY,
                 conversion_ratio=FLOUR_TO_BREAD_RATIO,
+                max_output=bake_target,
             )
         else:
             logger.warning(
@@ -255,7 +291,9 @@ def advance_bread_consumption_tick(today=None):
     bakery_cache = {}
 
     homes = (
-        CharacterLocation.objects.filter(role=CharacterLocation.Role.HOME, is_primary=True)
+        CharacterLocation.objects.filter(
+            role=CharacterLocation.Role.HOME, is_primary=True
+        )
         .select_related("character__needs", "location__population_centre")
         .order_by("character_id")
     )

@@ -1,4 +1,5 @@
 from datetime import date, datetime, timedelta
+from unittest.mock import PropertyMock, patch
 
 from django.contrib.gis.geos import Point, Polygon
 from django.test import TestCase
@@ -39,6 +40,19 @@ IN_WINDOW_DATE = date(2026, 3, 15)
 IN_WINDOW_NOW = timezone.make_aware(datetime(2026, 3, 15, 12, 0, 0))
 OUT_OF_WINDOW_DATE = date(2026, 8, 1)
 OUT_OF_WINDOW_NOW = timezone.make_aware(datetime(2026, 8, 1, 12, 0, 0))
+
+
+def _unlimited_demand():
+    """
+    Mill/bakery output is now also capped by bread demand (see
+    advance_mill_economy_tick/advance_bakery_economy_tick) - tests that
+    exist to exercise the *labor* cap need a population large enough that
+    demand is never the binding constraint, without bulk-creating hundreds
+    of residents just to hit that headroom.
+    """
+    return patch.object(
+        PopulationCentre, "resident_count", new_callable=PropertyMock, return_value=1000
+    )
 
 
 def _square(cx, cy, half_side):
@@ -156,7 +170,9 @@ def _make_bakery(centre, storage_area=1000.0):
 
 
 def _make_resident(centre, home_building, name, hunger=0.0):
-    character = Character.objects.create(first_name=name, location=home_building.location)
+    character = Character.objects.create(
+        first_name=name, location=home_building.location
+    )
     CharacterLocation.objects.create(
         character=character,
         location=home_building,
@@ -221,7 +237,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         centre, _, shelter, shelter_node, crop = _make_field_crop(
             stage=FieldCrop.Stage.READY
         )
-        crop.ready_yield = 1000.0
+        crop.ready_yield = 1_000_000.0
         crop.harvested_amount = 0
         crop.save(update_fields=["ready_yield", "harvested_amount"])
         _make_granary(centre, storage_area=10000.0)
@@ -252,8 +268,8 @@ class GenerateFieldsEconomyTickTests(TestCase):
         centre, _, shelter, shelter_node, crop = _make_field_crop(
             stage=FieldCrop.Stage.READY
         )
-        crop.ready_yield = 100.0
-        crop.harvested_amount = 95.0
+        crop.ready_yield = 100_000.0
+        crop.harvested_amount = 95_000.0
         crop.save(update_fields=["ready_yield", "harvested_amount"])
         _make_granary(centre, storage_area=10000.0)
 
@@ -268,21 +284,22 @@ class GenerateFieldsEconomyTickTests(TestCase):
         advance_field_economy_tick()
 
         crop.refresh_from_db()
-        self.assertEqual(crop.harvested_amount, 100.0)
+        self.assertEqual(crop.harvested_amount, 100_000.0)
         self.assertEqual(crop.stage, FieldCrop.Stage.FALLOW)
 
         stock = GoodsStock.objects.get(building__building_type="granary")
-        self.assertEqual(stock.quantity, 5.0)
+        self.assertEqual(stock.quantity, 5_000.0)
 
     def test_deposit_capped_by_granary_capacity(self):
         centre, _, shelter, shelter_node, crop = _make_field_crop(
             stage=FieldCrop.Stage.READY
         )
-        crop.ready_yield = 1000.0
+        crop.ready_yield = 1_000_000.0
         crop.harvested_amount = 0
         crop.save(update_fields=["ready_yield", "harvested_amount"])
-        # Tiny storage area -> tiny capacity, much less than one worker's
-        # daily capacity.
+        # Tiny storage area -> tiny capacity (0.1 * STORAGE_CAPACITY_PER_AREA_VOLUME
+        # (1_000.0) * wheat bulk density (770.0) = 77_000.0g), much less
+        # than one worker's daily harvest capacity (100_000.0g).
         granary = _make_granary(centre, storage_area=0.1)
 
         Character.objects.create(
@@ -302,7 +319,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         centre, _, shelter, shelter_node, crop = _make_field_crop(
             stage=FieldCrop.Stage.READY
         )
-        crop.ready_yield = 1000.0
+        crop.ready_yield = 1_000_000.0
         crop.harvested_amount = 0
         crop.save(update_fields=["ready_yield", "harvested_amount"])
 
@@ -323,7 +340,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         centre, _, shelter, shelter_node, crop = _make_field_crop(
             stage=FieldCrop.Stage.READY
         )
-        crop.ready_yield = 1000.0
+        crop.ready_yield = 1_000_000.0
         crop.harvested_amount = 0
         crop.save(update_fields=["ready_yield", "harvested_amount"])
         _make_granary(centre, storage_area=10000.0)
@@ -346,7 +363,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
 
 
 class AdvanceMillEconomyTickTests(TestCase):
-    def _make_centre_with_wheat(self, wheat_quantity=500.0, granary_area=10000.0):
+    def _make_centre_with_wheat(self, wheat_quantity=500_000.0, granary_area=10000.0):
         centre_point = Point(0, 0, srid=3857)
         centre = PopulationCentre.objects.create(
             name="Millville", location=centre_point, boundary=_square(0, 0, 50)
@@ -376,12 +393,13 @@ class AdvanceMillEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_mill_economy_tick()
+        with _unlimited_demand():
+            advance_mill_economy_tick()
 
         expected_input = 2 * PER_WORKER_DAILY_MILLING_CAPACITY
         wheat = GoodsStock.objects.get(building=granary, good_type="wheat")
         flour = GoodsStock.objects.get(building=mill, good_type="flour")
-        self.assertEqual(wheat.quantity, 500.0 - expected_input)
+        self.assertEqual(wheat.quantity, 500_000.0 - expected_input)
         self.assertEqual(flour.quantity, expected_input * WHEAT_TO_FLOUR_RATIO)
 
         state = GoodsConversionState.objects.get(building=mill)
@@ -417,15 +435,16 @@ class AdvanceMillEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_mill_economy_tick()
-        advance_mill_economy_tick()
+        with _unlimited_demand():
+            advance_mill_economy_tick()
+            advance_mill_economy_tick()
 
         expected_input = PER_WORKER_DAILY_MILLING_CAPACITY
         wheat = GoodsStock.objects.get(building=granary, good_type="wheat")
-        self.assertEqual(wheat.quantity, 500.0 - expected_input)
+        self.assertEqual(wheat.quantity, 500_000.0 - expected_input)
 
     def test_multiple_mills_in_one_centre_are_both_processed(self):
-        centre, granary = self._make_centre_with_wheat(wheat_quantity=1000.0)
+        centre, granary = self._make_centre_with_wheat(wheat_quantity=1_000_000.0)
         mill_a, node_a = _make_mill(centre)
         mill_b_building = Building.objects.create(
             name="Second Mill",
@@ -466,7 +485,8 @@ class AdvanceMillEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_mill_economy_tick()
+        with _unlimited_demand():
+            advance_mill_economy_tick()
 
         self.assertTrue(
             GoodsStock.objects.filter(
@@ -481,7 +501,7 @@ class AdvanceMillEconomyTickTests(TestCase):
 
 
 class AdvanceBakeryEconomyTickTests(TestCase):
-    def _make_centre_with_flour(self, flour_quantity=500.0):
+    def _make_centre_with_flour(self, flour_quantity=500_000.0):
         centre_point = Point(0, 0, srid=3857)
         centre = PopulationCentre.objects.create(
             name="Bakeville", location=centre_point, boundary=_square(0, 0, 50)
@@ -511,12 +531,13 @@ class AdvanceBakeryEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_bakery_economy_tick()
+        with _unlimited_demand():
+            advance_bakery_economy_tick()
 
         expected_input = 2 * PER_WORKER_DAILY_BAKING_CAPACITY
         flour = GoodsStock.objects.get(building=mill, good_type="flour")
         bread = GoodsStock.objects.get(building=bakery, good_type="bread")
-        self.assertEqual(flour.quantity, 500.0 - expected_input)
+        self.assertEqual(flour.quantity, 500_000.0 - expected_input)
         self.assertEqual(bread.quantity, expected_input * FLOUR_TO_BREAD_RATIO)
 
         state = GoodsConversionState.objects.get(building=bakery)
@@ -552,15 +573,16 @@ class AdvanceBakeryEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_bakery_economy_tick()
-        advance_bakery_economy_tick()
+        with _unlimited_demand():
+            advance_bakery_economy_tick()
+            advance_bakery_economy_tick()
 
         expected_input = PER_WORKER_DAILY_BAKING_CAPACITY
         flour = GoodsStock.objects.get(building=mill, good_type="flour")
-        self.assertEqual(flour.quantity, 500.0 - expected_input)
+        self.assertEqual(flour.quantity, 500_000.0 - expected_input)
 
     def test_multiple_bakeries_in_one_centre_are_both_processed(self):
-        centre, mill = self._make_centre_with_flour(flour_quantity=1000.0)
+        centre, mill = self._make_centre_with_flour(flour_quantity=1_000_000.0)
         bakery_a, node_a = _make_bakery(centre)
         bakery_b = Building.objects.create(
             name="Second Bakery",
@@ -592,7 +614,8 @@ class AdvanceBakeryEconomyTickTests(TestCase):
             is_moving=False,
         )
 
-        advance_bakery_economy_tick()
+        with _unlimited_demand():
+            advance_bakery_economy_tick()
 
         self.assertTrue(
             GoodsStock.objects.filter(
@@ -625,14 +648,16 @@ class AdvanceBreadConsumptionTickTests(TestCase):
         centre, home = self._make_centre_with_home()
         bakery, _ = _make_bakery(centre)
         GoodsStock.objects.create(
-            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=10.0
+            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=1_000.0
         )
         character = _make_resident(centre, home, "Eater1", hunger=5.0)
 
         advance_bread_consumption_tick()
 
         bread = GoodsStock.objects.get(building=bakery, good_type="bread")
-        self.assertEqual(bread.quantity, 10.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION)
+        self.assertEqual(
+            bread.quantity, 1_000.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+        )
 
         character.needs.refresh_from_db()
         self.assertEqual(character.needs.hunger, max(0.0, 5.0 - HUNGER_PER_MISSED_MEAL))
@@ -671,7 +696,7 @@ class AdvanceBreadConsumptionTickTests(TestCase):
         centre, home = self._make_centre_with_home()
         bakery, _ = _make_bakery(centre)
         GoodsStock.objects.create(
-            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=10.0
+            building=bakery, good_type=GoodsStock.GoodType.BREAD, quantity=1_000.0
         )
         _make_resident(centre, home, "Eater1", hunger=5.0)
 
@@ -679,7 +704,9 @@ class AdvanceBreadConsumptionTickTests(TestCase):
         advance_bread_consumption_tick()
 
         bread = GoodsStock.objects.get(building=bakery, good_type="bread")
-        self.assertEqual(bread.quantity, 10.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION)
+        self.assertEqual(
+            bread.quantity, 1_000.0 - BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+        )
 
     def test_two_characters_share_bakery_stock_first_come_first_served(self):
         centre, home = self._make_centre_with_home()
