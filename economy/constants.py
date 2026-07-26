@@ -1,3 +1,4 @@
+import math
 from datetime import timedelta
 from enum import Enum
 
@@ -122,14 +123,64 @@ def unit_suffix(good_type):
     return "L" if unit == UnitKind.VOLUME else "kg"
 
 
-def format_quantity(good_type, value, signed=False):
+# Bread naturally exists as discrete loaves, so it's displayed as a loaf
+# count rather than a weight - 1 loaf = 1kg is an exact, not approximate,
+# conversion for display purposes.
+LOAF_WEIGHT_GRAMS = 1000
+
+# Flour is displayed as the number of sacks required to store it (always
+# rounded up - any remaining flour still needs another sack), rather than
+# as a fractional weight. 20kg/sack is an assumed round figure, not a
+# real-world reference value.
+SACK_CAPACITY_GRAMS = 20_000
+
+
+def _format_default(good_type, value, signed=False):
     """
-    Format a quantity for display. Weight-kind goods are stored in grams but
-    displayed in kilograms for readability; volume-kind goods (litres) keep
-    one decimal place, since fractional litres are meaningful.
+    Format a quantity as a plain weight/volume figure. Weight-kind goods are
+    stored in grams but displayed in kilograms for readability; volume-kind
+    goods (litres) keep one decimal place, since fractional litres are
+    meaningful.
     """
     unit = GOOD_TYPE_UNIT.get(good_type, UnitKind.WEIGHT)
     display_value = value if unit == UnitKind.VOLUME else value / 1000
-    precision = 1
     sign = "+" if signed else ""
-    return f"{display_value:{sign},.{precision}f}{unit_suffix(good_type)}"
+    return f"{display_value:{sign},.1f}{unit_suffix(good_type)}"
+
+
+def _format_bread(value):
+    loaves = value / LOAF_WEIGHT_GRAMS
+    suffix = "loaf" if loaves == 1 else "loaves"
+    return f"{loaves:,.1f} {suffix}"
+
+
+def _format_flour(value):
+    sacks = math.ceil(value / SACK_CAPACITY_GRAMS)
+    suffix = "sack" if sacks == 1 else "sacks"
+    return f"{sacks:,} {suffix}"
+
+
+# Per-good_type display strategy for absolute quantities, mirroring the
+# GOOD_TYPE_UNIT/GOOD_TYPE_BULK_DENSITY/GOOD_TYPE_STORAGE_USAGE pattern
+# above. Only used for signed=False - see format_quantity.
+GOOD_TYPE_FORMATTER = {
+    "bread": _format_bread,
+    "flour": _format_flour,
+}
+
+
+def format_quantity(good_type, value, signed=False):
+    """
+    Format a quantity for display. Signed values (deltas) always show as a
+    plain weight/volume figure, since "round up to a whole sack/loaf" has
+    no sensible meaning for a change amount. Unsigned values use each
+    good's own display strategy (see GOOD_TYPE_FORMATTER), falling back to
+    the plain weight/volume figure for goods with no special strategy.
+    """
+    if signed:
+        return _format_default(good_type, value, signed=True)
+
+    formatter = GOOD_TYPE_FORMATTER.get(good_type)
+    if formatter:
+        return formatter(value)
+    return _format_default(good_type, value)
