@@ -22,7 +22,7 @@ Author:
 
 """
 
-from datetime import timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
 from django.contrib.auth.models import AbstractUser, UserManager
 from django.db import models, transaction
@@ -36,7 +36,10 @@ from timezone_field import TimeZoneField
 from gameplay.models import Currency, CurrencyAccountBase, ServerMessage
 
 if TYPE_CHECKING:
-    from character.models import Character
+    from django.db.models import Manager
+
+    from character.models import Character, PlayerCharacterLink
+    from gameplay.models import XpModifier
 
 logger = logging.getLogger("general")
 
@@ -52,7 +55,7 @@ class CustomUserManager(UserManager["CustomUser"]):
     """
 
     @transaction.atomic
-    def create_user(
+    def create_user(  # type: ignore[override]
         self, email: Optional[str], password: Optional[str], **extra_fields
     ):
         """
@@ -73,7 +76,7 @@ class CustomUserManager(UserManager["CustomUser"]):
         return user
 
     @transaction.atomic
-    def create_superuser(
+    def create_superuser(  # type: ignore[override]
         self, email: Optional[str], password: Optional[str], **extra_fields
     ):
         """
@@ -89,12 +92,12 @@ class CustomUser(AbstractUser):
     Custom user model extending Django's AbstractUser.
     """
 
-    username = None
+    username = None  # type: ignore[assignment,misc]
     email = models.EmailField(unique=True)
     date_of_birth = models.DateField(blank=True, null=True)
     timezone = TimeZoneField(default="UTC")
     created_at = models.DateTimeField(auto_now_add=True)
-    objects = CustomUserManager()
+    objects = CustomUserManager()  # type: ignore[assignment,misc]
     pending_delete = models.BooleanField(default=False)
     delete_at = models.DateTimeField(null=True, blank=True)
     is_confirmed = models.BooleanField(default=False)
@@ -202,7 +205,7 @@ class UserLogin(models.Model):
 
         user = logins[0].user
         dates = {login.local_date() for login in logins}
-        first_by_date = {}
+        first_by_date: dict[date, datetime] = {}
         for ts in (
             cls.objects.filter(user=user, timestamp__date__in=dates)
             .order_by("timestamp")
@@ -309,6 +312,14 @@ class Person(models.Model):
     level = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
+    if TYPE_CHECKING:
+        # Provided by concrete subclasses (Player, Character): `active_link`
+        # is a property on each, `xp_mods` is a reverse FK from XpModifier.
+        @property
+        def active_link(self) -> "PlayerCharacterLink | None": ...
+
+        xp_mods: "Manager[XpModifier]"
+
     class Meta:
         abstract = True
 
@@ -387,7 +398,7 @@ class Player(Person):
     onboarding_step = models.PositiveIntegerField(choices=ONBOARDING_STEPS, default=0)
 
     onboarding_completed = models.BooleanField(default=False)
-    tutorial_steps_seen = models.ManyToManyField(
+    tutorial_steps_seen: models.ManyToManyField = models.ManyToManyField(
         "TutorialStep", blank=True, related_name="seen_by"
     )
     # onboarding = models.JSONField(default=dict, blank=True)

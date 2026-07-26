@@ -15,8 +15,8 @@ class Command(BaseCommand):
             timer.pause()
 
         active_quest_timers = QuestTimer.objects.filter(status="Active")
-        for timer in active_quest_timers:
-            timer.pause()
+        for quest_timer in active_quest_timers:
+            quest_timer.pause()
 
         logger.info(
             f"[COMMAND: PAUSE ALL TIMERS] {active_act_timers.count()} active Activity timers paused; {active_quest_timers.count()} active Quest timers paused."

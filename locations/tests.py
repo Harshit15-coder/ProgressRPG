@@ -1,14 +1,22 @@
+import random
+from datetime import datetime
+
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point, Polygon
+from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.utils import timezone
 from unittest.mock import patch
 
-from .models import Node, Path, Building, Journey, PopulationCentre
+from .management.commands.spawn_villages import create_building_footprint
+from .models import Node, Path, Building, Journey, PopulationCentre, LandArea, Subzone
+from .services.schedule import sync_character_location, target_role_for
 from .services.wander import wander
-from .tasks import wander_tick
-from character.models import Character, PlayerCharacterLink
+from .tasks import commute_tick, move_characters_tick, wander_tick
+from character.models import Character, CharacterLocation, PlayerCharacterLink
+from economy.models import FieldCrop
 
 
 class LocationsModelsTestCase(TestCase):
@@ -136,6 +144,36 @@ class LocationsModelsTestCase(TestCase):
         journey.refresh_from_db()
         self.assertEqual(journey.status, "complete")
         self.assertIsNotNone(journey.finished_at)
+
+    def test_journey_arrival_via_move_characters_tick_does_not_raise(self):
+        """Regression test: arrive() used to reference nonexistent
+        current_content_type/current_object_id fields, which raised
+        AttributeError the moment any real Journey actually completed."""
+        char = Character.objects.create(
+            first_name="Arriver",
+            location=Point(0, 0, srid=3857),
+            current_node=self.node_a,
+        )
+        char.set_destination(node=self.node_b)
+        char.refresh_from_db()
+        self.assertTrue(char.is_moving)
+
+        # A large time_delta covers the full A -> B distance (10 units) in
+        # one step, but the Journey only reaches "complete" on the following
+        # tick (the one that finds no next_node) - in production this is the
+        # self-rescheduled tick; here we drive it explicitly twice.
+        with patch("locations.tasks.move_characters_tick.apply_async"):
+            move_characters_tick(time_delta=100.0)
+            move_characters_tick(time_delta=100.0)
+
+        char.refresh_from_db()
+        self.assertFalse(char.is_moving)
+        self.assertEqual(char.current_node, self.node_b)
+        self.assertEqual(char.location.x, self.node_b.location.x)
+        self.assertEqual(char.location.y, self.node_b.location.y)
+
+        journey = Journey.objects.filter(character=char).first()
+        self.assertEqual(journey.status, "complete")
 
 
 class PopulationCentreVillagePointsTest(TestCase):
@@ -322,3 +360,354 @@ class WanderTickTaskTest(TestCase):
         )
         self.assertNotIn(self.moving_npc.id, wandered_ids)
         self.assertGreaterEqual(len(wandered_ids), 1)
+
+
+class ScheduleServiceTargetRoleTest(TestCase):
+    def setUp(self):
+        self.character = Character.objects.create(
+            first_name="Scheduled", location=Point(0, 0, srid=3857)
+        )
+
+    def test_target_role_is_work_at_midday(self):
+        noon = timezone.make_aware(datetime(2026, 1, 1, 12, 0, 0))
+        self.assertEqual(
+            target_role_for(self.character, now=noon), CharacterLocation.Role.WORK
+        )
+
+    def test_target_role_is_home_at_midnight(self):
+        midnight = timezone.make_aware(datetime(2026, 1, 1, 0, 0, 0))
+        self.assertEqual(
+            target_role_for(self.character, now=midnight), CharacterLocation.Role.HOME
+        )
+
+    def test_target_role_respects_per_character_stagger_at_boundary(self):
+        with patch(
+            "locations.services.schedule._stagger_offset_seconds", return_value=0
+        ):
+            at_work_start = timezone.make_aware(datetime(2026, 1, 1, 8, 0, 0))
+            just_before = timezone.make_aware(datetime(2026, 1, 1, 7, 59, 59))
+            self.assertEqual(
+                target_role_for(self.character, now=at_work_start),
+                CharacterLocation.Role.WORK,
+            )
+            self.assertEqual(
+                target_role_for(self.character, now=just_before),
+                CharacterLocation.Role.HOME,
+            )
+
+        with patch(
+            "locations.services.schedule._stagger_offset_seconds",
+            return_value=600,
+        ):
+            # Boundary shifted 10 minutes later: 08:05 should still read HOME.
+            shifted = timezone.make_aware(datetime(2026, 1, 1, 8, 5, 0))
+            self.assertEqual(
+                target_role_for(self.character, now=shifted),
+                CharacterLocation.Role.HOME,
+            )
+
+
+class SyncCharacterLocationTest(TestCase):
+    def setUp(self):
+        self.start_node = Node.objects.create(
+            name="Start", location=Point(0, 0, srid=3857), kind=Node.Kind.OUTSIDE
+        )
+        self.home_building = Building.objects.create(
+            name="Home", building_type="residential", location=Point(0, 0, srid=3857)
+        )
+        self.work_building = Building.objects.create(
+            name="Work", building_type="communal", location=Point(20, 0, srid=3857)
+        )
+        self.home_node = Node.objects.create(
+            name="HomeEntrance",
+            location=Point(0, 0, srid=3857),
+            kind=Node.Kind.BUILDING_ENTRANCE,
+            building=self.home_building,
+        )
+        self.work_node = Node.objects.create(
+            name="WorkEntrance",
+            location=Point(20, 0, srid=3857),
+            kind=Node.Kind.BUILDING_ENTRANCE,
+            building=self.work_building,
+        )
+        Path.objects.create(from_node=self.start_node, to_node=self.home_node)
+        Path.objects.create(from_node=self.start_node, to_node=self.work_node)
+        Path.objects.create(from_node=self.home_node, to_node=self.work_node)
+
+        self.character = Character.objects.create(
+            first_name="Commuter",
+            location=Point(0, 0, srid=3857),
+            current_node=self.start_node,
+        )
+        CharacterLocation.objects.create(
+            character=self.character,
+            location=self.home_building,
+            role=CharacterLocation.Role.HOME,
+        )
+        CharacterLocation.objects.create(
+            character=self.character,
+            location=self.work_building,
+            role=CharacterLocation.Role.WORK,
+        )
+
+    def test_moves_toward_work_during_day(self):
+        with patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.WORK,
+        ), patch("locations.tasks.move_characters_tick.apply_async"):
+            sync_character_location(self.character)
+
+        self.character.refresh_from_db()
+        self.assertTrue(self.character.is_moving)
+        self.assertEqual(self.character.target_node, self.work_node)
+
+    def test_moves_toward_home_at_night(self):
+        with patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.HOME,
+        ), patch("locations.tasks.move_characters_tick.apply_async"):
+            sync_character_location(self.character)
+
+        self.character.refresh_from_db()
+        self.assertTrue(self.character.is_moving)
+        self.assertEqual(self.character.target_node, self.home_node)
+
+    def test_noop_when_already_at_target(self):
+        self.character.current_node = self.home_node
+        self.character.save(update_fields=["current_node"])
+
+        with patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.HOME,
+        ):
+            sync_character_location(self.character)
+
+        self.character.refresh_from_db()
+        self.assertFalse(self.character.is_moving)
+        self.assertIsNone(self.character.target_node)
+
+    def test_noop_when_already_heading_there(self):
+        # is_moving False but target_node already set to the destination -
+        # e.g. leftover from a cancelled journey. Should not re-trigger.
+        self.character.target_node = self.work_node
+        self.character.save(update_fields=["target_node"])
+
+        with patch.object(
+            self.character, "set_destination"
+        ) as mock_set_destination, patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.WORK,
+        ):
+            sync_character_location(self.character)
+
+        mock_set_destination.assert_not_called()
+
+    def test_noop_when_is_moving(self):
+        self.character.is_moving = True
+        self.character.save(update_fields=["is_moving"])
+
+        with patch("locations.services.schedule.target_role_for") as mock_target_role:
+            sync_character_location(self.character)
+
+        mock_target_role.assert_not_called()
+
+    def test_noop_when_no_matching_character_location(self):
+        CharacterLocation.objects.filter(
+            character=self.character, role=CharacterLocation.Role.WORK
+        ).delete()
+
+        with patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.WORK,
+        ):
+            sync_character_location(self.character)
+
+        self.character.refresh_from_db()
+        self.assertFalse(self.character.is_moving)
+
+    def test_catches_value_error_from_set_destination(self):
+        with patch(
+            "locations.services.schedule.target_role_for",
+            return_value=CharacterLocation.Role.WORK,
+        ), patch.object(
+            self.character, "set_destination", side_effect=ValueError("no path")
+        ):
+            sync_character_location(self.character)  # should not raise
+
+        self.character.refresh_from_db()
+        self.assertFalse(self.character.is_moving)
+
+
+class CommuteTickTaskTest(TestCase):
+    def setUp(self):
+        self.centre = PopulationCentre.objects.create(
+            name="Commute Village", location=Point(0, 0, srid=3857)
+        )
+        self.idle_character = Character.objects.create(
+            first_name="Idle",
+            location=Point(0, 0, srid=3857),
+            population_centre=self.centre,
+            is_moving=False,
+        )
+        self.moving_character = Character.objects.create(
+            first_name="Moving",
+            location=Point(0, 0, srid=3857),
+            population_centre=self.centre,
+            is_moving=True,
+        )
+        self.orphan_character = Character.objects.create(
+            first_name="Orphan",
+            location=Point(0, 0, srid=3857),
+            is_moving=False,
+        )
+
+    def test_commute_tick_only_syncs_idle_village_assigned_characters(self):
+        with patch("locations.services.schedule.sync_character_location") as mock_sync:
+            commute_tick()
+
+        synced_ids = {call.args[0].id for call in mock_sync.call_args_list}
+        self.assertEqual(synced_ids, {self.idle_character.id})
+
+
+def _make_centre_with_building(name, centre_point):
+    """Minimal PopulationCentre + one Building, boundary sized like spawn_villages."""
+    footprint = create_building_footprint(centre_point, min_size=10, max_size=20)
+    boundary = footprint.buffer(10)
+    centre = PopulationCentre.objects.create(
+        name=name, location=centre_point, boundary=boundary
+    )
+    Building.objects.create(
+        name=f"House of {name}",
+        building_type="residential",
+        location=centre_point,
+        footprint=footprint,
+        population_centre=centre,
+    )
+    return centre
+
+
+class GenerateLandareaCommandTest(TestCase):
+    def setUp(self):
+        # Deterministic placement - the command's own randomness (direction/
+        # margin) otherwise makes assertions flaky.
+        random.seed(1234)
+
+    def test_places_landarea_outside_the_boundary(self):
+        centre = _make_centre_with_building("Landtest village", Point(0, 0, srid=3857))
+        Character.objects.create(population_centre=centre)
+        original_boundary = centre.boundary
+
+        call_command("generate_landarea")
+
+        landarea = LandArea.objects.get(population_centre=centre)
+        self.assertEqual(landarea.subzones.filter(usage="crops").count(), 1)
+
+        centre.refresh_from_db()
+        # The LandArea is deliberately left outside the village boundary
+        # rather than folded into it - the boundary polygon is untouched,
+        # and there must be a real gap so it doesn't visually fuse onto the
+        # boundary line.
+        self.assertFalse(centre.boundary.intersects(landarea.boundary))
+        self.assertEqual(centre.boundary.area, original_boundary.area)
+
+    def test_avoids_overlapping_a_neighbouring_villages_boundary(self):
+        centre_a = _make_centre_with_building("Village A", Point(0, 0, srid=3857))
+        Character.objects.create(population_centre=centre_a)
+        centre_b = _make_centre_with_building("Village B", Point(500, 0, srid=3857))
+        Character.objects.create(population_centre=centre_b)
+
+        call_command("generate_landarea")
+
+        landarea_a = LandArea.objects.get(population_centre=centre_a)
+        landarea_b = LandArea.objects.get(population_centre=centre_b)
+
+        centre_b.refresh_from_db()
+        centre_a.refresh_from_db()
+        self.assertFalse(centre_b.boundary.intersects(landarea_a.boundary))
+        self.assertFalse(centre_a.boundary.intersects(landarea_b.boundary))
+
+    def test_skips_centre_with_no_residents(self):
+        _make_centre_with_building("Empty village", Point(0, 0, srid=3857))
+
+        call_command("generate_landarea")
+
+        self.assertEqual(LandArea.objects.count(), 0)
+
+
+class GenerateFieldsCommandTest(TestCase):
+    def setUp(self):
+        # Deterministic placement - generate_landarea's own randomness
+        # (direction/margin) otherwise makes assertions flaky.
+        random.seed(1234)
+
+    def _make_crops_subzone(self, centre, subzone_point):
+        """A crops Subzone with real geometry, as generate_landarea would produce."""
+        land_area = LandArea.objects.create(
+            name=f"{centre.name} Farmland",
+            population_centre=centre,
+            location=subzone_point,
+            boundary=create_building_footprint(subzone_point),
+            size=1.0,
+        )
+        return Subzone.objects.create(
+            land_area=land_area,
+            name=f"{centre.name} Farmland - Crops",
+            usage="crops",
+            boundary=create_building_footprint(subzone_point),
+            location=subzone_point,
+            size=1.0,
+        )
+
+    def test_attaches_shelter_and_fieldcrop_to_existing_crops_subzone(self):
+        centre = _make_centre_with_building("Fieldtest village", Point(0, 0, srid=3857))
+        subzone = self._make_crops_subzone(centre, Point(100, 100, srid=3857))
+
+        call_command("generate_fields")
+
+        shelter = Building.objects.get(
+            building_type="field_shelter", population_centre=centre
+        )
+        self.assertTrue(shelter.nodes.filter(kind=Node.Kind.BUILDING_ENTRANCE).exists())
+        self.assertTrue(shelter.nodes.filter(kind=Node.Kind.BUILDING).exists())
+        # The shelter is house-scale, much smaller than the crop area it sits
+        # beside.
+        self.assertLess(shelter.footprint.area, subzone.boundary.area)
+
+        crop = FieldCrop.objects.get(subzone=subzone)
+        self.assertEqual(crop.shelter_building, shelter)
+        self.assertEqual(crop.stage, FieldCrop.Stage.FALLOW)
+
+    def test_skips_crops_subzone_that_already_has_a_fieldcrop(self):
+        centre = _make_centre_with_building(
+            "Already fielded village", Point(0, 0, srid=3857)
+        )
+        subzone = self._make_crops_subzone(centre, Point(100, 100, srid=3857))
+        existing_shelter = Building.objects.create(
+            name="Existing shelter",
+            building_type="field_shelter",
+            location=Point(100, 100, srid=3857),
+            footprint=create_building_footprint(Point(100, 100, srid=3857)),
+            population_centre=centre,
+        )
+        FieldCrop.objects.create(
+            subzone=subzone,
+            shelter_building=existing_shelter,
+            stage=FieldCrop.Stage.GROWING,
+        )
+
+        call_command("generate_fields")
+
+        self.assertEqual(FieldCrop.objects.filter(subzone=subzone).count(), 1)
+        self.assertEqual(
+            Building.objects.filter(
+                building_type="field_shelter", population_centre=centre
+            ).count(),
+            1,
+        )
+
+    def test_does_nothing_when_no_crops_subzones_exist(self):
+        _make_centre_with_building("No fields village", Point(0, 0, srid=3857))
+
+        call_command("generate_fields")
+
+        self.assertEqual(FieldCrop.objects.count(), 0)

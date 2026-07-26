@@ -1,0 +1,93 @@
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/utilities/list-pages' as lp;
+@use '../../styles/semantic/colors' as c;
+
+.page {
+  @include m.page-layout();
+}
+
+.addSkillForm {
+  @include lp.list-page-add-form;
+}
+
+.addSkillInput {
+  @include lp.list-page-add-input;
+}
+
+.skillsList {
+  @include lp.list-page-list;
+}
+
+.skillItem {
+  @include lp.list-page-item;
+}
+
+.skillDetails {
+  @include lp.list-page-details;
+}
+
+.editInput {
+  @include lp.list-page-edit-input;
+}
+
+.actions {
+  @include lp.list-page-actions;
+}
+
+.editButton,
+.saveButton,
+.cancelButton,
+.deleteButton {
+  @include lp.list-page-action-button-base;
+}
+
+.editButton {
+  border: 1px solid c.$color-border-primary;
+  background: transparent;
+  color: c.$color-border-primary;
+
+  &:hover {
+    background: rgba(c.$color-border-primary, 0.1);
+  }
+}
+
+.saveButton {
+  border: 1px solid c.$color-border-primary;
+  background: c.$color-border-primary;
+  color: c.$color-bg;
+
+  &:hover {
+    filter: brightness(1.05);
+  }
+}
+
+.cancelButton {
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  background: transparent;
+  color: rgba(0, 0, 0, 0.7);
+
+  &:hover {
+    background: rgba(0, 0, 0, 0.06);
+  }
+}
+
+.deleteButton {
+  transition: filter 0.2s ease, color 0.2s ease;
+
+  &:hover {
+    filter: brightness(0.94);
+    color: rgba(c.$color-text-invert, 0.96);
+  }
+
+  &:active {
+    filter: brightness(0.88);
+  }
+}
+
+.emptyState {
+  @include lp.list-page-empty-state;
+}
+
+@include m.respond-to(md, down) {
+  @include lp.list-page-mobile;
+}

@@ -1,10 +1,22 @@
 from rest_framework import serializers
 from drf_spectacular.types import OpenApiTypes
-from drf_spectacular.utils import extend_schema_field, inline_serializer
+from drf_spectacular.utils import extend_schema_field
 
 from .achievements import achievement_goals_for_player
 from .models import Player, TutorialStep
 from .validators import clean_player_name
+
+
+class AchievementGoalSerializer(serializers.Serializer):
+    type = serializers.CharField()
+    label = serializers.CharField()
+    symbol = serializers.CharField()
+    tier = serializers.IntegerField()
+    complete = serializers.BooleanField()
+    color = serializers.CharField()
+    value = serializers.IntegerField()
+    threshold = serializers.IntegerField()
+    next_threshold = serializers.IntegerField(allow_null=True)
 
 
 class TutorialStepSerializer(serializers.ModelSerializer):
@@ -62,23 +74,7 @@ class PlayerSerializer(serializers.ModelSerializer):
         all_ids = set(TutorialStep.objects.values_list("id", flat=True))
         return sorted(all_ids - seen_ids)
 
-    @extend_schema_field(
-        inline_serializer(
-            name="AchievementGoalSerializer",
-            fields={
-                "type": serializers.CharField(),
-                "label": serializers.CharField(),
-                "symbol": serializers.CharField(),
-                "tier": serializers.IntegerField(),
-                "complete": serializers.BooleanField(),
-                "color": serializers.CharField(),
-                "value": serializers.IntegerField(),
-                "threshold": serializers.IntegerField(),
-                "next_threshold": serializers.IntegerField(allow_null=True),
-            },
-            many=True,
-        )
-    )
+    @extend_schema_field(AchievementGoalSerializer(many=True))
     def get_achievements(self, obj) -> list[dict[str, object]]:
         return achievement_goals_for_player(obj)
 

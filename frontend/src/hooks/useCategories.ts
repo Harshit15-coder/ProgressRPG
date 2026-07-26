@@ -9,6 +9,7 @@ export function useCategories() {
   return useQuery({
     queryKey: ["categories"],
     queryFn: fetchCategories,
+    staleTime: 30_000,
   });
 }
 

@@ -12,6 +12,58 @@
     "python.analysis.typeCheckingMode": "off",
     "python-envs.defaultEnvManager": "ms-python.python:system",
     "chat.tools.terminal.autoApprove": {
-        "git -C /home/gaidheal/repos/progressrpg": true
-    }
+        "git -C /home/gaidheal/repos/progressrpg status": true,
+        "git -C /home/gaidheal/repos/progressrpg diff": true,
+        "git -C /home/gaidheal/repos/progressrpg log": true,
+        "git -C /home/gaidheal/repos/progressrpg show": true,
+        "git -C /home/gaidheal/repos/progressrpg rev-parse": true,
+        "git ls-remote": true,
+
+        "pwd": true,
+        "ls": true,
+        "find /home/gaidheal/repos/progressrpg": true,
+
+        "rg ": true,
+        "rg --files": true,
+
+        "cat /home/gaidheal/repos/progressrpg": true,
+        "sed -n ": true,
+        "head ": true,
+        "tail ": true,
+        "wc -l ": true,
+        "tree": true,
+        "du -sh": true,
+        "stat": true,
+        "basename": true,
+        "dirname": true,
+        "sort": true,
+        "uniq": true
+    },
+    "files.watcherExclude": {
+        "/frontend/dist-ds/**": true,
+        "/frontend/node_modules/**": true,
+        "/frontend/playwright-report/**": true,
+        "/frontend/test-results/**": true,
+        "/logs/**": true,
+        "/media/**": true,
+        "/staticfiles/**": true
+    },
+    "files.exclude": {
+        "**/frontend/dist-ds": true,
+        "**/frontend/node_modules": true,
+        "**/frontend/test-results": true,
+        "**/logs": true,
+        "**/media": true,
+        "**/staticfiles": true
+    },
+    "search.exclude": {
+        "**/frontend/dist-ds": true,
+        "**/frontend/node_modules": true,
+        "**/frontend/test-results": true,
+        "**/logs": true,
+        "**/media": true,
+        "**/staticfiles": true
+    },
+    "python.terminal.activateEnvInCurrentTerminal": true,
+    "python.analysis.inlayHints.callArgumentNames": "partial",
 }

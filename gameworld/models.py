@@ -70,20 +70,21 @@ class GameWorld(models.Model):
 
     def convert_to_game_date(self, input_date):
         """Convert a date or datetime object to a chosen distance in the past."""
+        years_diff = self.years_diff or 0
         if isinstance(input_date, datetime):
-            new_year = input_date.year + self.years_diff
+            new_year = input_date.year + years_diff
             new_date = input_date.replace(year=new_year)
             print(f"New date: {new_date}, {type(new_date)}")
             return new_date
         elif isinstance(input_date, date):
-            new_year = input_date.year + self.years_diff
+            new_year = input_date.year + years_diff
             return input_date.replace(year=new_year)
         else:
             raise TypeError("Input must be a date or datetime object")
 
     def convert_to_original_date(self, modified_date):
         """Convert a modified date or datetime object back to its original year."""
-        original_year = modified_date.year - self.years_diff
+        original_year = modified_date.year - (self.years_diff or 0)
         if isinstance(modified_date, datetime):
             return modified_date.replace(year=original_year)
         elif isinstance(modified_date, date):

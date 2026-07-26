@@ -198,8 +198,6 @@ def arrive(movable, journey) -> bool:
     if not journey:
         return False
 
-    from django.contrib.contenttypes.models import ContentType
-
     final_node = journey.destination_node
 
     movable.location = final_node.location
@@ -211,14 +209,5 @@ def arrive(movable, journey) -> bool:
 
     movable.is_moving = False
     movable.target_node = None
-
-    if final_node.building_id:
-        movable.current_content_type = ContentType.objects.get_for_model(
-            final_node.building
-        )
-        movable.current_object_id = final_node.building_id
-    else:
-        movable.current_content_type = None
-        movable.current_object_id = None
 
     return True

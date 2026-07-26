@@ -10,23 +10,7 @@
 import { useReducer, useCallback, useRef, useEffect } from "react";
 import type { Dispatch } from "react";
 import { supportFlowReducer } from "../components/SupportFlow/supportFlowReducer";
-
-// ---------------------------------------------------------------------------
-// Types — the reducer lives in a .js file; we describe its state shape here.
-// ---------------------------------------------------------------------------
-
-interface FlowCtx {
-  activityText: string;
-  durationSeconds: number | null;
-  [key: string]: unknown;
-}
-
-type FlowState =
-  | { isOpen: false }
-  | { isOpen: true; screen: string; ctx: FlowCtx };
-
-/** Loose action type — the reducer handles all narrowing internally. */
-type FlowAction = { type: string; [key: string]: unknown };
+import type { FlowAction, FlowState } from "../components/SupportFlow/supportFlowTypes";
 
 interface OpenActivityRewardOptions {
   xpGained?: number | null;
@@ -60,7 +44,6 @@ interface SupportFlowOptions {
 export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
   const [flowState, flowDispatch] = useReducer(
     // The reducer uses loose internal types; cast via unknown to the typed signature.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     supportFlowReducer as unknown as (state: FlowState, action: FlowAction) => FlowState,
     { isOpen: false } as FlowState
   );
@@ -111,7 +94,7 @@ export function useSupportFlow({ onStartActivity }: SupportFlowOptions = {}) {
   const handleConfirmActivity = useCallback(async (activityTextOverride: string | null = null, taskId?: number | null): Promise<void> => {
     const state = flowStateRef.current;
     if (!state.isOpen) return;
-    const { activityText, durationSeconds } = state.ctx;
+    const { activityText = "", durationSeconds = null } = state.ctx;
     const finalActivityText =
       typeof activityTextOverride === "string"
         ? activityTextOverride

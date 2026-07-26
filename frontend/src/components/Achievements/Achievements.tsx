@@ -1,5 +1,6 @@
 import styles from "./Achievements.module.scss";
 import { achievementProgress, formatAchievementValue, tierClassName } from "./achievementUtils";
+import { asArray } from "../../utils/arrayUtils";
 
 interface Achievement {
   type: string;
@@ -18,7 +19,7 @@ interface AchievementsProps {
 }
 
 export default function Achievements({ achievements = [] }: AchievementsProps) {
-  const normalizedAchievements = Array.isArray(achievements) ? achievements : [];
+  const normalizedAchievements = asArray(achievements);
 
   return (
     <section className={styles.section}>

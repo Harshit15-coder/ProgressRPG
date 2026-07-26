@@ -2,6 +2,7 @@ from django.contrib import admin
 from .models import (
     Character,
     CharacterCurrency,
+    CharacterLocation,
     PlayerCharacterLink,
     CharacterRelationship,
     Behaviour,
@@ -182,6 +183,13 @@ class PlayerCharacterLinkAdmin(admin.ModelAdmin):
         ("linked_at", "unlinked_at"),
     ]
     readonly_fields = ["linked_at", "unlinked_at"]
+
+
+@admin.register(CharacterLocation)
+class CharacterLocationAdmin(admin.ModelAdmin):
+    list_display = ["character", "role", "location", "is_primary"]
+    list_filter = ["role", "is_primary"]
+    search_fields = ["character__first_name", "character__last_name", "location__name"]
 
 
 @admin.register(CharacterCurrency)

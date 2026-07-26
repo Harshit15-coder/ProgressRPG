@@ -68,13 +68,13 @@ export default function MapPage(): React.ReactElement {
 
   return (
     <div className={styles.page}>
-      <div className={styles.header}>
-        <h1>{geojson?.meta?.population_centre_name || "Village"}</h1>
-      </div>
-
+      {/* Visually hidden but still present - the page needs a heading for
+          screen reader/landmark navigation even though this page has no
+          visible title (the map itself is the content). */}
+      <h1 className="sr-only">{geojson?.meta?.population_centre_name || "Village map"}</h1>
       <div className={styles.content}>
         {geojson ? (
-          <PopulationCentreMap geojson={geojson} width={950} />
+          <PopulationCentreMap geojson={geojson} />
         ) : (
           "Loading..."
         )}

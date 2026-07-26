@@ -142,7 +142,7 @@ class Command(BaseCommand):
 
         minx, miny, maxx, maxy = walkable.extent
 
-        chosen = []
+        chosen: list[Point] = []
         attempts = 0
         while len(chosen) < to_create and attempts < max_attempts:
             attempts += 1

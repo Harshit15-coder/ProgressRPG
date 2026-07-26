@@ -20,7 +20,7 @@ export interface FilterOption<T> {
   predicate: (item: T) => boolean;
 }
 
-interface PlayerItemListProps<T extends { id?: string | number; name?: string; [key: string]: unknown }> {
+interface PlayerItemListProps<T extends { id?: string | number; name?: string }> {
   items?: T[];
   itemLabel?: string;
   ariaLabel?: string;
@@ -41,7 +41,7 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string; [
   controls?: React.ReactNode;
 }
 
-export default function PlayerItemList<T extends { id?: string | number; name?: string; [key: string]: unknown }>({
+export default function PlayerItemList<T extends { id?: string | number; name?: string }>({
   items = [],
   itemLabel = "item",
   ariaLabel,

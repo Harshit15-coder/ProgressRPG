@@ -86,7 +86,9 @@ def create_centre_boundary(buildings: list[Polygon], padding=10):
     return hull.buffer(padding)
 
 
-def compute_building_entrance_point(footprint: Polygon, fallback: Point) -> Point:
+def compute_building_entrance_point(
+    footprint: Polygon | None, fallback: Point
+) -> Point:
     """Pick a point along the longest wall as a building entrance."""
     if not footprint:
         return fallback
@@ -96,7 +98,7 @@ def compute_building_entrance_point(footprint: Polygon, fallback: Point) -> Poin
         return fallback
 
     best_midpoint = None
-    best_length = -1
+    best_length: float = -1
     for i in range(len(coords) - 1):
         (x1, y1), (x2, y2) = coords[i], coords[i + 1]
         dx = x2 - x1
@@ -163,7 +165,7 @@ class Command(BaseCommand):
         grid_size = options["grid_size"]
         min_distance = options["min_distance"]
 
-        centres_positions = []
+        centres_positions: list[Point] = []
         # Place centres
         for i in range(num_centres):
             for attempt in range(100):
@@ -191,8 +193,8 @@ class Command(BaseCommand):
             ]
             all_buildings_to_place = SPECIAL_BUILDINGS + residential_buildings
 
-            placed_building_points = []
-            placed_footprints = []
+            placed_building_points: list[Point] = []
+            placed_footprints: list[Polygon] = []
             created_buildings = []
             for btype_or_name in all_buildings_to_place:
                 for attempt in range(100):
@@ -214,12 +216,10 @@ class Command(BaseCommand):
                         for existing_fp in placed_footprints
                     ):
                         if btype_or_name in SPECIAL_BUILDINGS:
-                            building_name = (
-                                f"{btype_or_name.capitalize()} of ({centre_name})"
-                            )
+                            building_name = f"{btype_or_name.capitalize()}"
                             building_type = btype_or_name
                         else:
-                            building_name = f"House {btype_or_name.split('-')[1]} of ({centre_name})"
+                            building_name = f"House {btype_or_name.split('-')[1]}"
                             building_type = "residential"
 
                         placed_footprints.append(footprint)

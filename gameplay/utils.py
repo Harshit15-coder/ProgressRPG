@@ -190,7 +190,7 @@ def process_initiation(player: Player, character: Character, action: str) -> boo
     qt = quest_timer
     # logger.debug(f"[PROCESS INITIATION] Quest timer after refresh status/duration/elapsed/remaining: {qt.status}/{qt.duration}/{qt.get_elapsed_time()}/{qt.get_remaining_time()}")
 
-    start_success, result_text = start_server_timers(act_timer, quest_timer)
+    start_success, result_text = start_server_timers(act_timer)
     if not start_success:
         logger.info(
             f"[PROCESS INITIATION] Failed to start timers for player {player_id}. Result: {result_text}"

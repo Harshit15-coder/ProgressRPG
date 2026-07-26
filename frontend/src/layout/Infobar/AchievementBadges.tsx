@@ -5,6 +5,7 @@ import {
   formatAchievementValue,
   tierClassName,
 } from "../../components/Achievements/achievementUtils";
+import { asArray } from "../../utils/arrayUtils";
 import { AchievementGoal } from "../../types/domain";
 import styles from "./AchievementBadges.module.scss";
 
@@ -18,7 +19,7 @@ const tooltipLabel = (achievement: AchievementGoal): string =>
 export default function AchievementBadges({
   achievements = [],
 }: AchievementBadgesProps) {
-  const normalizedAchievements = Array.isArray(achievements) ? achievements : [];
+  const normalizedAchievements = asArray(achievements);
 
   if (normalizedAchievements.length === 0) {
     return null;

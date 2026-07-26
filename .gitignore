@@ -34,4 +34,5 @@ ds-bundle/
 .design-sync/sb-reference/
 .design-sync/learnings/
 .design-sync/node_modules
+.design-sync/sb-reference/
 frontend/dist-ds/
