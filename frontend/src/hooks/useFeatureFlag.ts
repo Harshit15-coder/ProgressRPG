@@ -13,14 +13,20 @@ function resolveGroups(value: unknown): AccessGroup[] {
   return [];
 }
 
+// Remote (server-driven) flags take precedence over the local `featureFlags`
+// fallback when both define the same key.
+export function getFeatureGroups(flag: FeatureFlagKey, remoteFeatureFlags: Record<string, unknown>): AccessGroup[] {
+  return hasOwn(remoteFeatureFlags, flag)
+    ? resolveGroups(remoteFeatureFlags[flag])
+    : resolveGroups(featureFlags[flag]);
+}
+
 export function useFeatureFlag(flag: FeatureFlagKey): boolean {
   const { player } = useGame() ?? {};
   const { data: appConfig } = useAppConfig();
   const remoteFeatureFlags = appConfig?.feature_flags ?? {};
 
-  const groups: AccessGroup[] = hasOwn(remoteFeatureFlags, flag)
-    ? resolveGroups(remoteFeatureFlags[flag])
-    : resolveGroups(featureFlags[flag]);
+  const groups = getFeatureGroups(flag, remoteFeatureFlags);
 
   if (groups.includes("all")) return true;
   if (groups.includes("premium") && Boolean(player?.is_premium)) return true;

@@ -70,9 +70,25 @@ app.conf.beat_schedule = {
     #     "task": "locations.tasks.move_characters_tick",
     #     "schedule": 5.0,  # every 5 seconds
     # },
-    "wander_tick": {
-        "task": "locations.tasks.wander_tick",
-        "schedule": 10.0,  # every 10 seconds
+    "commute_tick": {
+        "task": "locations.tasks.commute_tick",
+        "schedule": 60.0,  # every 60 seconds
+    },
+    "advance_field_economy": {
+        "task": "economy.tasks.advance_field_economy_tick",
+        "schedule": crontab(hour=18, minute=5),  # 5 min after WORK_END
+    },
+    "advance_mill_economy": {
+        "task": "economy.tasks.advance_mill_economy_tick",
+        "schedule": crontab(hour=18, minute=10),  # after advance_field_economy
+    },
+    "advance_bakery_economy": {
+        "task": "economy.tasks.advance_bakery_economy_tick",
+        "schedule": crontab(hour=18, minute=15),  # after advance_mill_economy
+    },
+    "advance_bread_consumption": {
+        "task": "economy.tasks.advance_bread_consumption_tick",
+        "schedule": crontab(hour=18, minute=20),  # after advance_bakery_economy
     },
     # "precompute-sun-times-daily": {
     #     "task": "gameworld.tasks.precompute_sun_times",

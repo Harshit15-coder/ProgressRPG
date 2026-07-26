@@ -1,5 +1,7 @@
 from rest_framework import serializers
+from character.models import CharacterLocation
 from character.serializers import CharacterSerializer
+from economy.constants import format_quantity
 
 from locations.models import (
     InteriorSpace,
@@ -22,7 +24,7 @@ class GeoJSONFeatureSerializer(serializers.Serializer):
     Base helper: subclasses implement get_geometry() and get_properties().
     """
 
-    feature_type = None  # optional string, e.g. "building", "path"
+    feature_type: str | None = None  # optional string, e.g. "building", "path"
 
     def get_geometry(self, obj):
         raise NotImplementedError
@@ -66,10 +68,20 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def get_point(self, obj):
         return obj.location.x, obj.location.y
 
+    def _primary_location_name(self, obj, role):
+        for location in obj.locations.all():
+            if location.role == role and location.is_primary:
+                return location.location.display_name
+        return None
+
     def get_properties(self, obj):
+        needs = getattr(obj, "needs", None)
         return {
             "id": obj.id,
             "name": obj.name,
+            "home": self._primary_location_name(obj, CharacterLocation.Role.HOME),
+            "work": self._primary_location_name(obj, CharacterLocation.Role.WORK),
+            "hunger_label": needs.hunger_label() if needs else None,
         }
 
 
@@ -105,9 +117,10 @@ class PathFeatureSerializer(LineStringFeatureSerializer):
 class PolygonFeatureSerializer(GeoJSONFeatureSerializer):
     feature_type = "polygon"
 
-    polygon_attr = None  # e.g. "footprint" or "boundary"
+    polygon_attr: str | None = None  # e.g. "footprint" or "boundary"
 
     def get_geometry(self, obj):
+        assert self.polygon_attr is not None
         geom = getattr(obj, self.polygon_attr)
         outer_ring = geom.coords[0]
         coords = [[list(map(float, pt)) for pt in outer_ring]]
@@ -124,11 +137,29 @@ class BuildingFeatureSerializer(PolygonFeatureSerializer):
     feature_type = "building"
     polygon_attr = "footprint"
 
+    def _primary_count(self, obj, role):
+        return sum(
+            1
+            for location in obj.character_locations.all()
+            if location.role == role and location.is_primary
+        )
+
     def get_properties(self, obj):
+        goods = [
+            {
+                "good_type": stock.good_type,
+                "display": format_quantity(stock.good_type, stock.quantity),
+            }
+            for stock in obj.goods_stocks.all()
+            if stock.quantity > 0
+        ]
         return {
             "id": obj.id,
             "name": obj.name,
             "building_type": obj.building_type,
+            "workers": self._primary_count(obj, CharacterLocation.Role.WORK),
+            "residents": self._primary_count(obj, CharacterLocation.Role.HOME),
+            "goods": goods,
         }
 
 
@@ -138,6 +169,21 @@ class BoundaryFeatureSerializer(PolygonFeatureSerializer):
 
     def get_properties(self, obj):
         return {"feature_type": "boundary"}
+
+
+class SubzoneFeatureSerializer(PolygonFeatureSerializer):
+    feature_type = "subzone"
+    polygon_attr = "boundary"
+
+    def get_properties(self, obj):
+        crop = getattr(obj, "field_crop", None)
+        return {
+            "id": obj.id,
+            "name": obj.name,
+            "usage": obj.usage,
+            "crop_stage": crop.stage if crop else None,
+            "crop_progress": crop.growth_progress if crop else None,
+        }
 
 
 class FeatureCollectionSerializer(serializers.Serializer):

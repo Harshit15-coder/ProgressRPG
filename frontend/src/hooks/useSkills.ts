@@ -9,6 +9,7 @@ export function useSkills() {
   return useQuery({
     queryKey: ["skills"],
     queryFn: fetchSkills,
+    staleTime: 30_000,
   });
 }
 

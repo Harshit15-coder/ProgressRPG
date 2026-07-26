@@ -68,6 +68,253 @@ describe('PopulationCentreMap', () => {
     });
   });
 
+  it('places characters at random points inside their building footprint, not clustered at its centre', () => {
+    const geojsonWithHousehold = {
+      bbox: [0, 0, 20, 20] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 20], [20, 20], [20, 0], [0, 0]]],
+          },
+          properties: {
+            feature_type: 'building',
+            name: 'House',
+            building_type: 'residential',
+          },
+        },
+        ...[10, 11, 12, 13, 14].map((id) => ({
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: { feature_type: 'character', id, name: `Resident ${id}` },
+        })),
+      ],
+    };
+
+    const { container } = renderMap({ geojson: geojsonWithHousehold });
+    const markers = container.querySelectorAll('g');
+    expect(markers).toHaveLength(5);
+
+    const points = Array.from(markers).map((marker) => {
+      const transform = marker.getAttribute('transform') || '';
+      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+      return [Number(match?.[1]), Number(match?.[2])];
+    });
+
+    // Every character should land inside the 0-20 footprint (inset from the
+    // walls a little), not stacked at the shared (10, 10) entrance point.
+    points.forEach(([x, y]) => {
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(20);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(20);
+    });
+
+    const exactlyAtSharedPoint = points.filter(([x, y]) => x === 10 && y === 10);
+    expect(exactlyAtSharedPoint.length).toBeLessThan(points.length);
+
+    const uniquePoints = new Set(points.map(([x, y]) => `${x},${y}`));
+    expect(uniquePoints.size).toBe(5);
+  });
+
+  it('keeps a minimum distance between housemates scattered in the same building', () => {
+    // A small 10x10 footprint with 5 residents - tight enough to make the
+    // minimum-distance constraint actually bind, not just happen to pass.
+    const geojsonWithCrowdedHousehold = {
+      bbox: [0, 0, 10, 10] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 10], [10, 10], [10, 0], [0, 0]]],
+          },
+          properties: {
+            feature_type: 'building',
+            name: 'House',
+            building_type: 'residential',
+          },
+        },
+        ...[20, 21, 22, 23, 24].map((id) => ({
+          geometry: { type: 'Point', coordinates: [5, 5] },
+          properties: { feature_type: 'character', id, name: `Resident ${id}` },
+        })),
+      ],
+    };
+
+    const { container } = renderMap({ geojson: geojsonWithCrowdedHousehold });
+    const points = Array.from(container.querySelectorAll('g')).map((marker) => {
+      const transform = marker.getAttribute('transform') || '';
+      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+      return [Number(match?.[1]), Number(match?.[2])] as [number, number];
+    });
+    expect(points).toHaveLength(5);
+
+    // The footprint is tight relative to the minimum spacing, so the exact
+    // 3.5-unit floor may not be reachable for every pair - but positions
+    // should still land noticeably apart rather than nearly on top of each
+    // other (which the earlier ring-radius approach could produce).
+    for (let i = 0; i < points.length; i++) {
+      for (let j = i + 1; j < points.length; j++) {
+        const dx = points[i][0] - points[j][0];
+        const dy = points[i][1] - points[j][1];
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        expect(dist).toBeGreaterThan(1.5);
+      }
+    }
+  });
+
+  it('places characters at a shared point on the footprint boundary (e.g. the entrance node) inside the house, not clustered at the door', () => {
+    // The entrance node sits on the midpoint of a wall - exactly on the
+    // polygon's edge, not safely inside it. This regresses if the
+    // footprint-matching lookup uses a strict point-in-polygon test, which
+    // is unreliable exactly on a boundary.
+    const geojsonWithResidentsAtEntrance = {
+      bbox: [0, 0, 20, 20] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 20], [20, 20], [20, 0], [0, 0]]],
+          },
+          properties: {
+            feature_type: 'building',
+            name: 'House',
+            building_type: 'residential',
+          },
+        },
+        ...[30, 31, 32, 33, 34].map((id) => ({
+          geometry: { type: 'Point', coordinates: [10, 0] }, // midpoint of the bottom wall
+          properties: { feature_type: 'character', id, name: `Resident ${id}` },
+        })),
+      ],
+    };
+
+    const { container } = renderMap({ geojson: geojsonWithResidentsAtEntrance });
+    const points = Array.from(container.querySelectorAll('g')).map((marker) => {
+      const transform = marker.getAttribute('transform') || '';
+      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+      return [Number(match?.[1]), Number(match?.[2])];
+    });
+    expect(points).toHaveLength(5);
+
+    points.forEach(([x, y]) => {
+      expect(x).toBeGreaterThan(0);
+      expect(x).toBeLessThan(20);
+      expect(y).toBeGreaterThan(0);
+      expect(y).toBeLessThan(20);
+    });
+
+    const exactlyAtDoor = points.filter(([x, y]) => x === 10 && y === 0);
+    expect(exactlyAtDoor.length).toBe(0);
+  });
+
+  it('renders a ready-to-harvest crops subzone in gold, distinct from the default grey building fill', () => {
+    const geojsonWithCropSubzone = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[50, 50], [50, 60], [60, 60], [60, 50], [50, 50]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'House 2 of (Driftmoor village)',
+            building_type: 'residential',
+          },
+        },
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'subzone',
+            name: 'Driftmoor village Farmland - Crops',
+            usage: 'crops',
+            crop_stage: 'ready',
+            crop_progress: null,
+          },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonWithCropSubzone });
+    const polygons = container.querySelectorAll('polygon');
+    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+
+    expect(fills).toContain('#E4C158');
+    expect(fills).toContain('#ddd');
+  });
+
+  it('renders a fallow or not-yet-planted crops subzone as bare soil, distinct from ready gold', () => {
+    const geojsonFallow = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'subzone',
+            name: 'Farmland - Crops',
+            usage: 'crops',
+            crop_stage: 'fallow',
+            crop_progress: null,
+          },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonFallow });
+    const polygons = container.querySelectorAll('polygon');
+    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+
+    expect(fills).toContain('#c2a878');
+    expect(fills).not.toContain('#E4C158');
+  });
+
+  it('renders a growing crops subzone with a green that darkens as growth progress increases', () => {
+    const cropFeature = (progress: number) => ({
+      geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+      properties: {
+        feature_type: 'subzone',
+        name: 'Farmland - Crops',
+        usage: 'crops',
+        crop_stage: 'growing',
+        crop_progress: progress,
+      },
+    });
+
+    const { container: early } = renderMap({
+      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.1)] },
+    });
+    const { container: late } = renderMap({
+      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.9)] },
+    });
+
+    const earlyFill = early.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
+    const lateFill = late.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
+
+    expect(earlyFill).toMatch(/^hsl\(/);
+    expect(lateFill).toMatch(/^hsl\(/);
+    expect(earlyFill).not.toBe(lateFill);
+  });
+
+  it('renders field_shelter buildings in the default grey, not gold', () => {
+    const geojsonWithShelter = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 15], [15, 15], [15, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'Field Shelter of (Driftmoor village)',
+            building_type: 'field_shelter',
+          },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonWithShelter });
+    const polygons = container.querySelectorAll('polygon');
+    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+
+    expect(fills).not.toContain('#E4C158');
+    expect(fills).toContain('#ddd');
+  });
+
   it('shows just the building type in the tooltip, not the full backend name', async () => {
     const geojsonWithBuilding = {
       ...baseGeojson,
@@ -98,7 +345,209 @@ describe('PopulationCentreMap', () => {
     expect(tooltip).not.toHaveTextContent('Driftmoor village');
   });
 
-  it('does not hide path lines with opacity 0', () => {
+  it('shows workers and in-stock goods in a building tooltip', async () => {
+    const geojsonWithBuilding = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'Bakery of (Driftmoor village)',
+            building_type: 'bakery',
+            workers: 2,
+            goods: [
+              { good_type: 'flour', display: '3 sacks' },
+              { good_type: 'bread', display: '18.0 loaves' },
+              { good_type: 'wheat', display: '0.0kg' },
+            ],
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithBuilding} />
+      </TooltipProvider>
+    );
+
+    const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
+    await user.hover(building);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Workers: 2');
+    expect(tooltip).toHaveTextContent('Flour: 3 sacks');
+    expect(tooltip).toHaveTextContent('Bread: 18.0 loaves');
+  });
+
+  it('shows residents rather than workers for a residential building', async () => {
+    const geojsonWithHouse = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'House 2 of (Driftmoor village)',
+            building_type: 'residential',
+            workers: 0,
+            residents: 3,
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithHouse} />
+      </TooltipProvider>
+    );
+
+    const house = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
+    await user.hover(house);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Residents: 3');
+    expect(tooltip).not.toHaveTextContent('Workers');
+  });
+
+  it('shows home, workplace, and hunger in a character tooltip', async () => {
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            home: 'Rose Cottage',
+            work: 'Village Bakery',
+            hunger_label: 'Well fed',
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithCharacter} />
+      </TooltipProvider>
+    );
+
+    await user.hover(document.querySelector('g') as SVGGElement);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Alice');
+    expect(tooltip).toHaveTextContent('Lives at: Rose Cottage');
+    expect(tooltip).toHaveTextContent('Works at: Village Bakery');
+    expect(tooltip).toHaveTextContent('Well fed');
+  });
+
+  it('shows the crop stage in a field tooltip instead of the literal word "Crops"', async () => {
+    const geojsonWithReadyField = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'subzone',
+            name: 'Farmland - Crops',
+            usage: 'crops',
+            crop_stage: 'ready',
+            crop_progress: null,
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithReadyField} />
+      </TooltipProvider>
+    );
+
+    const field = document.querySelector('polygon[fill="#E4C158"]') as SVGPolygonElement;
+    await user.hover(field);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Ready to harvest');
+  });
+
+  it('fans out characters sharing the same coordinate instead of stacking them', () => {
+    const geojsonWithSharedHouse = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 3, name: 'Carol' },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 4, name: 'Dave' },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 5, name: 'Eve' },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonWithSharedHouse });
+    const markers = container.querySelectorAll('g');
+    expect(markers).toHaveLength(5);
+
+    const houseMarkerTransforms = Array.from(markers)
+      .slice(2) // Carol, Dave, Eve - all originally at (50, 50)
+      .map((marker) => marker.getAttribute('transform'));
+
+    expect(new Set(houseMarkerTransforms).size).toBe(3);
+  });
+
+  it('paints characters lower on screen after (on top of) ones higher up, in DOM/render order', () => {
+    const geojsonOutOfOrder = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          // Listed first in the feature list but should paint last (highest
+          // y = lowest on screen, since the viewBox y axis isn't flipped).
+          geometry: { type: 'Point', coordinates: [30, 90] },
+          properties: { feature_type: 'character', id: 3, name: 'LowestOnScreen' },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [30, 5] },
+          properties: { feature_type: 'character', id: 4, name: 'HighestOnScreen' },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonOutOfOrder });
+    const markerNames = Array.from(container.querySelectorAll('g')).map((marker) =>
+      marker.getAttribute('transform')
+    );
+
+    // Alice (y=10), Bob (y=20), HighestOnScreen (y=5), LowestOnScreen (y=90)
+    // -> expected paint order ascending by y: HighestOnScreen, Alice, Bob, LowestOnScreen
+    expect(markerNames).toEqual([
+      'translate(30, 5)',
+      'translate(10, 10)',
+      'translate(20, 20)',
+      'translate(30, 90)',
+    ]);
+  });
+
+  it('keeps a single character at its exact point (no unnecessary offset)', () => {
+    const { container } = renderMap({ geojson: baseGeojson });
+    const markers = container.querySelectorAll('g');
+    expect(markers[0].getAttribute('transform')).toBe('translate(10, 10)');
+    expect(markers[1].getAttribute('transform')).toBe('translate(20, 20)');
+  });
+
+  it('renders path lines invisibly (opacity 0)', () => {
     const geojsonWithPath = {
       ...baseGeojson,
       features: [
@@ -112,6 +561,6 @@ describe('PopulationCentreMap', () => {
     const { container } = renderMap({ geojson: geojsonWithPath });
     const path = container.querySelector('polyline');
     expect(path).not.toBeNull();
-    expect(path?.getAttribute('opacity')).not.toBe('0');
+    expect(path?.getAttribute('opacity')).toBe('0');
   });
 });

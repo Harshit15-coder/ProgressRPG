@@ -1,0 +1,131 @@
+@use '../../styles/utilities/mixins' as m;
+@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/typography' as t;
+@use '../../styles/semantic/colors' as c;
+@use 'sass:map';
+
+.page {
+  @include m.page-layout();
+}
+
+.content {
+  width: min(100%, 720px);
+  display: flex;
+  flex-direction: column;
+}
+
+.dateTabs {
+  display: flex;
+  gap: v.$spacing-sm;
+  margin-bottom: v.$spacing-md;
+  flex-wrap: wrap;
+  justify-content: center;
+  width: 100%;
+}
+
+.dateButton {
+  padding: v.$spacing-xs v.$spacing-sm;
+  border: 1px solid rgba(c.$color-border-primary, 0.4);
+  border-radius: v.$border-radius;
+  background: transparent;
+  cursor: pointer;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+  @include t.apply-text-style(t.$text-body);
+
+  &:hover {
+    border-color: c.$color-border-primary;
+    background: rgba(c.$color-border-primary, 0.1);
+  }
+
+  &.active {
+    @include c.apply-button-variant(primary);
+  }
+}
+
+.dayHeading {
+  margin: 1em 0 0.5em;
+  font-size: 0.95em;
+  opacity: 0.7;
+}
+
+.activitiesList {
+  display: flex;
+  flex-direction: column;
+  gap: v.$spacing-md;
+  width: 100%;
+  max-width: 900px;
+  margin: 0 auto;
+  max-height: min(62vh, calc(100vh - 25rem));
+  max-height: min(62dvh, calc(100dvh - 25rem));
+  overflow-y: auto;
+  scrollbar-gutter: stable;
+  padding-right: v.$spacing-sm;
+
+  @include m.respond-to(md, down) {
+    max-height: min(56vh, calc(100vh - 19rem));
+    max-height: min(56dvh, calc(100dvh - 19rem));
+  }
+
+  @include m.respond-to(sm, down) {
+    max-height: min(48vh, calc(100vh - 24rem));
+    max-height: min(48dvh, calc(100dvh - 24rem));
+  }
+
+  @media (max-height: 387px) {
+    max-height: min(40vh, calc(100vh - 14rem));
+    max-height: min(40dvh, calc(100dvh - 14rem));
+  }
+
+  &::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  &::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  &::-webkit-scrollbar-thumb {
+    background: rgba(c.$color-border-primary, 0.4);
+    border-radius: 4px;
+
+    &:hover {
+      background: rgba(c.$color-border-primary, 0.6);
+    }
+  }
+}
+
+.backLink {
+  padding: v.$spacing-xs v.$spacing-sm;
+  border: 1px solid c.$color-border-primary;
+  border-radius: v.$border-radius;
+  background: transparent;
+  color: c.$color-border-primary;
+  text-decoration: none;
+  font-size: 0.9em;
+  transition: all 0.2s ease;
+  @include t.apply-text-style(t.$text-body);
+  text-align: center;
+  margin-bottom: v.$spacing-md;
+
+  &:hover {
+    background: rgba(c.$color-border-primary, 0.1);
+    border-color: #5a4cff;
+    color: #5a4cff;
+  }
+
+  &:active {
+    background: rgba(c.$color-border-primary, 0.2);
+  }
+}
+
+.emptyState {
+  text-align: center;
+  padding: v.$padding-lg;
+  color: rgba(0, 0, 0, 0.6);
+
+  p {
+    @include t.apply-text-style(t.$text-body);
+    margin: 0;
+  }
+}

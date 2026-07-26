@@ -144,11 +144,16 @@ function useEntitySearchResults({
     return typeof maxVisibleRows === "number" ? combined.slice(0, maxVisibleRows) : combined;
   }, [rawResults, maxVisibleRows]);
 
-  const taskItems = useMemo(() => results.filter((result) => result.source === "task"), [results]);
-  const activityItems = useMemo(
-    () => results.filter((result) => result.source !== "task"),
-    [results]
-  );
+  const { taskItems, activityItems } = useMemo(() => {
+    const taskItems: Array<{ entity: SearchEntity; index: number }> = [];
+    const activityItems: Array<{ entity: SearchEntity; index: number }> = [];
+
+    results.forEach((entity, index) => {
+      (entity.source === "task" ? taskItems : activityItems).push({ entity, index });
+    });
+
+    return { taskItems, activityItems };
+  }, [results]);
 
   return {
     results,

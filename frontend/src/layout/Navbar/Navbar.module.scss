@@ -53,9 +53,17 @@
   }
 }
 
-.navLink {
+// Doubled selector to out-specificity Button's own .button{padding} rule -
+// both are single-class selectors from separate CSS Modules, so which one
+// wins the cascade otherwise depends on unpredictable module bundle order,
+// not on which is "more specific" or "more local" to this component.
+.navLink.navLink {
     @include t.apply-text-style(t.$text-link);
     @include c.apply-text-tone(map.get(c.$text-tone, invert));
+    // Tighter than Button's own default padding ($button-padding) - with
+    // several nav buttons sharing one row, the default spacing left too
+    // little room for a label to fit on one line.
+    padding: v.$spacing-xs v.$spacing-sm;
 }
 
 .unreadBadge {
@@ -358,10 +366,13 @@
     gap: v.$spacing-xs;
   }
 
-  .navLink {
-    padding-left: v.$spacing-sm;
-    padding-right: v.$spacing-sm;
+  .navLink.navLink {
     font-size: 0.875rem;
+    // The narrow md range is where leftLinks/rightLinks are most cramped
+    // (four+ buttons sharing the row) - without this, a button's flex-
+    // shrink can squeeze it below its content's natural width and wrap
+    // the label onto a second line.
+    white-space: nowrap;
   }
 }
 
@@ -371,9 +382,7 @@
     gap: v.$spacing-md;
   }
 
-  .navLink {
-    padding-left: v.$spacing-md;
-    padding-right: v.$spacing-md;
+  .navLink.navLink {
     font-size: 1rem;
   }
 }

@@ -1,8 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 
-interface UsePlayerItemModalProps<
-  T extends { id?: string | number; name?: string; [key: string]: unknown },
-> {
+interface UsePlayerItemModalProps<T extends { id?: string | number; name?: string }> {
   items: T[];
   getItemName: (item: T) => string;
   renderItemMeta?: (item: T) => React.ReactNode;
@@ -11,9 +9,7 @@ interface UsePlayerItemModalProps<
   onDelete?: (item: T) => void;
 }
 
-export function usePlayerItemModal<
-  T extends { id?: string | number; name?: string; [key: string]: unknown },
->({
+export function usePlayerItemModal<T extends { id?: string | number; name?: string }>({
   items,
   getItemName,
   renderItemMeta,

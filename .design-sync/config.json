@@ -2,12 +2,20 @@
   "projectId": "53a90b3e-6574-419d-a8e1-4af3ae413270",
   "pkg": "frontend",
   "globalName": "progressRPG",
-  "shape": "package",
-  "srcDir": "src/components/Button",
+  "shape": "storybook",
+  "storybookConfigDir": "frontend/.storybook",
+  "storybookStatic": ".design-sync/sb-reference",
+  "readmeHeader": ".design-sync/conventions.md",
   "cssEntry": "dist-ds/frontend.css",
   "buildCmd": "cd frontend && npx vite build --config vite.ds.config.js",
   "componentSrcMap": {
-    "Button": "src/components/Button/Button.jsx",
-    "ButtonFrame": "src/components/Button/ButtonFrame.jsx"
+    "Button": "src/components/Button/Button.tsx",
+    "ButtonFrame": "src/components/Button/ButtonFrame.tsx"
+  },
+  "overrides": {
+    "AlertDialog": { "cardMode": "single", "primaryStory": "Default" },
+    "Modal": { "cardMode": "single", "primaryStory": "Default" },
+    "Form": { "cardMode": "column" },
+    "Tooltip": { "cardMode": "column" }
   }
 }

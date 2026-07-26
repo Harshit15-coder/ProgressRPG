@@ -96,9 +96,6 @@ LOGGING = {
 }
 
 
-dotenv_path = os.path.join(BASE_DIR, ".env")
-load_dotenv(dotenv_path)
-
 REGISTRATION_ENABLED = True
 ACCOUNT_EMAIL_VERIFICATION = "none"
 SECRET_KEY_FALLBACKS = [

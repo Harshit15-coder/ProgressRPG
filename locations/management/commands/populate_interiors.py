@@ -15,7 +15,7 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "storage": 0.05,
     },
     "granary": {
-        "storage": 1.0,
+        "grain_storage": 1.0,
     },
     "inn": {
         "sleeping": 0.50,
@@ -24,8 +24,9 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "storage": 0.15,
     },
     "mill": {
-        "workshop": 0.70,
-        "storage": 0.30,
+        "workshop": 0.50,
+        "grain_storage": 0.25,
+        "flour_storage": 0.25,
     },
     "bakery": {
         "workshop": 0.50,
@@ -36,6 +37,10 @@ BUILDING_INTERIORS_PROPORTIONS = {
         "meeting": 0.50,
         "kitchen": 0.30,
         "storage": 0.20,
+    },
+    "field_shelter": {
+        "other": 0.70,
+        "storage": 0.30,
     },
 }
 
@@ -56,7 +61,7 @@ class Command(BaseCommand):
 
         buildings = Building.objects.all()
         if centre_name:
-            buildings = buildings.filter(centre__name=centre_name)
+            buildings = buildings.filter(population_centre__name=centre_name)
 
         self.stdout.write(
             self.style.SUCCESS(f"Processing {buildings.count()} buildings...")
@@ -113,7 +118,7 @@ class Command(BaseCommand):
             name = info["usage"]
             space = InteriorSpace.objects.create(
                 building=building,
-                name=f"{name} of {building.name}",
+                name=f"{name.capitalize()}",
                 usage=info["usage"],
                 area=info["area"],
             )

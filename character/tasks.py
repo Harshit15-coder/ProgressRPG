@@ -1,6 +1,7 @@
 # character/tasks.py
 from celery import shared_task
 from django.utils import timezone
+from datetime import datetime
 
 
 @shared_task(bind=True, autoretry_for=(Exception,), retry_backoff=True, max_retries=5)
@@ -13,7 +14,7 @@ def generate_character_days(self, date_iso: str | None = None) -> dict:
     target_date = (
         timezone.localdate()
         if not date_iso
-        else timezone.datetime.fromisoformat(date_iso).date()
+        else datetime.fromisoformat(date_iso).date()
     )
 
     generated = 0

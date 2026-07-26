@@ -5,6 +5,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import NotFound
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
+from rest_framework.serializers import BaseSerializer
 import logging
 
 from .models import Quest
@@ -15,9 +16,6 @@ from .serializers import (
     QuestTimerSerializer,
 )
 from .filters import QuestFilter
-from .utils import check_quest_eligibility
-
-from character.models import PlayerCharacterLink
 
 from progression.models import Task
 
@@ -49,26 +47,7 @@ class QuestViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=False, methods=["get"])
     def eligible(self, request):
-        # check_quest_eligibility is not called at this time.
-        # The character link and eligibility logic below is kept for future use:
-        #
-        #   player = request.user.player
-        #   try:
-        #       character = PlayerCharacterLink.get_character(player)
-        #   except ValueError as e:
-        #       logger.warning(
-        #           "Failed to get character for player %s: %s",
-        #           player.id if hasattr(player, "id") else player,
-        #           e,
-        #       )
-        #       return Response(
-        #           {"error": "Unable to determine eligible quests for your character."},
-        #           status=400,
-        #       )
-        #   eligible_quests = check_quest_eligibility(character, player)
-        #   serializer = self.get_serializer(eligible_quests, many=True)
-        #   return Response({"eligible_quests": serializer.data})
-
+        # Eligibility logic is not wired up yet; endpoint always returns empty.
         return Response({"eligible_quests": []})
 
 
@@ -78,9 +57,13 @@ class BaseTimerViewSet(viewsets.ViewSet):
     """
 
     permission_classes = [IsAuthenticated]
-    serializer_class = None
+    serializer_class: type[BaseSerializer] | None = None
+
+    def get_timer(self, request):
+        raise NotImplementedError
 
     def serialize(self, timer):
+        assert self.serializer_class is not None
         return self.serializer_class(timer).data
 
     @action(detail=False, methods=["post"])
@@ -104,10 +87,9 @@ class BaseTimerViewSet(viewsets.ViewSet):
     @action(detail=False, methods=["post"])
     def complete(self, request):
         timer = self.get_timer(request)
-        print("datadata:", request.data)
         name = request.data.get("activityName")
 
-        result = timer.complete(newName=name)
+        timer.complete(newName=name)
         return Response(self.serialize(timer))
 
 
@@ -122,7 +104,7 @@ class ActivityTimerViewSet(BaseTimerViewSet):
         return timer
 
     @action(detail=False, methods=["post"])
-    def complete(self, request):
+    def complete(self, request):  # type: ignore[override]
         timer = self.get_timer(request)
         name = request.data.get("activityName")
         raw_elapsed_seconds = request.data.get("elapsedSeconds")

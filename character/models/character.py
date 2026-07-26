@@ -6,11 +6,9 @@ from django.contrib.gis.db.models.functions import Distance
 from django.db import models, transaction, IntegrityError
 from django.db.models import Sum
 from django.utils import timezone
-from random import random, randint
 from typing import TYPE_CHECKING, Optional, Dict, Any, cast
 import logging
 import math
-import random
 
 from users.models import Person, Player
 
@@ -35,7 +33,7 @@ logger_errors = logging.getLogger("errors")
 
 
 class CharacterRelationship(models.Model):
-    characters = models.ManyToManyField(
+    characters: models.ManyToManyField = models.ManyToManyField(
         "Character", through="CharacterRelationshipMembership"
     )
 
@@ -241,6 +239,9 @@ class Character(Person, LifeCycleMixin, Movable):
 
     def assign_home(self, building: Building):
         return character_services.character_assign_home(self, building)
+
+    def assign_work(self, building: Building):
+        return character_services.character_assign_work(self, building)
 
     @transaction.atomic
     def complete_quest(self, xp_gained):

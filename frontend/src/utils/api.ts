@@ -23,9 +23,39 @@ function isTokenExpiringSoon(token: string, bufferSeconds = 60): boolean {
   }
 }
 
-function clearAuthAndRedirect(): void {
+export type ApiFetchErrorKind = "unauthorized" | "service_unavailable" | "network";
+
+export class ApiFetchError extends Error {
+  readonly kind: ApiFetchErrorKind;
+
+  constructor(kind: ApiFetchErrorKind, message: string) {
+    super(message);
+    this.name = "ApiFetchError";
+    this.kind = kind;
+  }
+}
+
+// api.ts is a plain module with no direct line into React state, so it can't
+// call AuthContext's logout() itself. AuthProvider registers logout here once
+// on mount instead of api.ts broadcasting a DOM CustomEvent that AuthContext
+// happens to listen for — an explicit, typed callback instead of an implicit
+// global side channel.
+type UnauthorizedHandler = () => void;
+let unauthorizedHandler: UnauthorizedHandler | null = null;
+
+export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): void {
+  unauthorizedHandler = handler;
+}
+
+function handleUnauthorized(): void {
+  // Cleared here unconditionally, not left solely to the registered handler:
+  // this covers a request firing before AuthProvider has mounted, or in a
+  // context with no AuthProvider at all (e.g. a test), and it doesn't rely on
+  // whatever handler ends up registered also clearing storage itself. That
+  // makes AuthProvider's logout() clearing storage too a deliberate, harmless
+  // overlap (defense in depth) rather than a bug to dedupe away.
   clearAuthStorage();
-  window.dispatchEvent(new CustomEvent("auth:expired"));
+  unauthorizedHandler?.();
 }
 
 async function refreshAccessToken(refreshToken: string): Promise<string | false> {
@@ -50,18 +80,34 @@ async function refreshAccessToken(refreshToken: string): Promise<string | false>
   }
 }
 
+// Callers of apiFetch can fire concurrently (e.g. several components mounting
+// at once). Without this, each one independently notices the token is
+// expiring and starts its own refresh request. Sharing the in-flight promise
+// means only the first caller actually hits the network; the rest await the
+// same result.
+let inFlightRefresh: Promise<string | false> | null = null;
+
+function refreshAccessTokenOnce(refreshToken: string): Promise<string | false> {
+  if (!inFlightRefresh) {
+    inFlightRefresh = refreshAccessToken(refreshToken).finally(() => {
+      inFlightRefresh = null;
+    });
+  }
+  return inFlightRefresh;
+}
+
 export async function getValidAccessToken(): Promise<string> {
   const { accessToken, refreshToken } = getStoredAuthTokens();
   if (!accessToken || !refreshToken) {
-    clearAuthAndRedirect();
-    throw new Error("Missing tokens");
+    handleUnauthorized();
+    throw new ApiFetchError("unauthorized", "Missing tokens");
   }
 
   if (isTokenExpiringSoon(accessToken)) {
-    const newAccess = await refreshAccessToken(refreshToken);
+    const newAccess = await refreshAccessTokenOnce(refreshToken);
     if (!newAccess) {
-      clearAuthAndRedirect();
-      throw new Error("Token refresh failed");
+      handleUnauthorized();
+      throw new ApiFetchError("unauthorized", "Token refresh failed");
     }
     return newAccess;
   }
@@ -84,10 +130,6 @@ export async function apiFetch<T = unknown>(
     const { responseType = "json", ...fetchOptions } = options;
     const accessToken = explicitAccessToken || (await getValidAccessToken());
 
-    if (!accessToken) {
-      throw new Error("No access token available for request");
-    }
-
     const headers: Record<string, string> = {
       ...(fetchOptions.headers || {}),
       Authorization: `Bearer ${accessToken}`,
@@ -100,16 +142,13 @@ export async function apiFetch<T = unknown>(
     });
 
     if (response.status === 401) {
-      clearAuthAndRedirect();
-      throw new Error("Unauthorized");
+      handleUnauthorized();
+      throw new ApiFetchError("unauthorized", "Unauthorized");
     }
 
     if (response.status === 503) {
-      // optionally parse JSON if included
-      const data: { detail?: string } = await response.json().catch(() => ({}));
-      // redirect or show toast
       window.location.href = "/maintenance";
-      return Promise.reject(new Error(data.detail || "Maintenance mode"));
+      return Promise.reject(new ApiFetchError("service_unavailable", "Maintenance mode"));
     }
 
     if (!response.ok) {
@@ -131,7 +170,7 @@ export async function apiFetch<T = unknown>(
   } catch (err) {
     if (err instanceof TypeError) {
       window.location.href = "/unavailable";
-      return Promise.reject(err);
+      return Promise.reject(new ApiFetchError("network", err.message));
     }
     console.error("apiFetch error:", err);
     throw err;

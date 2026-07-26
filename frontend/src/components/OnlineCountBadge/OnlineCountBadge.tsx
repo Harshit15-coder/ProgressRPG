@@ -14,7 +14,7 @@ export default function OnlineCountBadge() {
   return (
     <div className={styles.badge} aria-live="polite" role="status">
       <span aria-hidden="true">🟢 </span>
-      {onlinePlayerCount} players online
+      {Math.max(1, onlinePlayerCount)} players online
     </div>
   );
 }

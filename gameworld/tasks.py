@@ -1,7 +1,7 @@
 from celery import shared_task
 from zoneinfo import ZoneInfo
 from django.utils import timezone
-from datetime import date, datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from astral import LocationInfo
 from astral.sun import sun
 import random
@@ -87,7 +87,9 @@ def check_character_deaths():
 
     # Process characters in batches to avoid memory overload
     for character in Character.objects.iterator(chunk_size=batch_size):
-        age = timezone.now().date() - character.birth_date
+        if character.birth_date is None:
+            continue
+        age = (timezone.now().date() - character.birth_date).days // 365
         chance = death_probability(age)
 
         if random.random() < chance:
@@ -107,22 +109,24 @@ def check_character_pregnancies():
     for character in Character.objects.filter(is_pregnant=True).iterator(
         chunk_size=batch_size
     ):
+        if character.pregnancy_start_date is None:
+            continue
         pregnancy_duration = (today - character.pregnancy_start_date).days
 
         if pregnancy_duration >= 260:
             # Pick a random day in following week for birth
-            birth_day = today + timezone.timedelta(days=random.randint(7, 13))
+            birth_day = today + timedelta(days=random.randint(7, 13))
             # Pick a random time for birthday
             random_hour = random.randint(0, 23)
             random_minute = random.randint(0, 59)
             random_second = random.randint(0, 59)
             character.pregnancy_due_date = timezone.make_aware(
-                timezone.datetime.combine(
-                    birth_day, timezone.time(random_hour, random_minute, random_second)
+                datetime.combine(
+                    birth_day, time(random_hour, random_minute, random_second)
                 )
             )
             handle_birth.apply_async((character.id), eta=character.pregnancy_due_date)
-        if random() < character.get_miscarriage_chance():
+        if random.random() < character.get_miscarriage_change():
             character.handle_miscarriage()
 
 

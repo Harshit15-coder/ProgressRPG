@@ -9,6 +9,7 @@ import {
   getPlayerNameErrorMessage,
   getPlayerNameValidation,
 } from "../../utils/playerNameValidation";
+import { asArray } from "../../utils/arrayUtils";
 
 function useAccountNameEditor({
   currentPlayerName,
@@ -175,7 +176,7 @@ export function useAccountPage() {
   const totalTimeSeconds = player?.total_time ?? 0;
   const totalHours = Math.floor(totalTimeSeconds / 3600);
   const totalMinutes = Math.floor((totalTimeSeconds % 3600) / 60);
-  const achievements = Array.isArray(player?.achievements) ? player.achievements : [];
+  const achievements = asArray(player?.achievements);
   const nameDisplay = loading ? "Loading..." : player?.name?.trim() || "Unnamed player";
 
   const isTrialing = player?.is_trialing ?? false;

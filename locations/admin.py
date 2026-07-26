@@ -1,5 +1,5 @@
 from django.contrib.gis import admin
-
+from economy.models import GoodsStock
 from .models import (
     Node,
     Path,
@@ -45,16 +45,57 @@ class InteriorSpaceAdmin(admin.ModelAdmin):
 class InteriorSpaceInline(admin.TabularInline):
     model = InteriorSpace
     extra = 0
+    fields = ("name", "area_display")
+    readonly_fields = ("name", "area_display")
+    can_delete = False
+
+    @admin.display(description="Area")
+    def area_display(self, obj):
+        rounded = round(obj.area, 1) if obj.area is not None else 0.0
+        return f"{rounded} m²"
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+
+class GoodsStockInline(admin.TabularInline):
+    model = GoodsStock
+    extra = 0
+    can_delete = False
+
+    fields = (
+        "good_type",
+        "quantity",
+        "capacity",
+    )
+    readonly_fields = (
+        "good_type",
+        "capacity",
+    )
+
+    @admin.display(description="Capacity")
+    def capacity(self, obj):
+        return obj.capacity
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class CharacterInline(admin.TabularInline):
     model = Character
     extra = 0
+    fields = ("name",)
+    readonly_fields = ("name",)
+    can_delete = False
+    show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(Building)
 class BuildingAdmin(admin.ModelAdmin):
-    inlines = [InteriorSpaceInline, CharacterInline]
+    inlines = [InteriorSpaceInline, CharacterInline, GoodsStockInline]
     list_display = [
         "name",
         "id",
@@ -68,6 +109,7 @@ class BuildingAdmin(admin.ModelAdmin):
     readonly_fields = [
         "building_type",
         "population_centre",
+        "description",
     ]
     fields = [
         "name",
@@ -75,7 +117,7 @@ class BuildingAdmin(admin.ModelAdmin):
         "population_centre",
         "building_type",
     ]
-    search_field = [
+    search_fields = [
         "name",
     ]
 
@@ -83,18 +125,33 @@ class BuildingAdmin(admin.ModelAdmin):
 class BuildingInline(admin.TabularInline):
     model = Building
     extra = 0
+    fields = ("building_type",)
+    readonly_fields = ("building_type",)
+    can_delete = False
+    show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 class LandAreaInline(admin.TabularInline):
     model = LandArea
     extra = 0
+    fields = ("name",)
+    can_delete = False
+    readonly_fields = ("name",)
+    show_change_link = True
+
+    def has_add_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(PopulationCentre)
 class PopulationCentreAdmin(admin.ModelAdmin):
     inlines = [BuildingInline, LandAreaInline]
-    search_field = ["name"]
+    search_fields = ["name"]
     list_display = ["name", "building_count"]
+    list_display_links = ["name"]
     readonly_fields = ["building_count"]
     fields = [
         "name",
@@ -102,20 +159,30 @@ class PopulationCentreAdmin(admin.ModelAdmin):
         "building_count",
     ]
 
+    @admin.display(description="Buildings")
     def building_count(self, obj):
         return obj.buildings.count()
-
-    building_count.short_description = "Buildings"
 
 
 class SubzoneInline(admin.TabularInline):
     model = Subzone
     extra = 0
+    can_delete = False
+    fields = ("name", "area")
+    readonly_fields = ("name", "area")
+
+    def has_add_permission(self, request, obj=None):
+        return False
+
+    @admin.display(description="Area (m²)")
+    def area(self, obj):
+        rounded = round(obj.size, 1) if obj.size is not None else 0.0
+        return f"{rounded} m²"
 
 
 @admin.register(LandArea)
 class LandAreaAdmin(admin.ModelAdmin):
-    search_field = ["name"]
+    search_fields = ["name"]
     inlines = [SubzoneInline]
 
     list_display = [
@@ -130,9 +197,15 @@ class LandAreaAdmin(admin.ModelAdmin):
 
     readonly_fields = [
         "population_centre",
+        "size_display",
     ]
     fields = [
         "name",
-        "size",
+        "size_display",
         "population_centre",
     ]
+
+    @admin.display(description="Area (hectares)")
+    def size_display(self, obj):
+        rounded = round(obj.size, 1) if obj.size is not None else 0.0
+        return f"{rounded} ha"
