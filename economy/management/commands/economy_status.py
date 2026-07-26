@@ -1,5 +1,6 @@
 from django.core.management.base import BaseCommand
 
+from economy.constants import format_quantity
 from economy.models import GoodsStock
 from locations.models import Building, PopulationCentre
 
@@ -19,7 +20,9 @@ class Command(BaseCommand):
             centres = centres.filter(name=options["centre"])
             if not centres.exists():
                 self.stdout.write(
-                    self.style.WARNING(f"No PopulationCentre named {options['centre']!r}")
+                    self.style.WARNING(
+                        f"No PopulationCentre named {options['centre']!r}"
+                    )
                 )
                 return
 
@@ -36,20 +39,20 @@ class Command(BaseCommand):
 
         current_centre = None
         for building in buildings:
-            if building.population_centre_id != (
-                current_centre and current_centre.id
-            ):
+            if building.population_centre_id != (current_centre and current_centre.id):
                 current_centre = building.population_centre
-                self.stdout.write(self.style.MIGRATE_HEADING(f"\n{current_centre.name}"))
+                self.stdout.write(
+                    self.style.MIGRATE_HEADING(f"\n{current_centre.name}")
+                )
 
             self.stdout.write(f"  {building.name} [{building.building_type}]")
 
             stocks = list(building.goods_stocks.all())
             if stocks:
                 for stock in stocks:
-                    self.stdout.write(
-                        f"    {stock.good_type}: {stock.quantity:.1f} / {stock.capacity:.1f}"
-                    )
+                    quantity = format_quantity(stock.good_type, stock.quantity)
+                    capacity = format_quantity(stock.good_type, stock.capacity)
+                    self.stdout.write(f"    {stock.good_type}: {quantity} / {capacity}")
             else:
                 self.stdout.write("    (no goods stored)")
 

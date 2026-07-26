@@ -4,6 +4,7 @@ from django.utils import timezone
 from django.utils.dateparse import parse_date
 
 from character.models import CharacterNeeds
+from economy.constants import format_quantity
 from economy.models import FieldCrop, GoodsConversionState, GoodsStock
 from economy.tasks import (
     advance_bakery_economy_tick,
@@ -66,7 +67,9 @@ class Command(BaseCommand):
         self._print_hunger_diff(hunger_before, hunger_after)
 
     def _snapshot_stocks(self):
-        return {(s.building_id, s.good_type): s.quantity for s in GoodsStock.objects.all()}
+        return {
+            (s.building_id, s.good_type): s.quantity for s in GoodsStock.objects.all()
+        }
 
     def _snapshot_crops(self):
         return {c.id: (c.stage, c.harvested_amount) for c in FieldCrop.objects.all()}
@@ -83,9 +86,11 @@ class Command(BaseCommand):
             if old != new:
                 changed = True
                 building = Building.objects.get(id=building_id)
+                delta = format_quantity(good_type, new - old, signed=True)
                 self.stdout.write(
-                    f"  {building.name} [{good_type}]: {old:.1f} -> {new:.1f} "
-                    f"({new - old:+.1f})"
+                    f"  {building.name} [{good_type}]: "
+                    f"{format_quantity(good_type, old)} -> "
+                    f"{format_quantity(good_type, new)} ({delta})"
                 )
         if not changed:
             self.stdout.write("  (no changes)")
@@ -99,9 +104,16 @@ class Command(BaseCommand):
                 continue
             changed = True
             crop = FieldCrop.objects.get(id=crop_id)
+            # harvested_amount is wheat, a weight-kind good - whole grams.
+            old_display = (
+                "None" if old_harvested is None else f"{round(old_harvested)}g"
+            )
+            new_display = (
+                "None" if new_harvested is None else f"{round(new_harvested)}g"
+            )
             self.stdout.write(
                 f"  {crop} stage: {old_stage} -> {new_stage}, "
-                f"harvested: {old_harvested} -> {new_harvested}"
+                f"harvested: {old_display} -> {new_display}"
             )
         if not changed:
             self.stdout.write("  (no changes)")
