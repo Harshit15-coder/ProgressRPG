@@ -100,18 +100,28 @@ def generate_day(behaviour, date, replace_future=True):
         character=behaviour.character
     )
 
+    today = timezone.now().date()
+    is_past = date < today
+
     if replace_future:
         window_start = aware(date, time(0, 0))
         window_end = aware(date, time(23, 59, 59))
-        qs.filter(
-            is_complete=False,
+        to_delete = qs.filter(
             scheduled_start__lt=sleep_end,
             scheduled_end__gt=window_start,
-        ).delete()
+        )
+        if not is_past:
+            # Only protects activities the character has actually lived
+            # through in real time (marked complete by sync_to_now as the
+            # day progresses) - a past-date backfill sets is_complete=True
+            # on every row purely because the date is past, so that
+            # protection would otherwise make regenerating the same past
+            # date non-idempotent (duplicated activities instead of
+            # replaced ones).
+            to_delete = to_delete.filter(is_complete=False)
+        to_delete.delete()
 
     created = []
-    today = timezone.now().date()
-    is_past = date < today
 
     for kind, name, start, end in cleaned:
         activity_kwargs = {
