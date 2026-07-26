@@ -360,7 +360,7 @@ describe('PopulationCentreMap', () => {
     expect(markers[1].getAttribute('transform')).toBe('translate(20, 20)');
   });
 
-  it('does not hide path lines with opacity 0', () => {
+  it('renders path lines invisibly (opacity 0)', () => {
     const geojsonWithPath = {
       ...baseGeojson,
       features: [
@@ -374,6 +374,6 @@ describe('PopulationCentreMap', () => {
     const { container } = renderMap({ geojson: geojsonWithPath });
     const path = container.querySelector('polyline');
     expect(path).not.toBeNull();
-    expect(path?.getAttribute('opacity')).not.toBe('0');
+    expect(path?.getAttribute('opacity')).toBe('0');
   });
 });

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Tooltip, { TooltipProvider } from "../Tooltip/Tooltip";
-import { computeViewBox } from "./utils";
+import { computeBaseRect, ViewBoxRect } from "./utils";
 import styles from "./Map.module.scss";
 
 interface GeoJSONFeatureProperties {
@@ -25,7 +25,6 @@ interface GeoJSON {
 
 interface PopulationCentreMapProps {
   geojson?: GeoJSON | null;
-  width?: number;
 }
 
 // Placeholder palette until real character sprites/art exist. Colour is
@@ -288,6 +287,49 @@ const BUILDING_TYPE_LABELS: Record<string, string> = {
 // for every other building type.
 const FIELD_FILL = "#E4C158";
 
+// Pan/zoom scale is relative to the base (fully-zoomed-out) rect: 1 shows
+// the whole padded bbox, smaller values zoom in. Clamped rather than
+// unbounded so the map can't be zoomed out past its own content or zoomed
+// in so far the view loses all context.
+const MIN_ZOOM_SCALE = 0.08;
+const MAX_ZOOM_SCALE = 1;
+const WHEEL_ZOOM_FACTOR = 1.2;
+const ZOOM_BUTTON_FACTOR = 1.4;
+
+// A plain click (no movement) shouldn't be treated as the start of a pan -
+// capturing the pointer immediately on every pointerdown meant even a
+// stationary click briefly entered "dragging" state. Panning only kicks in
+// once the pointer has actually moved past this threshold.
+const DRAG_START_THRESHOLD_PX = 4;
+
+interface PanZoomState {
+  scale: number;
+  // Centre of the current view, in the same coordinate space as feature
+  // geometry (GIS units), not screen pixels.
+  cx: number;
+  cy: number;
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function panZoomToRect(base: ViewBoxRect, view: PanZoomState): ViewBoxRect {
+  const w = base.w * view.scale;
+  const h = base.h * view.scale;
+  return { x: view.cx - w / 2, y: view.cy - h / 2, w, h };
+}
+
+// Panning is clamped to the base content bounds themselves (which already
+// include everything - village, fields, paths - via the bbox), so a user
+// can't drag the view off into empty space with nothing rendered.
+function clampCentre(base: ViewBoxRect, cx: number, cy: number): [number, number] {
+  return [
+    clamp(cx, base.x, base.x + base.w),
+    clamp(cy, base.y, base.y + base.h),
+  ];
+}
+
 function polygonTooltipContent(properties: GeoJSONFeatureProperties | null | undefined): string | undefined {
   if (properties?.feature_type === "building") {
     const buildingType = properties?.building_type as string | undefined;
@@ -301,7 +343,6 @@ function polygonTooltipContent(properties: GeoJSONFeatureProperties | null | und
 
 export default function PopulationCentreMap({
   geojson,
-  width = 600,
 }: PopulationCentreMapProps) {
   const features: GeoJSONFeature[] = useMemo(
     () => geojson?.features || [],
@@ -313,12 +354,157 @@ export default function PopulationCentreMap({
   // scaling do the work (rather than pre-computing a pixel transform)
   // means the map always fills its container and scales/zooms correctly,
   // instead of floating at a fixed size inside a mismatched canvas.
-  const viewBox = useMemo(() => {
+  const baseRect = useMemo<ViewBoxRect>(() => {
     if (geojson?.bbox) {
-      return computeViewBox(geojson.bbox);
+      return computeBaseRect(geojson.bbox);
     }
-    return "0 0 100 100";
+    return { x: 0, y: 0, w: 100, h: 100 };
   }, [geojson]);
+
+  // Fields can sit far outside the village itself, so the base (fully
+  // zoomed-out) view that fits everything renders the village tiny. Pan/zoom
+  // lets the user zoom into the village (or the field) instead of forcing
+  // one fixed view to fit both. Kept as separate state from baseRect so
+  // panning/zooming persists across polls (baseRect is only reset when the
+  // underlying bbox itself actually changes, e.g. switching villages).
+  const [view, setView] = useState<PanZoomState>({
+    scale: 1,
+    cx: baseRect.x + baseRect.w / 2,
+    cy: baseRect.y + baseRect.h / 2,
+  });
+  const lastBaseKeyRef = useRef<string | null>(null);
+  useEffect(() => {
+    const key = `${baseRect.x},${baseRect.y},${baseRect.w},${baseRect.h}`;
+    if (lastBaseKeyRef.current === key) return;
+    lastBaseKeyRef.current = key;
+    setView({
+      scale: 1,
+      cx: baseRect.x + baseRect.w / 2,
+      cy: baseRect.y + baseRect.h / 2,
+    });
+  }, [baseRect]);
+
+  const currentRect = useMemo(() => panZoomToRect(baseRect, view), [baseRect, view]);
+  const viewBox = `${currentRect.x} ${currentRect.y} ${currentRect.w} ${currentRect.h}`;
+
+  const svgRef = useRef<SVGSVGElement>(null);
+  const dragStateRef = useRef<{
+    pointerId: number;
+    startClientX: number;
+    startClientY: number;
+    startCx: number;
+    startCy: number;
+    captured: boolean;
+  } | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
+  const zoomAt = (
+    clientX: number,
+    clientY: number,
+    factor: number
+  ) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    setView((prev) => {
+      const prevViewRect = panZoomToRect(baseRect, prev);
+      // Point under the cursor, in GIS coordinates, before zooming.
+      const focusX = prevViewRect.x + ((clientX - rect.left) / rect.width) * prevViewRect.w;
+      const focusY = prevViewRect.y + ((clientY - rect.top) / rect.height) * prevViewRect.h;
+
+      const nextScale = clamp(prev.scale / factor, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
+      const nextW = baseRect.w * nextScale;
+      const nextH = baseRect.h * nextScale;
+
+      // Keep the same GIS point under the cursor after the zoom, not the
+      // view centre - otherwise zooming in always drifts toward the middle
+      // of the map instead of toward whatever the user pointed at.
+      const nextX = focusX - ((clientX - rect.left) / rect.width) * nextW;
+      const nextY = focusY - ((clientY - rect.top) / rect.height) * nextH;
+      const [cx, cy] = clampCentre(baseRect, nextX + nextW / 2, nextY + nextH / 2);
+
+      return { scale: nextScale, cx, cy };
+    });
+  };
+
+  useEffect(() => {
+    const svg = svgRef.current;
+    if (!svg) return;
+
+    // Wheel must be a non-passive native listener to preventDefault (stop
+    // the page itself from scrolling while zooming the map) - React's
+    // synthetic onWheel is attached passively and can't reliably do this.
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_FACTOR : WHEEL_ZOOM_FACTOR;
+      zoomAt(e.clientX, e.clientY, factor);
+    };
+
+    svg.addEventListener("wheel", handleWheel, { passive: false });
+    return () => svg.removeEventListener("wheel", handleWheel);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [baseRect]);
+
+  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
+    // Only the primary button/touch starts a drag - avoids hijacking
+    // right-click and other pointer interactions.
+    if (e.button !== 0) return;
+    dragStateRef.current = {
+      pointerId: e.pointerId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startCx: view.cx,
+      startCy: view.cy,
+      captured: false,
+    };
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
+    const drag = dragStateRef.current;
+    const svg = svgRef.current;
+    if (!drag || !svg || drag.pointerId !== e.pointerId) return;
+
+    if (!drag.captured) {
+      const movedX = Math.abs(e.clientX - drag.startClientX);
+      const movedY = Math.abs(e.clientY - drag.startClientY);
+      if (Math.hypot(movedX, movedY) < DRAG_START_THRESHOLD_PX) return;
+      drag.captured = true;
+      setIsDragging(true);
+      svg.setPointerCapture(e.pointerId);
+    }
+
+    const rect = svg.getBoundingClientRect();
+    if (!rect.width || !rect.height) return;
+
+    const viewRect = panZoomToRect(baseRect, view);
+    const dxSvg = -((e.clientX - drag.startClientX) / rect.width) * viewRect.w;
+    const dySvg = -((e.clientY - drag.startClientY) / rect.height) * viewRect.h;
+    const [cx, cy] = clampCentre(baseRect, drag.startCx + dxSvg, drag.startCy + dySvg);
+    setView((prev) => ({ ...prev, cx, cy }));
+  };
+
+  const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (dragStateRef.current?.pointerId !== e.pointerId) return;
+    dragStateRef.current = null;
+    setIsDragging(false);
+  };
+
+  const handleZoomButton = (factor: number) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    const rect = svg.getBoundingClientRect();
+    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
+  };
+
+  const handleResetView = () => {
+    setView({
+      scale: 1,
+      cx: baseRect.x + baseRect.w / 2,
+      cy: baseRect.y + baseRect.h / 2,
+    });
+  };
 
   const buildingFootprints = useMemo(
     () => buildingFootprintRings(features),
@@ -364,14 +550,16 @@ export default function PopulationCentreMap({
     // (markers are small and easy to overshoot), independent of the app's
     // default hover delay used elsewhere.
     <TooltipProvider delayDuration={0} skipDelayDuration={0}>
-    <div
-      className={styles.mapWrapper}
-      style={{ maxWidth: `${width}px` }}
-    >
+    <div className={styles.mapWrapper}>
       <svg
-        className={styles.mapSvg}
+        ref={svgRef}
+        className={isDragging ? `${styles.mapSvg} ${styles.dragging}` : styles.mapSvg}
         viewBox={viewBox}
         preserveAspectRatio="xMidYMid meet"
+        onPointerDown={handlePointerDown}
+        onPointerMove={handlePointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
       >
       {/* Polygons */}
       {features
@@ -394,6 +582,7 @@ export default function PopulationCentreMap({
           <Tooltip key={i} content={tooltipContent} disabled={!tooltipContent}>
             <polygon
               tabIndex={0}
+              className={styles.focusableShape}
               points={points}
               fill={isBoundary ? "none" : isCropSubzone ? FIELD_FILL : "#ddd"}
               stroke={isBoundary ? "#888" : "#333"}
@@ -424,6 +613,7 @@ export default function PopulationCentreMap({
               <Tooltip key={`line-${i}`} content={f.properties?.name} disabled={!f.properties?.name}>
                 <polyline
                   tabIndex={0}
+                  className={styles.focusableShape}
                   points={points}
                   fill="none"
                   stroke={isPath ? "#8b5a2b" : "#666"}
@@ -432,7 +622,7 @@ export default function PopulationCentreMap({
                   strokeLinecap="round"
                   strokeLinejoin="round"
                   strokeDasharray={isPath ? "4 3" : undefined}
-                  opacity={isPath ? 0.45 : 1}
+                  opacity={isPath ? 0 : 1}
                 />
               </Tooltip>
             );
@@ -468,6 +658,25 @@ export default function PopulationCentreMap({
           );
         })}
       </svg>
+      <div className={styles.zoomControls}>
+        <button
+          type="button"
+          aria-label="Zoom in"
+          onClick={() => handleZoomButton(ZOOM_BUTTON_FACTOR)}
+        >
+          +
+        </button>
+        <button
+          type="button"
+          aria-label="Zoom out"
+          onClick={() => handleZoomButton(1 / ZOOM_BUTTON_FACTOR)}
+        >
+          −
+        </button>
+        <button type="button" aria-label="Reset view" onClick={handleResetView}>
+          reset
+        </button>
+      </div>
     </div>
     </TooltipProvider>
   );
