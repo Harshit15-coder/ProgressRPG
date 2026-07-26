@@ -586,21 +586,84 @@ def _make_centre_with_building(name, centre_point):
     return centre
 
 
-class GenerateFieldsCommandTest(TestCase):
+class GenerateLandareaCommandTest(TestCase):
     def setUp(self):
         # Deterministic placement - the command's own randomness (direction/
-        # margin, footprint irregularity) otherwise makes assertions flaky.
+        # margin) otherwise makes assertions flaky.
         random.seed(1234)
 
-    def test_creates_crop_subzone_and_shelter_outside_the_boundary(self):
-        centre = _make_centre_with_building("Fieldtest village", Point(0, 0, srid=3857))
+    def test_places_landarea_outside_the_boundary(self):
+        centre = _make_centre_with_building("Landtest village", Point(0, 0, srid=3857))
+        Character.objects.create(population_centre=centre)
         original_boundary = centre.boundary
+
+        call_command("generate_landarea")
+
+        landarea = LandArea.objects.get(population_centre=centre)
+        self.assertEqual(landarea.subzones.filter(usage="crops").count(), 1)
+
+        centre.refresh_from_db()
+        # The LandArea is deliberately left outside the village boundary
+        # rather than folded into it - the boundary polygon is untouched,
+        # and there must be a real gap so it doesn't visually fuse onto the
+        # boundary line.
+        self.assertFalse(centre.boundary.intersects(landarea.boundary))
+        self.assertEqual(centre.boundary.area, original_boundary.area)
+
+    def test_avoids_overlapping_a_neighbouring_villages_boundary(self):
+        centre_a = _make_centre_with_building("Village A", Point(0, 0, srid=3857))
+        Character.objects.create(population_centre=centre_a)
+        centre_b = _make_centre_with_building("Village B", Point(500, 0, srid=3857))
+        Character.objects.create(population_centre=centre_b)
+
+        call_command("generate_landarea")
+
+        landarea_a = LandArea.objects.get(population_centre=centre_a)
+        landarea_b = LandArea.objects.get(population_centre=centre_b)
+
+        centre_b.refresh_from_db()
+        centre_a.refresh_from_db()
+        self.assertFalse(centre_b.boundary.intersects(landarea_a.boundary))
+        self.assertFalse(centre_a.boundary.intersects(landarea_b.boundary))
+
+    def test_skips_centre_with_no_residents(self):
+        _make_centre_with_building("Empty village", Point(0, 0, srid=3857))
+
+        call_command("generate_landarea")
+
+        self.assertEqual(LandArea.objects.count(), 0)
+
+
+class GenerateFieldsCommandTest(TestCase):
+    def setUp(self):
+        # Deterministic placement - generate_landarea's own randomness
+        # (direction/margin) otherwise makes assertions flaky.
+        random.seed(1234)
+
+    def _make_crops_subzone(self, centre, subzone_point):
+        """A crops Subzone with real geometry, as generate_landarea would produce."""
+        land_area = LandArea.objects.create(
+            name=f"{centre.name} Farmland",
+            population_centre=centre,
+            location=subzone_point,
+            boundary=create_building_footprint(subzone_point),
+            size=1.0,
+        )
+        return Subzone.objects.create(
+            land_area=land_area,
+            name=f"{centre.name} Farmland - Crops",
+            usage="crops",
+            boundary=create_building_footprint(subzone_point),
+            location=subzone_point,
+            size=1.0,
+        )
+
+    def test_attaches_shelter_and_fieldcrop_to_existing_crops_subzone(self):
+        centre = _make_centre_with_building("Fieldtest village", Point(0, 0, srid=3857))
+        subzone = self._make_crops_subzone(centre, Point(100, 100, srid=3857))
 
         call_command("generate_fields")
 
-        subzone = Subzone.objects.get(
-            land_area__population_centre=centre, usage="crops"
-        )
         shelter = Building.objects.get(
             building_type="field_shelter", population_centre=centre
         )
@@ -610,61 +673,41 @@ class GenerateFieldsCommandTest(TestCase):
         # beside.
         self.assertLess(shelter.footprint.area, subzone.boundary.area)
 
-        centre.refresh_from_db()
-        # The crop area is deliberately left outside the village boundary
-        # rather than folded into it - the boundary polygon is untouched,
-        # and there must be a real gap so it doesn't visually fuse onto the
-        # boundary line.
-        self.assertFalse(centre.boundary.intersects(subzone.boundary))
-        self.assertEqual(centre.boundary.area, original_boundary.area)
-
         crop = FieldCrop.objects.get(subzone=subzone)
         self.assertEqual(crop.shelter_building, shelter)
         self.assertEqual(crop.stage, FieldCrop.Stage.FALLOW)
 
-    def test_skips_centre_that_already_has_a_crops_subzone(self):
+    def test_skips_crops_subzone_that_already_has_a_fieldcrop(self):
         centre = _make_centre_with_building(
             "Already fielded village", Point(0, 0, srid=3857)
         )
-        land_area = LandArea.objects.create(
-            name="Existing farmland",
+        subzone = self._make_crops_subzone(centre, Point(100, 100, srid=3857))
+        existing_shelter = Building.objects.create(
+            name="Existing shelter",
+            building_type="field_shelter",
+            location=Point(100, 100, srid=3857),
+            footprint=create_building_footprint(Point(100, 100, srid=3857)),
             population_centre=centre,
-            location=Point(100, 100, srid=3857),
-            boundary=create_building_footprint(Point(100, 100, srid=3857)),
-            size=1.0,
         )
-        Subzone.objects.create(
-            land_area=land_area,
-            name="Existing crops",
-            usage="crops",
-            boundary=create_building_footprint(Point(100, 100, srid=3857)),
-            location=Point(100, 100, srid=3857),
-            size=1.0,
+        FieldCrop.objects.create(
+            subzone=subzone,
+            shelter_building=existing_shelter,
+            stage=FieldCrop.Stage.GROWING,
         )
 
         call_command("generate_fields")
 
+        self.assertEqual(FieldCrop.objects.filter(subzone=subzone).count(), 1)
         self.assertEqual(
-            Subzone.objects.filter(
-                land_area__population_centre=centre, usage="crops"
+            Building.objects.filter(
+                building_type="field_shelter", population_centre=centre
             ).count(),
             1,
         )
 
-    def test_avoids_overlapping_a_neighbouring_villages_boundary(self):
-        centre_a = _make_centre_with_building("Village A", Point(0, 0, srid=3857))
-        centre_b = _make_centre_with_building("Village B", Point(500, 0, srid=3857))
+    def test_does_nothing_when_no_crops_subzones_exist(self):
+        _make_centre_with_building("No fields village", Point(0, 0, srid=3857))
 
         call_command("generate_fields")
 
-        subzone_a = Subzone.objects.get(
-            land_area__population_centre=centre_a, usage="crops"
-        )
-        subzone_b = Subzone.objects.get(
-            land_area__population_centre=centre_b, usage="crops"
-        )
-
-        centre_b.refresh_from_db()
-        centre_a.refresh_from_db()
-        self.assertFalse(centre_b.boundary.intersects(subzone_a.boundary))
-        self.assertFalse(centre_a.boundary.intersects(subzone_b.boundary))
+        self.assertEqual(FieldCrop.objects.count(), 0)
