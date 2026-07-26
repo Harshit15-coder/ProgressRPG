@@ -207,7 +207,7 @@ describe('PopulationCentreMap', () => {
     expect(exactlyAtDoor.length).toBe(0);
   });
 
-  it('renders crops subzones in gold, distinct from the default grey building fill', () => {
+  it('renders a ready-to-harvest crops subzone in gold, distinct from the default grey building fill', () => {
     const geojsonWithCropSubzone = {
       ...baseGeojson,
       features: [
@@ -226,6 +226,8 @@ describe('PopulationCentreMap', () => {
             feature_type: 'subzone',
             name: 'Driftmoor village Farmland - Crops',
             usage: 'crops',
+            crop_stage: 'ready',
+            crop_progress: null,
           },
         },
       ],
@@ -236,6 +238,58 @@ describe('PopulationCentreMap', () => {
 
     expect(fills).toContain('#E4C158');
     expect(fills).toContain('#ddd');
+  });
+
+  it('renders a fallow or not-yet-planted crops subzone as bare soil, distinct from ready gold', () => {
+    const geojsonFallow = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'subzone',
+            name: 'Farmland - Crops',
+            usage: 'crops',
+            crop_stage: 'fallow',
+            crop_progress: null,
+          },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: geojsonFallow });
+    const polygons = container.querySelectorAll('polygon');
+    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+
+    expect(fills).toContain('#c2a878');
+    expect(fills).not.toContain('#E4C158');
+  });
+
+  it('renders a growing crops subzone with a green that darkens as growth progress increases', () => {
+    const cropFeature = (progress: number) => ({
+      geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+      properties: {
+        feature_type: 'subzone',
+        name: 'Farmland - Crops',
+        usage: 'crops',
+        crop_stage: 'growing',
+        crop_progress: progress,
+      },
+    });
+
+    const { container: early } = renderMap({
+      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.1)] },
+    });
+    const { container: late } = renderMap({
+      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.9)] },
+    });
+
+    const earlyFill = early.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
+    const lateFill = late.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
+
+    expect(earlyFill).toMatch(/^hsl\(/);
+    expect(lateFill).toMatch(/^hsl\(/);
+    expect(earlyFill).not.toBe(lateFill);
   });
 
   it('renders field_shelter buildings in the default grey, not gold', () => {
@@ -289,6 +343,139 @@ describe('PopulationCentreMap', () => {
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('House');
     expect(tooltip).not.toHaveTextContent('Driftmoor village');
+  });
+
+  it('shows workers and in-stock goods in a building tooltip', async () => {
+    const geojsonWithBuilding = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'Bakery of (Driftmoor village)',
+            building_type: 'bakery',
+            workers: 2,
+            goods: [
+              { good_type: 'flour', display: '3 sacks' },
+              { good_type: 'bread', display: '18.0 loaves' },
+              { good_type: 'wheat', display: '0.0kg' },
+            ],
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithBuilding} />
+      </TooltipProvider>
+    );
+
+    const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
+    await user.hover(building);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Workers: 2');
+    expect(tooltip).toHaveTextContent('Flour: 3 sacks');
+    expect(tooltip).toHaveTextContent('Bread: 18.0 loaves');
+  });
+
+  it('shows residents rather than workers for a residential building', async () => {
+    const geojsonWithHouse = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'building',
+            name: 'House 2 of (Driftmoor village)',
+            building_type: 'residential',
+            workers: 0,
+            residents: 3,
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithHouse} />
+      </TooltipProvider>
+    );
+
+    const house = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
+    await user.hover(house);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Residents: 3');
+    expect(tooltip).not.toHaveTextContent('Workers');
+  });
+
+  it('shows home, workplace, and hunger in a character tooltip', async () => {
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            home: 'Rose Cottage',
+            work: 'Village Bakery',
+            hunger_label: 'Well fed',
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithCharacter} />
+      </TooltipProvider>
+    );
+
+    await user.hover(document.querySelector('g') as SVGGElement);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Alice');
+    expect(tooltip).toHaveTextContent('Lives at: Rose Cottage');
+    expect(tooltip).toHaveTextContent('Works at: Village Bakery');
+    expect(tooltip).toHaveTextContent('Well fed');
+  });
+
+  it('shows the crop stage in a field tooltip instead of the literal word "Crops"', async () => {
+    const geojsonWithReadyField = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
+          properties: {
+            feature_type: 'subzone',
+            name: 'Farmland - Crops',
+            usage: 'crops',
+            crop_stage: 'ready',
+            crop_progress: null,
+          },
+        },
+      ],
+    };
+    const user = userEvent.setup();
+    render(
+      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+        <PopulationCentreMap geojson={geojsonWithReadyField} />
+      </TooltipProvider>
+    );
+
+    const field = document.querySelector('polygon[fill="#E4C158"]') as SVGPolygonElement;
+    await user.hover(field);
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Ready to harvest');
   });
 
   it('fans out characters sharing the same coordinate instead of stacking them', () => {

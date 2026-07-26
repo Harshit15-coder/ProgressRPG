@@ -1,6 +1,8 @@
+import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import Tooltip, { TooltipProvider } from "../Tooltip/Tooltip";
-import { computeBaseRect, ViewBoxRect } from "./utils";
+import { computeBaseRect, fieldFillFor, ViewBoxRect } from "./utils";
+import { BuildingTooltipContent, CharacterTooltipContent } from "./MapTooltips";
 import styles from "./Map.module.scss";
 
 interface GeoJSONFeatureProperties {
@@ -283,10 +285,6 @@ const BUILDING_TYPE_LABELS: Record<string, string> = {
   field_shelter: "Field Shelter",
 };
 
-// Wheat gold, to read as farmland at a glance against the neutral grey used
-// for every other building type.
-const FIELD_FILL = "#E4C158";
-
 // Pan/zoom scale is relative to the base (fully-zoomed-out) rect: 1 shows
 // the whole padded bbox, smaller values zoom in. Clamped rather than
 // unbounded so the map can't be zoomed out past its own content or zoomed
@@ -330,13 +328,33 @@ function clampCentre(base: ViewBoxRect, cx: number, cy: number): [number, number
   ];
 }
 
-function polygonTooltipContent(properties: GeoJSONFeatureProperties | null | undefined): string | undefined {
+function polygonTooltipContent(
+  properties: GeoJSONFeatureProperties | null | undefined
+): React.ReactNode | undefined {
   if (properties?.feature_type === "building") {
     const buildingType = properties?.building_type as string | undefined;
-    return (buildingType && BUILDING_TYPE_LABELS[buildingType]) || "Building";
+    const label = (buildingType && BUILDING_TYPE_LABELS[buildingType]) || "Building";
+    return (
+      <BuildingTooltipContent
+        label={label}
+        buildingType={buildingType}
+        workers={properties?.workers as number | null | undefined}
+        residents={properties?.residents as number | null | undefined}
+        goods={properties?.goods as { good_type?: string; display?: string }[] | null | undefined}
+      />
+    );
   }
   if (properties?.feature_type === "subzone") {
-    return properties?.usage === "crops" ? "Crops" : properties?.name;
+    if (properties?.usage !== "crops") return properties?.name;
+
+    const stage = properties?.crop_stage as string | null | undefined;
+    if (stage === "ready") return "Crops - Ready to harvest";
+    if (stage === "growing") {
+      const progress = properties?.crop_progress as number | null | undefined;
+      const percent = Number.isFinite(progress) ? Math.round((progress as number) * 100) : null;
+      return percent === null ? "Crops - Growing" : `Crops - Growing (${percent}%)`;
+    }
+    return "Crops - Fallow";
   }
   return properties?.name;
 }
@@ -584,7 +602,16 @@ export default function PopulationCentreMap({
               tabIndex={0}
               className={styles.focusableShape}
               points={points}
-              fill={isBoundary ? "none" : isCropSubzone ? FIELD_FILL : "#ddd"}
+              fill={
+                isBoundary
+                  ? "none"
+                  : isCropSubzone
+                  ? fieldFillFor(
+                      f.properties?.crop_stage as string | null | undefined,
+                      f.properties?.crop_progress as number | null | undefined
+                    )
+                  : "#ddd"
+              }
               stroke={isBoundary ? "#888" : "#333"}
               strokeWidth={isBoundary ? 2 : 1}
               vectorEffect="non-scaling-stroke"
@@ -612,8 +639,17 @@ export default function PopulationCentreMap({
             return (
               <Tooltip key={`line-${i}`} content={f.properties?.name} disabled={!f.properties?.name}>
                 <polyline
-                  tabIndex={0}
-                  className={styles.focusableShape}
+                  // Paths (roads) are rendered invisible (opacity 0, no
+                  // tooltip content) but were still hit-testable, sitting on
+                  // top of buildings/subzones wherever a road runs near them
+                  // - a mouse jittering by a couple of pixels would flip the
+                  // topmost hit target between the road and the shape
+                  // beneath it, flickering that shape's tooltip open/closed.
+                  // Since an invisible line has nothing worth hovering,
+                  // taking it out of hit-testing entirely fixes that.
+                  tabIndex={isPath ? undefined : 0}
+                  className={isPath ? undefined : styles.focusableShape}
+                  style={isPath ? { pointerEvents: "none" } : undefined}
                   points={points}
                   fill="none"
                   stroke={isPath ? "#8b5a2b" : "#666"}
@@ -634,7 +670,14 @@ export default function PopulationCentreMap({
           return (
             <Tooltip
               key={`char-${f.properties?.id}`}
-              content={f.properties?.name}
+              content={
+                <CharacterTooltipContent
+                  name={f.properties?.name as string | undefined}
+                  home={f.properties?.home as string | null | undefined}
+                  work={f.properties?.work as string | null | undefined}
+                  hungerLabel={f.properties?.hunger_label as string | null | undefined}
+                />
+              }
               disabled={!f.properties?.name}
             >
               <g
