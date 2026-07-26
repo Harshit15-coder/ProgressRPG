@@ -55,6 +55,11 @@ relaying through **Resend** (`smtp.resend.com:587`), configured in
 
 - `RESEND_API_KEY`
   - API key used as the SMTP password for the Resend relay
+  - **Required in prod**: `prod.py` raises `ImproperlyConfigured` at startup if
+    it is unset/empty, so a missing key fails the deploy instead of silently
+    skipping SMTP auth (Resend then rejects every send with
+    `530 authentication Required`). The Dockerfile's `collectstatic` build step
+    passes a dummy value, like `SECRET_KEY`.
 - `DEFAULT_FROM_EMAIL` / `SERVER_EMAIL`
   - Set to `Progress RPG <noreply@mail.progressrpg.com>` in prod
 

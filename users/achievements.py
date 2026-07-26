@@ -1,4 +1,14 @@
-ACHIEVEMENT_DEFINITIONS = [
+from typing import TypedDict
+
+
+class _AchievementDefinition(TypedDict):
+    type: str
+    label: str
+    symbol: str
+    thresholds: list[int]
+
+
+ACHIEVEMENT_DEFINITIONS: list[_AchievementDefinition] = [
     {
         "type": "level",
         "label": "Player level",

@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from .base import *
 from urllib.parse import quote
-from .utils import get_redis_url
+from .utils import get_redis_url, get_required_env
 
 LOGGING = {
     "version": 1,
@@ -93,7 +93,11 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_HOST_USER = "resend"  # Resend SMTP requires this literal string as the username
-EMAIL_HOST_PASSWORD = os.environ.get("RESEND_API_KEY", "")
+EMAIL_HOST_PASSWORD = get_required_env(
+    "RESEND_API_KEY",
+    hint="Without it Django skips SMTP auth and Resend rejects every email "
+    "with '530 authentication Required'. Set it in the service's env group.",
+)
 
 print("DEBUG:", DEBUG, file=sys.stderr)
 
@@ -140,6 +144,7 @@ DATABASE_URL = os.environ.get("DATABASE_URL")
 #     DB_PORT = os.environ.get("DB_PORT", 5432)
 #     DATABASE_URL = f"postgres://{DB_USER}:{quote(DB_PASSWORD, safe='')}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+assert DATABASE_URL is not None, "DATABASE_URL is required in production"
 db = dj_database_url.parse(DATABASE_URL, conn_max_age=60)
 db["ENGINE"] = "django.contrib.gis.db.backends.postgis"
 # Required when connecting through pgbouncer in transaction pooling mode;
@@ -198,7 +203,7 @@ CSRF_COOKIE_SECURE = True
 
 # Security settings
 SECURE_SSL_REDIRECT = "test" not in sys.argv
-SECURE_REDIRECT_EXEMPT = []
+SECURE_REDIRECT_EXEMPT: list[str] = []
 SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
 SECURE_HSTS_SECONDS = 31536000
 SECURE_HSTS_INCLUDE_SUBDOMAINS = True

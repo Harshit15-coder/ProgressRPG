@@ -70,7 +70,11 @@ class PopulationCentreMapView(APIView):
         features.extend(SubzoneFeatureSerializer(crop_subzones, many=True).data)
         features.extend(PathFeatureSerializer(paths, many=True).data)
 
-        bbox = list(population_centre.boundary.extent)
+        bbox = (
+            list(population_centre.boundary.extent)
+            if population_centre.boundary
+            else None
+        )
         for polygon_obj, polygon_attr in [
             *((b, "footprint") for b in buildings),
             *((s, "boundary") for s in crop_subzones),
@@ -79,6 +83,9 @@ class PopulationCentreMapView(APIView):
             if geom is None:
                 continue
             g_min_x, g_min_y, g_max_x, g_max_y = geom.extent
+            if bbox is None:
+                bbox = [g_min_x, g_min_y, g_max_x, g_max_y]
+                continue
             bbox[0] = min(bbox[0], g_min_x)
             bbox[1] = min(bbox[1], g_min_y)
             bbox[2] = max(bbox[2], g_max_x)

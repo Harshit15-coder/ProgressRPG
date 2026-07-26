@@ -86,7 +86,7 @@ class Command(BaseCommand):
             occupancy[building.id] += 1
 
             node = None
-            rooms = list(char.building.interiorspaces.all())
+            rooms = list(building.interiorspaces.all())
 
             if rooms:
                 room = random.choice(rooms)

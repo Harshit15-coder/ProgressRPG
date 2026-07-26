@@ -1,3 +1,5 @@
+from datetime import timedelta
+
 from django.db import models
 from django.utils import timezone
 import subprocess
@@ -50,7 +52,7 @@ class MaintenanceWindow(models.Model):
             message = f"Warning: maintenance is starting in {minutes_until} minute(s)!"
             result = send_warning.apply_async(
                 kwargs={"message": message},
-                eta=self.start_time - timezone.timedelta(minutes=minutes_until),
+                eta=self.start_time - timedelta(minutes=minutes_until),
             )
             task_ids.append(result.id)
         logger.debug(

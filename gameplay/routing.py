@@ -1,6 +1,6 @@
-from django.urls import re_path
+from django.urls import re_path, URLPattern
 
-websocket_urlpatterns = []
+websocket_urlpatterns: list[URLPattern] = []
 
 
 def load_websocket_urlpatterns():

@@ -1,11 +1,18 @@
 # progression/views.py
+from typing import TYPE_CHECKING
 from datetime import timedelta
+from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
 from rest_framework import viewsets, filters, status
 from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+
+if TYPE_CHECKING:
+    from rest_framework.views import APIView as _RequestMixinBase
+else:
+    _RequestMixinBase = object
 
 from api.views import IsOwnerPlayer
 from .models import (
@@ -51,24 +58,26 @@ def _request_player_or_none(request):
     return getattr(user, "player", None)
 
 
-class PlayerScopedQuerysetMixin:
+class PlayerScopedQuerysetMixin(_RequestMixinBase):
     """Scopes a viewset's queryset to the requesting player's own records and
     creates new records under that same player. Set `model` (and optionally
     `ordering`, default "-created_at") on the viewset.
     """
 
-    model = None
+    model: type[models.Model] | None = None
     ordering = "-created_at"
 
     def get_queryset(self):
+        assert self.model is not None
         player = _request_player_or_none(self.request)
         if not player:
-            return self.model.objects.none()
-        qs = self.model.objects.filter(player=player)
+            return self.model._default_manager.none()
+        qs = self.model._default_manager.filter(player=player)
         return qs.order_by(self.ordering) if self.ordering else qs
 
     def perform_create(self, serializer):
-        serializer.save(player=self.request.user.player)
+        player = _request_player_or_none(self.request)
+        serializer.save(player=player)
 
 
 class CategoryViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
@@ -208,22 +217,23 @@ class PlayerActivityViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
         return Response({"success": True})
 
 
-class CurrentCharacterScopedQuerysetMixin:
+class CurrentCharacterScopedQuerysetMixin(_RequestMixinBase):
     """Scopes a viewset's queryset to the requesting player's current
     character's own records. Set `model` on the viewset.
     """
 
-    model = None
+    model: type[models.Model] | None = None
 
     def get_queryset(self):
+        assert self.model is not None
         player = _request_player_or_none(self.request)
         if not player:
-            return self.model.objects.none()
+            return self.model._default_manager.none()
 
         character = player.current_character
         if not character:
-            return self.model.objects.none()
-        return self.model.objects.filter(character=character)
+            return self.model._default_manager.none()
+        return self.model._default_manager.filter(character=character)
 
 
 class CharacterActivityViewSet(
