@@ -6,7 +6,16 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
         self.stdout.write("=== Spawning villages ===")
-        call_command("spawn_villages")
+        call_command("spawn_villages", num_centres=1)
+
+        self.stdout.write("=== Placing characters ===")
+        call_command("place_characters")
+
+        self.stdout.write("=== Generating land areas ===")
+        # Must run before generate_fields, which attaches each FieldCrop to
+        # the "crops" Subzone this creates - only needs boundary/location/
+        # residents, all already set by spawn_villages.
+        call_command("generate_landarea")
 
         self.stdout.write("=== Generating fields ===")
         # Must run before generate_paths, which needs the field shelter's
@@ -26,13 +35,7 @@ class Command(BaseCommand):
         self.stdout.write("=== Populating interiors ===")
         call_command("populate_interiors")
 
-        self.stdout.write("=== Placing characters ===")
-        call_command("place_characters")
-
         self.stdout.write("=== Assigning workers ===")
         call_command("assign_workers")
-
-        self.stdout.write("=== Generating land areas ===")
-        call_command("generate_landarea")
 
         self.stdout.write(self.style.SUCCESS("All setup tasks completed!"))

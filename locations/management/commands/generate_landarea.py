@@ -4,12 +4,31 @@ import random
 from django.contrib.gis.geos import Point, Polygon
 from django.core.management.base import BaseCommand
 from django.db import transaction
+from economy.constants import (
+    BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
+    FLOUR_TO_BREAD_RATIO,
+    WHEAT_TO_FLOUR_RATIO,
+    YIELD_PER_AREA,
+)
 from locations.models import Building, LandArea, Subzone, PopulationCentre
 
 PLACEMENT_ATTEMPTS = 100
 LANDAREA_BUFFER = 5
 MIN_MARGIN_BEYOND_BOUNDARY = 10
 MAX_MARGIN_BEYOND_BOUNDARY = 40
+
+DAYS_PER_YEAR = 365
+
+# Fraction of a LandArea given over to the "crops" Subzone - must match
+# subdivide_landarea's own breakdown, since estimate_required_land works
+# backwards from "how much crop area is needed" to "how big must the whole
+# LandArea be" through this same fraction.
+CROPS_SUBZONE_FRACTION = 0.60
+
+# Wheat only grows once per year (see SOWING_WINDOW_MONTHS/GROWTH_DURATION
+# in economy/constants.py - sown in spring, ready ~5 months later), so a
+# single YIELD_PER_AREA harvest must cover a full year of consumption.
+HARVESTS_PER_YEAR = 1
 
 
 class Command(BaseCommand):
@@ -27,11 +46,23 @@ class Command(BaseCommand):
     # -----------------------------
     def estimate_required_land(self, residents: int) -> float:
         """
-        Estimate required land in hectares for a village population.
-        0.1 ha per resident + 20% buffer.
+        Estimate required land in hectares for a village population, derived
+        from the actual economy constants rather than a flat per-resident
+        guess - so a village's crops Subzone is sized to actually grow
+        enough wheat (after milling/baking losses) to feed its residents'
+        bread consumption for a full year, plus a 20% buffer.
         """
-        base = residents * 0.1
-        return base * 1.2
+        annual_bread_demand = BREAD_PER_CHARACTER_DAILY_CONSUMPTION * DAYS_PER_YEAR
+        annual_wheat_needed = annual_bread_demand / (
+            WHEAT_TO_FLOUR_RATIO * FLOUR_TO_BREAD_RATIO
+        )
+        crop_area_needed_m2 = (
+            residents * annual_wheat_needed / (YIELD_PER_AREA * HARVESTS_PER_YEAR)
+        )
+        crop_area_needed_ha = crop_area_needed_m2 / 10000
+
+        total_land_ha = crop_area_needed_ha / CROPS_SUBZONE_FRACTION
+        return total_land_ha * 1.2
 
     def assign_landarea_geometry(self, landarea: LandArea, other_boundaries):
         """
@@ -103,7 +134,7 @@ class Command(BaseCommand):
         Split a LandArea into Subzones proportionally.
         """
         breakdown = {
-            "crops": 0.60,
+            "crops": CROPS_SUBZONE_FRACTION,
             "grazing": 0.20,
             "mixed_crops": 0.20,
         }
@@ -117,22 +148,34 @@ class Command(BaseCommand):
             )
 
     def assign_subzone_geometry(self, landarea: LandArea):
-        # Simplified: split LandArea square into N subzone squares
-        N = len(landarea.subzones.all())
-        if N == 0:
+        # Split LandArea square into vertical strips sized by each
+        # subzone's own `size` fraction of the total (set in
+        # subdivide_landarea) - splitting evenly by *count* instead would
+        # silently give every subzone 1/3 of the area regardless of its
+        # intended 60/20/20 breakdown, which is exactly the bug this fixed
+        # (the crops Subzone's real geometry was a third of the land area,
+        # not 60% of it, starving FieldCrop's actual yield potential).
+        subzones = list(landarea.subzones.all())
+        if not subzones:
             return
 
         assert (
             landarea.boundary is not None
         ), "assign_subzone_geometry requires assign_landarea_geometry to have run first"
+        assert (
+            landarea.size
+        ), "assign_subzone_geometry requires a non-zero LandArea size"
+
         # Bounding box of landarea
         min_x, min_y, max_x, max_y = landarea.boundary.extent
-        width = (max_x - min_x) / N
+        total_width = max_x - min_x
         height = max_y - min_y  # same height for all
 
-        for i, subzone in enumerate(landarea.subzones.all()):
-            x0 = min_x + i * width
-            x1 = x0 + width
+        x_cursor = min_x
+        for subzone in subzones:
+            fraction = subzone.size / landarea.size
+            x0 = x_cursor
+            x1 = x0 + total_width * fraction
             subzone.boundary = Polygon(
                 (
                     (x0, min_y),
@@ -146,6 +189,7 @@ class Command(BaseCommand):
             # center as location
             subzone.location = Point((x0 + x1) / 2, (min_y + max_y) / 2, srid=3857)
             subzone.save(update_fields=["boundary", "location"])
+            x_cursor = x1
 
     # -----------------------------
     # Main logic
