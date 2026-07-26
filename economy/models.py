@@ -1,6 +1,13 @@
 from django.db import models
 
-from .constants import GOOD_TYPE_STORAGE_USAGE, STORAGE_CAPACITY_PER_AREA
+from .constants import (
+    GOOD_TYPE_BULK_DENSITY,
+    GOOD_TYPE_STORAGE_USAGE,
+    GOOD_TYPE_UNIT,
+    STORAGE_CAPACITY_PER_AREA_VOLUME,
+    STORAGE_CAPACITY_PER_AREA_WEIGHT,
+    UnitKind,
+)
 
 
 class FieldCrop(models.Model):
@@ -52,6 +59,10 @@ class GoodsStock(models.Model):
         "locations.Building", on_delete=models.CASCADE, related_name="goods_stocks"
     )
     good_type = models.CharField(max_length=20)
+    # In the good's base unit per GOOD_TYPE_UNIT - grams for weight-kind
+    # goods, litres for volume-kind goods. Note a good's storage *capacity*
+    # may still be volume-derived even when its quantity is mass-accounted
+    # (see GOOD_TYPE_BULK_DENSITY on the `capacity` property below).
     quantity = models.FloatField(default=0)
 
     class Meta:
@@ -79,7 +90,23 @@ class GoodsStock(models.Model):
             )["total"]
             or 0
         )
-        return storage_area * STORAGE_CAPACITY_PER_AREA
+
+        # Goods stored as loose bulk material (e.g. wheat in a silo) are
+        # limited by the room's *volume*, converted to a grams ceiling via
+        # the good's real bulk density - even though the good is otherwise
+        # mass-accounted. Everything else uses a direct per-area figure
+        # matching its own unit kind (weight or, for a future liquid good,
+        # volume). Weight-kind results are rounded to a whole number of
+        # grams (no meaningful sub-gram precision); a direct-volume result
+        # is left as a float, since fractional litres are meaningful.
+        bulk_density = GOOD_TYPE_BULK_DENSITY.get(self.good_type)
+        if bulk_density is not None:
+            return round(storage_area * STORAGE_CAPACITY_PER_AREA_VOLUME * bulk_density)
+
+        if GOOD_TYPE_UNIT.get(self.good_type, UnitKind.WEIGHT) == UnitKind.VOLUME:
+            return storage_area * STORAGE_CAPACITY_PER_AREA_VOLUME
+
+        return round(storage_area * STORAGE_CAPACITY_PER_AREA_WEIGHT)
 
 
 class GoodsConversionState(models.Model):
