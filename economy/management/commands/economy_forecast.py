@@ -1,8 +1,8 @@
+import logging
 from datetime import datetime, time, timedelta
 
 from django.core.management.base import BaseCommand
 from django.db import transaction
-from django.db.models import Sum
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
@@ -51,7 +51,7 @@ class Command(BaseCommand):
         parser.add_argument(
             "--days",
             type=int,
-            default=30,
+            default=365,
             help="Number of days to simulate (default 365)",
         )
         parser.add_argument(
@@ -104,55 +104,154 @@ class Command(BaseCommand):
                     f"seed_wheat={format_quantity('wheat', seed_wheat)})"
                 )
             )
+
+            # Fetched once - buildings themselves don't appear/disappear
+            # during the simulation, only their stock does.
+            granaries = list(
+                Building.objects.filter(building_type="granary").select_related(
+                    "population_centre"
+                )
+            )
+            mills = list(
+                Building.objects.filter(building_type="mill").select_related(
+                    "population_centre"
+                )
+            )
+            bakeries = list(
+                Building.objects.filter(building_type="bakery").select_related(
+                    "population_centre"
+                )
+            )
+
+            # Column per building, in a fixed order matching the row
+            # printing below - building ids are baked into the headers so
+            # multiple granaries/mills/bakeries (multiple villages) don't
+            # collide under one shared label.
+            columns = [f"G{g.id}(kg)" for g in granaries]
+            for m in mills:
+                columns += [f"M{m.id} made(kg)", f"M{m.id} stock(kg)"]
+            for b in bakeries:
+                columns += [f"B{b.id} made(kg)", f"B{b.id} stock(kg)"]
+
             self.stdout.write(
-                f"{'day':>5} {'date':>10} {'wheat(kg)':>10} {'flour(kg)':>10} "
-                f"{'bread(kg)':>10} {'avg hunger':>10} {'max hunger':>10} "
-                f"{'unfed today':>11}"
+                f"{'day':>5} {'date':>10} "
+                + " ".join(f"{c:>14}" for c in columns)
+                + f" {'unfed':>7}"
             )
 
             first_bread_day = None
             min_bread = None
             worst_hunger = 0.0
 
-            for day_offset in range(days):
-                today = start + timedelta(days=day_offset)
-                now = timezone.make_aware(datetime.combine(today, time(hour=18)))
+            # advance_bread_consumption_tick logs a warning per unfed
+            # character - useful for the real Celery task, but pure noise
+            # here since the simulation already prints an "unfed today"
+            # line every interval. Quieted for the loop only, restored
+            # after, so a real error elsewhere in the app during this
+            # process wouldn't be silently swallowed too.
+            economy_logger = logging.getLogger("general")
+            previous_log_level = economy_logger.level
+            economy_logger.setLevel(logging.ERROR)
+            try:
+                for day_offset in range(days):
+                    today = start + timedelta(days=day_offset)
+                    now = timezone.make_aware(datetime.combine(today, time(hour=18)))
+                    should_print = day_offset % interval == 0 or day_offset == days - 1
 
-                advance_field_economy_tick(today=today, now=now)
-                advance_mill_economy_tick(today=today)
-                advance_bakery_economy_tick(today=today)
-                hunger_before = dict(CharacterNeeds.objects.values_list("id", "hunger"))
-                advance_bread_consumption_tick(today=today)
-                unfed_today = sum(
-                    1
-                    for needs_id, hunger_after in CharacterNeeds.objects.values_list(
-                        "id", "hunger"
+                    advance_field_economy_tick(today=today, now=now)
+
+                    # Snapshot each mill/bakery's own output stock either
+                    # side of its tick, per building - the tick functions
+                    # process every building of that type in one call, so
+                    # this is the only way to attribute "produced today" to
+                    # a specific building rather than a village-wide total.
+                    flour_before = self._quantities_by_building(
+                        GoodsStock.GoodType.FLOUR, [m.id for m in mills]
                     )
-                    if hunger_after > hunger_before.get(needs_id, 0.0)
-                )
-
-                totals = self._stock_totals()
-                if totals["bread"] > 0 and first_bread_day is None:
-                    first_bread_day = day_offset
-                if min_bread is None or totals["bread"] < min_bread:
-                    min_bread = totals["bread"]
-
-                hunger_values = list(
-                    CharacterNeeds.objects.values_list("hunger", flat=True)
-                )
-                avg_hunger = (
-                    sum(hunger_values) / len(hunger_values) if hunger_values else 0.0
-                )
-                max_hunger = max(hunger_values) if hunger_values else 0.0
-                worst_hunger = max(worst_hunger, max_hunger)
-
-                if day_offset % interval == 0 or day_offset == days - 1:
-                    self.stdout.write(
-                        f"{day_offset:>5} {today.isoformat():>10} "
-                        f"{totals['wheat'] / 1000:>10,.1f} {totals['flour'] / 1000:>10,.1f} "
-                        f"{totals['bread'] / 1000:>10,.1f} {avg_hunger:>10.1f} "
-                        f"{max_hunger:>10.1f} {unfed_today:>11}"
+                    advance_mill_economy_tick(today=today)
+                    flour_after = self._quantities_by_building(
+                        GoodsStock.GoodType.FLOUR, [m.id for m in mills]
                     )
+
+                    bread_before = self._quantities_by_building(
+                        GoodsStock.GoodType.BREAD, [b.id for b in bakeries]
+                    )
+                    advance_bakery_economy_tick(today=today)
+                    # "Produced" is read right after baking, before it's
+                    # eaten - the bakery only ever bakes up to that day's
+                    # demand (see advance_bakery_economy_tick), so a post-
+                    # consumption reading would show 0 on every day baking
+                    # keeps up, masking whether production is happening at
+                    # all.
+                    bread_after_baking = self._quantities_by_building(
+                        GoodsStock.GoodType.BREAD, [b.id for b in bakeries]
+                    )
+                    bread_produced_today = sum(
+                        bread_after_baking.get(b.id, 0.0) - bread_before.get(b.id, 0.0)
+                        for b in bakeries
+                    )
+
+                    hunger_before = dict(
+                        CharacterNeeds.objects.values_list("id", "hunger")
+                    )
+                    advance_bread_consumption_tick(today=today)
+                    unfed_today = sum(
+                        1
+                        for needs_id, hunger_after in CharacterNeeds.objects.values_list(
+                            "id", "hunger"
+                        )
+                        if hunger_after > hunger_before.get(needs_id, 0.0)
+                    )
+
+                    if bread_produced_today > 0 and first_bread_day is None:
+                        first_bread_day = day_offset
+                    if min_bread is None or bread_produced_today < min_bread:
+                        min_bread = bread_produced_today
+
+                    hunger_values = list(
+                        CharacterNeeds.objects.values_list("hunger", flat=True)
+                    )
+                    max_hunger = max(hunger_values) if hunger_values else 0.0
+                    worst_hunger = max(worst_hunger, max_hunger)
+
+                    if should_print:
+                        # Bakery stock as of right now (post-consumption) -
+                        # the bread_after_baking snapshot above is pre-
+                        # consumption and only used for "made today".
+                        wheat_now = self._quantities_by_building(
+                            GoodsStock.GoodType.WHEAT, [g.id for g in granaries]
+                        )
+                        bread_now = self._quantities_by_building(
+                            GoodsStock.GoodType.BREAD, [b.id for b in bakeries]
+                        )
+
+                        row_values = [
+                            f"{wheat_now.get(g.id, 0.0) / 1000:,.1f}" for g in granaries
+                        ]
+                        for mill in mills:
+                            made = flour_after.get(mill.id, 0.0) - flour_before.get(
+                                mill.id, 0.0
+                            )
+                            row_values.append(f"{made / 1000:,.1f}")
+                            row_values.append(
+                                f"{flour_after.get(mill.id, 0.0) / 1000:,.1f}"
+                            )
+                        for bakery in bakeries:
+                            made = bread_after_baking.get(
+                                bakery.id, 0.0
+                            ) - bread_before.get(bakery.id, 0.0)
+                            row_values.append(f"{made / 1000:,.1f}")
+                            row_values.append(
+                                f"{bread_now.get(bakery.id, 0.0) / 1000:,.1f}"
+                            )
+
+                        self.stdout.write(
+                            f"{day_offset:>5} {today.isoformat():>10} "
+                            + " ".join(f"{v:>14}" for v in row_values)
+                            + f" {unfed_today:>7}"
+                        )
+            finally:
+                economy_logger.setLevel(previous_log_level)
 
             self._print_verdict(first_bread_day, min_bread, worst_hunger)
 
@@ -231,11 +330,6 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.MIGRATE_HEADING("\nWorking building storage"))
         for building in buildings:
-            centre_name = (
-                building.population_centre.name
-                if building.population_centre
-                else "(no centre)"
-            )
             for good_type in BUILDING_STORAGE_GOODS[building.building_type]:
                 stock, _ = GoodsStock.objects.get_or_create(
                     building=building, good_type=good_type
@@ -244,21 +338,27 @@ class Command(BaseCommand):
                     (stock.quantity / stock.capacity * 100) if stock.capacity else 0.0
                 )
                 self.stdout.write(
-                    f"  {building.building_type.title()} {building.id} "
-                    f"({centre_name}) {good_type}: "
+                    f"  {self._building_label(building)} {good_type}: "
                     f"{format_quantity(good_type, stock.quantity)} / "
                     f"{format_quantity(good_type, stock.capacity)} "
                     f"({fill_percent:.0f}%)"
                 )
 
-    def _stock_totals(self):
-        totals = {"wheat": 0.0, "flour": 0.0, "bread": 0.0}
-        for row in GoodsStock.objects.values("good_type").annotate(
-            total=Sum("quantity")
-        ):
-            if row["good_type"] in totals:
-                totals[row["good_type"]] = row["total"] or 0.0
-        return totals
+    def _building_label(self, building):
+        centre_name = (
+            building.population_centre.name
+            if building.population_centre
+            else "(no centre)"
+        )
+        return f"{building.building_type.title()} {building.id} ({centre_name})"
+
+    def _quantities_by_building(self, good_type, building_ids):
+        if not building_ids:
+            return {}
+        rows = GoodsStock.objects.filter(
+            good_type=good_type, building_id__in=building_ids
+        ).values_list("building_id", "quantity")
+        return dict(rows)
 
     def _print_verdict(self, first_bread_day, min_bread, worst_hunger):
         self.stdout.write(self.style.MIGRATE_HEADING("\nVerdict"))
@@ -269,7 +369,7 @@ class Command(BaseCommand):
                 f"  First bread produced on simulated day {first_bread_day}."
             )
         self.stdout.write(
-            f"  Minimum total bread stock reached: {format_quantity('bread', min_bread)}"
+            f"  Minimum bread baked in a single day: {format_quantity('bread', min_bread)}"
         )
         self.stdout.write(
             f"  Worst hunger value reached by any character: {worst_hunger:.1f}"
