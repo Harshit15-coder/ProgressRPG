@@ -232,7 +232,7 @@ class Command(BaseCommand):
             required_area = self.estimate_required_land(residents)
 
             landarea = LandArea.objects.create(
-                name=f"{pc.name} Land Area",
+                name=f"Land area",
                 population_centre=pc,
                 size=required_area,
             )

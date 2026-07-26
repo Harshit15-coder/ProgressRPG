@@ -373,7 +373,7 @@ class Building(models.Model):
     parent_for_navigation = "population_centre"
 
     def __str__(self):
-        return f"{self.name} ({self.building_type})"
+        return f"{self.name}"
 
     @property
     def display_name(self):
@@ -418,7 +418,7 @@ class InteriorSpace(models.Model):
     parent_for_navigation = "building"
 
     def __str__(self):
-        return f"{self.name} ({self.usage})"
+        return f"{self.name}"
 
 
 ##########################################################
@@ -449,7 +449,7 @@ class LandArea(models.Model):
     parent_for_navigation = "population_centre"
 
     def __str__(self):
-        return f"{self.name} ({self.size:.1f} ha)"
+        return f"{self.name}"
 
 
 class Subzone(models.Model):
@@ -483,7 +483,7 @@ class Subzone(models.Model):
     parent_for_navigation = "land_area"
 
     def __str__(self):
-        return f"{self.usage} ({self.size:.1f} ha)"
+        return f"Subzone: {self.usage}"
 
 
 ##########################################################

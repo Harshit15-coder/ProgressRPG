@@ -91,7 +91,7 @@ def _make_field_crop(
         size=1.0,
     )
     shelter = Building.objects.create(
-        name=f"Field Shelter of ({centre_name})",
+        name=f"Field Shelter",
         building_type="field_shelter",
         location=Point(90, 0, srid=3857),
         footprint=_square(90, 0, 5),
@@ -111,7 +111,7 @@ def _make_field_crop(
 
 def _make_granary(centre, storage_area=100.0):
     granary = Building.objects.create(
-        name=f"Granary of ({centre.name})",
+        name=f"Granary",
         building_type="granary",
         location=Point(-90, 0, srid=3857),
         footprint=_square(-90, 0, 5),
@@ -125,7 +125,7 @@ def _make_granary(centre, storage_area=100.0):
 
 def _make_mill(centre, grain_area=1000.0, flour_area=1000.0):
     mill = Building.objects.create(
-        name=f"Mill of ({centre.name})",
+        name=f"Mill",
         building_type="mill",
         location=Point(80, 0, srid=3857),
         footprint=_square(80, 0, 5),
@@ -150,7 +150,7 @@ def _make_mill(centre, grain_area=1000.0, flour_area=1000.0):
 
 def _make_bakery(centre, storage_area=1000.0):
     bakery = Building.objects.create(
-        name=f"Bakery of ({centre.name})",
+        name=f"Bakery",
         building_type="bakery",
         location=Point(60, 0, srid=3857),
         footprint=_square(60, 0, 5),

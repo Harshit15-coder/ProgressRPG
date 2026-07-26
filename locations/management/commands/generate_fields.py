@@ -65,7 +65,7 @@ class Command(BaseCommand):
                 irregularity=0,
             )
             shelter = Building.objects.create(
-                name=f"Field Shelter of ({centre.name})",
+                name=f"Field Shelter",
                 building_type="field_shelter",
                 location=shelter_point,
                 footprint=shelter_footprint,

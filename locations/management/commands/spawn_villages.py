@@ -216,12 +216,10 @@ class Command(BaseCommand):
                         for existing_fp in placed_footprints
                     ):
                         if btype_or_name in SPECIAL_BUILDINGS:
-                            building_name = (
-                                f"{btype_or_name.capitalize()} of ({centre_name})"
-                            )
+                            building_name = f"{btype_or_name.capitalize()}"
                             building_type = btype_or_name
                         else:
-                            building_name = f"House {btype_or_name.split('-')[1]} of ({centre_name})"
+                            building_name = f"House {btype_or_name.split('-')[1]}"
                             building_type = "residential"
 
                         placed_footprints.append(footprint)

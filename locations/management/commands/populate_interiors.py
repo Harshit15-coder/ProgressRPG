@@ -118,7 +118,7 @@ class Command(BaseCommand):
             name = info["usage"]
             space = InteriorSpace.objects.create(
                 building=building,
-                name=f"{name} of {building.name}",
+                name=f"{name.capitalize()}",
                 usage=info["usage"],
                 area=info["area"],
             )
