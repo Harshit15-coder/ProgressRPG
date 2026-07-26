@@ -7,10 +7,21 @@
  * correctly, and keeps the map filling its container instead of floating
  * small inside a much bigger, mismatched canvas.
  */
-export function computeViewBox(
+export interface ViewBoxRect {
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+}
+
+/**
+ * Same padded box as computeViewBox, as a rect rather than a string - used
+ * as the base/fully-zoomed-out extent for pan/zoom clamping.
+ */
+export function computeBaseRect(
   bbox: [number, number, number, number],
   paddingRatio = 0.08
-): string {
+): ViewBoxRect {
   const [minX, minY, maxX, maxY] = bbox;
 
   const geomWidth = maxX - minX || 1;
@@ -19,5 +30,18 @@ export function computeViewBox(
   const padX = geomWidth * paddingRatio;
   const padY = geomHeight * paddingRatio;
 
-  return `${minX - padX} ${minY - padY} ${geomWidth + padX * 2} ${geomHeight + padY * 2}`;
+  return {
+    x: minX - padX,
+    y: minY - padY,
+    w: geomWidth + padX * 2,
+    h: geomHeight + padY * 2,
+  };
+}
+
+export function computeViewBox(
+  bbox: [number, number, number, number],
+  paddingRatio = 0.08
+): string {
+  const { x, y, w, h } = computeBaseRect(bbox, paddingRatio);
+  return `${x} ${y} ${w} ${h}`;
 }
