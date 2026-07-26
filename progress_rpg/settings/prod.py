@@ -8,7 +8,7 @@ https://docs.djangoproject.com/en/5.1/ref/settings/
 
 from .base import *
 from urllib.parse import quote
-from .utils import get_redis_url, get_required_env
+from .utils import get_redis_url
 
 LOGGING = {
     "version": 1,
@@ -93,11 +93,10 @@ EMAIL_PORT = 587
 EMAIL_USE_TLS = True
 EMAIL_USE_SSL = False
 EMAIL_HOST_USER = "resend"  # Resend SMTP requires this literal string as the username
-EMAIL_HOST_PASSWORD = get_required_env(
-    "RESEND_API_KEY",
-    hint="Without it Django skips SMTP auth and Resend rejects every email "
-    "with '530 authentication Required'. Set it in the service's env group.",
-)
+# Validated by core.checks.check_required_prod_settings (manage.py check --deploy);
+# an unset key here just means Django skips SMTP auth and Resend rejects every
+# email with '530 authentication Required'.
+EMAIL_HOST_PASSWORD = os.environ.get("RESEND_API_KEY", "")
 
 print("DEBUG:", DEBUG, file=sys.stderr)
 

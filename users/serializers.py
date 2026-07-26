@@ -1,5 +1,6 @@
-from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
+from drf_spectacular.types import OpenApiTypes
+from drf_spectacular.utils import extend_schema_field
 
 from .achievements import achievement_goals_for_player
 from .models import Player, TutorialStep
@@ -22,6 +23,7 @@ class TutorialStepSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     alt_text = serializers.SerializerMethodField()
 
+    @extend_schema_field(serializers.URLField(allow_null=True))
     def get_image_url(self, obj) -> str | None:
         if not obj.image:
             return None
@@ -29,6 +31,7 @@ class TutorialStepSerializer(serializers.ModelSerializer):
         url = obj.image.image.url
         return request.build_absolute_uri(url) if request else url
 
+    @extend_schema_field(OpenApiTypes.STR)
     def get_alt_text(self, obj) -> str:
         return obj.image.alt_text if obj.image else ""
 
@@ -61,16 +64,18 @@ class PlayerSerializer(serializers.ModelSerializer):
     )
     unseen_tutorial_step_ids = serializers.SerializerMethodField()
 
+    @extend_schema_field(OpenApiTypes.BOOL)
     def get_is_tester(self, obj) -> bool:
         return obj.user.groups.filter(name="Testers").exists()
 
+    @extend_schema_field(serializers.ListField(child=serializers.IntegerField()))
     def get_unseen_tutorial_step_ids(self, obj) -> list[int]:
         seen_ids = set(obj.tutorial_steps_seen.values_list("id", flat=True))
         all_ids = set(TutorialStep.objects.values_list("id", flat=True))
         return sorted(all_ids - seen_ids)
 
     @extend_schema_field(AchievementGoalSerializer(many=True))
-    def get_achievements(self, obj):
+    def get_achievements(self, obj) -> list[dict[str, object]]:
         return achievement_goals_for_player(obj)
 
     def validate_name(self, value):

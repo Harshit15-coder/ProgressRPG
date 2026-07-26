@@ -31,6 +31,7 @@ site/
 .ds-sync/
 ds-bundle/
 .design-sync/.cache/
+.design-sync/sb-reference/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/sb-reference/
