@@ -29,6 +29,7 @@ from .serializers import (
     FeatureCollectionSerializer,
     CharacterPointFeatureSerializer,
     BuildingFeatureSerializer,
+    SubzoneFeatureSerializer,
 )
 
 ##########################################################
@@ -42,7 +43,16 @@ class PopulationCentreMapView(APIView):
 
     def get(self, request, pk):
         population_centre = get_object_or_404(PopulationCentre, pk=pk)
-        buildings = population_centre.buildings.all()
+        buildings = list(
+            population_centre.buildings.all().prefetch_related(
+                "character_locations", "goods_stocks"
+            )
+        )
+        crop_subzones = list(
+            Subzone.objects.filter(
+                land_area__population_centre=population_centre, usage="crops"
+            ).select_related("field_crop")
+        )
 
         paths = (
             population_centre.paths.all()
@@ -53,14 +63,15 @@ class PopulationCentreMapView(APIView):
                 "to_node__location",
             )
         )
-        characters = population_centre.residents.only(
-            "id", "first_name", "last_name", "location"
-        )
+        characters = population_centre.residents.select_related(
+            "needs"
+        ).prefetch_related("locations__location")
 
         features = []
         features.append(BoundaryFeatureSerializer(population_centre).data)
         features.extend(CharacterPointFeatureSerializer(characters, many=True).data)
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
+        features.extend(SubzoneFeatureSerializer(crop_subzones, many=True).data)
         features.extend(PathFeatureSerializer(paths, many=True).data)
 
         bbox = (
@@ -68,6 +79,21 @@ class PopulationCentreMapView(APIView):
             if population_centre.boundary
             else None
         )
+        for polygon_obj, polygon_attr in [
+            *((b, "footprint") for b in buildings),
+            *((s, "boundary") for s in crop_subzones),
+        ]:
+            geom = getattr(polygon_obj, polygon_attr)
+            if geom is None:
+                continue
+            g_min_x, g_min_y, g_max_x, g_max_y = geom.extent
+            if bbox is None:
+                bbox = [g_min_x, g_min_y, g_max_x, g_max_y]
+                continue
+            bbox[0] = min(bbox[0], g_min_x)
+            bbox[1] = min(bbox[1], g_min_y)
+            bbox[2] = max(bbox[2], g_max_x)
+            bbox[3] = max(bbox[3], g_max_y)
         meta = {
             "population_centre_id": population_centre.id,
             "feature_count": len(features),

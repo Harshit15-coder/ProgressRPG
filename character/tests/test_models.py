@@ -210,8 +210,7 @@ class LifeCycleMixinTests(TestCase):
         male_partner.save()
         self.assertFalse(self.character.can_reproduce_with(male_partner))
 
-    @patch("character.models.random")
-    def test_start_pregnancy(self, mock_random):
+    def test_start_pregnancy(self):
         """Test starting pregnancy"""
         partner = Character.objects.create(
             first_name="Partner",
@@ -226,10 +225,12 @@ class LifeCycleMixinTests(TestCase):
         self.assertEqual(self.character.pregnancy_start_date, now().date())
         self.assertEqual(self.character.pregnancy_partner, partner)
 
-    @patch("character.models.random")
-    def test_handle_childbirth(self, mock_random):
+    @patch("character.services.lifecycle_services.randint")
+    def test_handle_childbirth(self, mock_randint):
         """Test childbirth handling"""
-        mock_random.return_value = 0.7  # Female child
+        mock_randint.return_value = (
+            1  # Female child (sex is Male only when randint == 0)
+        )
 
         partner = Character.objects.create(
             first_name="Partner",

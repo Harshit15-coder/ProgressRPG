@@ -24,6 +24,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const { announcementUnreadCount, setAnnouncementUnreadCount } = useGame();
   const location = useLocation();
   const isAnnouncementsEnabled = useFeatureFlag("announcements");
+  const isMapEnabled = useFeatureFlag("map");
 
   const { data: announcementsData, isLoading: announcementsLoading } =
     useAnnouncements(isAnnouncementsEnabled);
@@ -33,6 +34,7 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
   const isTimerPage = location.pathname === "/timer";
   const isHomePage = location.pathname === "/";
   const isLibraryPage = location.pathname.startsWith("/library");
+  const isMapPage = location.pathname === "/map";
   const isAccountPage = location.pathname === "/account";
 
   const announcements = announcementsData?.results ?? [];
@@ -86,6 +88,17 @@ export default function Navbar({ onMenuClick, onHelpClick }: NavbarProps) {
                 className={styles.navLink}
               >
                 <span aria-hidden="true">📚 </span>Your library
+              </Button>
+            </Link>
+          )}
+
+          {isAuthenticated && isMapEnabled && (
+            <Link to="/map" aria-label="Go to the map">
+              <Button
+                variant={isMapPage ? "primary" : "secondary"}
+                className={styles.navLink}
+              >
+                <span aria-hidden="true">🗺️ </span>Map
               </Button>
             </Link>
           )}

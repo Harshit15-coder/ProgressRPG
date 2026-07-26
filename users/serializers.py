@@ -1,3 +1,4 @@
+from drf_spectacular.utils import extend_schema_field
 from rest_framework import serializers
 
 from .achievements import achievement_goals_for_player
@@ -5,18 +6,30 @@ from .models import Player, TutorialStep
 from .validators import clean_player_name
 
 
+class AchievementGoalSerializer(serializers.Serializer):
+    type = serializers.CharField()
+    label = serializers.CharField()
+    symbol = serializers.CharField()
+    tier = serializers.IntegerField()
+    complete = serializers.BooleanField()
+    color = serializers.CharField()
+    value = serializers.IntegerField()
+    threshold = serializers.IntegerField()
+    next_threshold = serializers.IntegerField(allow_null=True)
+
+
 class TutorialStepSerializer(serializers.ModelSerializer):
     image_url = serializers.SerializerMethodField()
     alt_text = serializers.SerializerMethodField()
 
-    def get_image_url(self, obj):
+    def get_image_url(self, obj) -> str | None:
         if not obj.image:
             return None
         request = self.context.get("request")
         url = obj.image.image.url
         return request.build_absolute_uri(url) if request else url
 
-    def get_alt_text(self, obj):
+    def get_alt_text(self, obj) -> str:
         return obj.image.alt_text if obj.image else ""
 
     class Meta:
@@ -48,14 +61,15 @@ class PlayerSerializer(serializers.ModelSerializer):
     )
     unseen_tutorial_step_ids = serializers.SerializerMethodField()
 
-    def get_is_tester(self, obj):
+    def get_is_tester(self, obj) -> bool:
         return obj.user.groups.filter(name="Testers").exists()
 
-    def get_unseen_tutorial_step_ids(self, obj):
+    def get_unseen_tutorial_step_ids(self, obj) -> list[int]:
         seen_ids = set(obj.tutorial_steps_seen.values_list("id", flat=True))
         all_ids = set(TutorialStep.objects.values_list("id", flat=True))
         return sorted(all_ids - seen_ids)
 
+    @extend_schema_field(AchievementGoalSerializer(many=True))
     def get_achievements(self, obj):
         return achievement_goals_for_player(obj)
 

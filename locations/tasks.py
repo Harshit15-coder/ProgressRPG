@@ -96,6 +96,25 @@ def wander_tick(fraction=0.2):
 
 
 @shared_task
+def commute_tick():
+    """
+    Sweep idle, village-assigned characters and send anyone who should be
+    home/at work but isn't (and isn't already heading there) via the
+    existing Journey/set_destination movement stack. Replaces wander_tick
+    as the scheduled beat task - see locations.services.schedule.
+    """
+    from character.models import Character
+    from .services.schedule import sync_character_location
+
+    for character in (
+        Character.objects.filter(is_moving=False, population_centre__isnull=False)
+        .select_related("current_node", "target_node")
+        .iterator(chunk_size=100)
+    ):
+        sync_character_location(character)
+
+
+@shared_task
 def spawn_villages_task():
     call_command("spawn_villages")
 

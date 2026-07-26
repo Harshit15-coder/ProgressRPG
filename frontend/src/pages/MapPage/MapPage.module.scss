@@ -8,20 +8,6 @@
   @include m.page-layout();
 }
 
-.header {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  margin-bottom: v.$spacing-sm;
-  gap: v.$spacing-md;
-  width: 100%;
-
-  h1 {
-    margin: 0;
-  }
-}
-
-
 /* Centre content consistently */
 .content {
   display: flex;

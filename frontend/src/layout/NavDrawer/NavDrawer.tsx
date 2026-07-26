@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useRef } from "react";
 import styles from "./NavDrawer.module.scss";
 import { Link } from "react-router-dom";
 import { useAuth } from "../../context/AuthContext";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 
 interface NavDrawerProps {
   drawerOpen: boolean;
@@ -11,6 +12,7 @@ interface NavDrawerProps {
 export default function NavDrawer({ drawerOpen, onClose }: NavDrawerProps) {
   const drawerRef = useRef<HTMLElement>(null);
   const { isAuthenticated } = useAuth();
+  const isMapEnabled = useFeatureFlag("map");
 
   const handleClose = useCallback(() => {
     const activeElement = document.activeElement as HTMLElement | null;
@@ -82,6 +84,13 @@ export default function NavDrawer({ drawerOpen, onClose }: NavDrawerProps) {
                   <span aria-hidden="true">📚 </span>Your library
                 </Link>
               </li>
+              {isMapEnabled && (
+                <li>
+                  <Link to="/map" onClick={handleClose} tabIndex={drawerOpen ? 0 : -1}>
+                    <span aria-hidden="true">🗺️ </span>Map
+                  </Link>
+                </li>
+              )}
             </>
           ) : (
             <>

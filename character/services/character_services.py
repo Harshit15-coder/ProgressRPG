@@ -24,9 +24,29 @@ def character_react_to_sun_phase(character, phase: str) -> None:
 
 
 def character_assign_home(character, building) -> None:
+    from character.models import CharacterLocation
+
     character.building = building
     character.population_centre = building.population_centre
     character.save(update_fields=["building", "population_centre"])
+
+    CharacterLocation.objects.update_or_create(
+        character=character,
+        role=CharacterLocation.Role.HOME,
+        is_primary=True,
+        defaults={"location": building},
+    )
+
+
+def character_assign_work(character, building) -> None:
+    from character.models import CharacterLocation
+
+    CharacterLocation.objects.update_or_create(
+        character=character,
+        role=CharacterLocation.Role.WORK,
+        is_primary=True,
+        defaults={"location": building},
+    )
 
 
 @transaction.atomic

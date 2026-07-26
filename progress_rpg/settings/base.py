@@ -82,6 +82,7 @@ INSTALLED_APPS = [
     "sendgrid",
     "core",
     "character",
+    "economy",
     "gameplay",
     "gameworld",
     # "events",

@@ -153,7 +153,7 @@ class FetchInfoResponseSerializer(serializers.Serializer):
 class AnnouncementSerializer(serializers.ModelSerializer):
     is_read = serializers.SerializerMethodField()
 
-    def get_is_read(self, obj):
+    def get_is_read(self, obj) -> bool:
         read_ids = self.context.get("read_ids", set())
         return obj.id in read_ids
 

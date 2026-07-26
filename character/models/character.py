@@ -240,6 +240,9 @@ class Character(Person, LifeCycleMixin, Movable):
     def assign_home(self, building: Building):
         return character_services.character_assign_home(self, building)
 
+    def assign_work(self, building: Building):
+        return character_services.character_assign_work(self, building)
+
     @transaction.atomic
     def complete_quest(self, xp_gained):
         """
