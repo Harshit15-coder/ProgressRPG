@@ -368,9 +368,14 @@ class Command(BaseCommand):
             self.stdout.write(
                 f"  First bread produced on simulated day {first_bread_day}."
             )
-        self.stdout.write(
-            f"  Minimum bread baked in a single day: {format_quantity('bread', min_bread)}"
-        )
+        if min_bread is None:
+            self.stdout.write(
+                "  Minimum bread baked in a single day: n/a (no days simulated)"
+            )
+        else:
+            self.stdout.write(
+                f"  Minimum bread baked in a single day: {format_quantity('bread', min_bread)}"
+            )
         self.stdout.write(
             f"  Worst hunger value reached by any character: {worst_hunger:.1f}"
         )
