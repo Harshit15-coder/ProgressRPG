@@ -43,11 +43,15 @@ class PopulationCentreMapView(APIView):
 
     def get(self, request, pk):
         population_centre = get_object_or_404(PopulationCentre, pk=pk)
-        buildings = list(population_centre.buildings.all())
+        buildings = list(
+            population_centre.buildings.all().prefetch_related(
+                "character_locations", "goods_stocks"
+            )
+        )
         crop_subzones = list(
             Subzone.objects.filter(
                 land_area__population_centre=population_centre, usage="crops"
-            )
+            ).select_related("field_crop")
         )
 
         paths = (
@@ -59,9 +63,9 @@ class PopulationCentreMapView(APIView):
                 "to_node__location",
             )
         )
-        characters = population_centre.residents.only(
-            "id", "first_name", "last_name", "location"
-        )
+        characters = population_centre.residents.select_related(
+            "needs"
+        ).prefetch_related("locations__location")
 
         features = []
         features.append(BoundaryFeatureSerializer(population_centre).data)

@@ -1,9 +1,11 @@
 from django.db import models
+from django.utils import timezone
 
 from .constants import (
     GOOD_TYPE_BULK_DENSITY,
     GOOD_TYPE_STORAGE_USAGE,
     GOOD_TYPE_UNIT,
+    GROWTH_DURATION,
     STORAGE_CAPACITY_PER_AREA_VOLUME,
     STORAGE_CAPACITY_PER_AREA_WEIGHT,
     UnitKind,
@@ -41,6 +43,22 @@ class FieldCrop(models.Model):
 
     def __str__(self):
         return f"FieldCrop({self.subzone_id}, {self.stage})"
+
+    @property
+    def growth_progress(self):
+        """
+        Fraction of GROWTH_DURATION elapsed since planting, clamped to
+        [0, 1] - purely a display derivation (e.g. field colour), not used
+        by the stage-transition logic itself (see advance_field_growth_tick
+        in tasks.py, which compares planted_at/GROWTH_DURATION directly).
+        Only meaningful while GROWING; None otherwise since fallow fields
+        haven't been planted and ready fields are already at their mature
+        appearance.
+        """
+        if self.stage != self.Stage.GROWING or self.planted_at is None:
+            return None
+        elapsed = timezone.now() - self.planted_at
+        return max(0.0, min(1.0, elapsed / GROWTH_DURATION))
 
 
 class GoodsStock(models.Model):

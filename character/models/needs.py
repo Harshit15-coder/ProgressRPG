@@ -1,5 +1,7 @@
 from django.db import models
 
+from economy.constants import HUNGER_MAX
+
 
 class CharacterNeeds(models.Model):
     """
@@ -16,3 +18,7 @@ class CharacterNeeds(models.Model):
 
     def __str__(self):
         return f"CharacterNeeds({self.character_id}, hunger={self.hunger:.1f})"
+
+    def hunger_label(self):
+        """Player-friendly hunger wording - "Hungry" from the midpoint up."""
+        return "Hungry" if self.hunger >= HUNGER_MAX / 2 else "Well fed"
