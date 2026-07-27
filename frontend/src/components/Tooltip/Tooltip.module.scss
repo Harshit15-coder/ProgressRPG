@@ -1,6 +1,16 @@
 @use '../../styles/base/variables' as v;
 @use '../../styles/semantic/colors' as c;
 
+.trigger {
+  // Click/tap opens the tooltip now (see #568), so a long-press on a
+  // trigger must never fall through to the browser's native
+  // text-selection/callout gesture - only our own tap handling should run.
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .content {
   z-index: v.$z-index-tooltip;
   // Read-only content, never something to click/hover on its own - but on

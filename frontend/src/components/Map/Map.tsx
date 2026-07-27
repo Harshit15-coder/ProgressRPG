@@ -564,10 +564,7 @@ export default function PopulationCentreMap({
   }, []);
 
   return (
-    // Local provider: map tooltips should appear immediately on hover
-    // (markers are small and easy to overshoot), independent of the app's
-    // default hover delay used elsewhere.
-    <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+    <TooltipProvider>
     <div className={styles.mapWrapper}>
       <svg
         ref={svgRef}
