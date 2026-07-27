@@ -7,22 +7,49 @@ function renderTooltip() {
   render(
     <TooltipProvider delayDuration={0} skipDelayDuration={0}>
       <Tooltip content="Helpful context">
-        <button type="button">Hover me</button>
+        <button type="button">Trigger</button>
       </Tooltip>
+      <button type="button">Elsewhere</button>
     </TooltipProvider>
   );
 }
 
 describe('Tooltip', () => {
-  it('shows on hover and hides when the pointer leaves', async () => {
+  it('does not open on hover', async () => {
     const user = userEvent.setup();
 
     renderTooltip();
 
-    await user.hover(screen.getByRole('button', { name: 'Hover me' }));
+    await user.hover(screen.getByRole('button', { name: 'Trigger' }));
+
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+  });
+
+  it('opens on click and closes when the trigger is clicked again', async () => {
+    const user = userEvent.setup();
+
+    renderTooltip();
+
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
+
+    await user.click(trigger);
     expect(await screen.findByRole('tooltip')).toHaveTextContent('Helpful context');
 
-    await user.unhover(screen.getByRole('button', { name: 'Hover me' }));
+    await user.click(trigger);
+    await waitFor(() => {
+      expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
+    });
+  });
+
+  it('closes when clicking outside the trigger, including unrelated elements', async () => {
+    const user = userEvent.setup();
+
+    renderTooltip();
+
+    await user.click(screen.getByRole('button', { name: 'Trigger' }));
+    expect(await screen.findByRole('tooltip')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Elsewhere' }));
 
     await waitFor(() => {
       expect(screen.queryByRole('tooltip')).not.toBeInTheDocument();
@@ -36,7 +63,7 @@ describe('Tooltip', () => {
 
     await user.tab();
 
-    const trigger = screen.getByRole('button', { name: 'Hover me' });
+    const trigger = screen.getByRole('button', { name: 'Trigger' });
     const tooltip = await screen.findByRole('tooltip');
 
     expect(trigger).toHaveFocus();

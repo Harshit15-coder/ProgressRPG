@@ -7,7 +7,7 @@ import { TooltipProvider } from '../Tooltip/Tooltip';
 
 function renderMap(props: ComponentProps<typeof PopulationCentreMap>) {
   return render(
-    <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+    <TooltipProvider>
       <PopulationCentreMap {...props} />
     </TooltipProvider>
   );
@@ -332,13 +332,13 @@ describe('PopulationCentreMap', () => {
     };
     const user = userEvent.setup();
     render(
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <TooltipProvider>
         <PopulationCentreMap geojson={geojsonWithBuilding} />
       </TooltipProvider>
     );
 
     const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.hover(building);
+    await user.click(building);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('House');
@@ -368,13 +368,13 @@ describe('PopulationCentreMap', () => {
     };
     const user = userEvent.setup();
     render(
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <TooltipProvider>
         <PopulationCentreMap geojson={geojsonWithBuilding} />
       </TooltipProvider>
     );
 
     const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.hover(building);
+    await user.click(building);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Workers: 2');
@@ -401,13 +401,13 @@ describe('PopulationCentreMap', () => {
     };
     const user = userEvent.setup();
     render(
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <TooltipProvider>
         <PopulationCentreMap geojson={geojsonWithHouse} />
       </TooltipProvider>
     );
 
     const house = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.hover(house);
+    await user.click(house);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Residents: 3');
@@ -433,12 +433,12 @@ describe('PopulationCentreMap', () => {
     };
     const user = userEvent.setup();
     render(
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <TooltipProvider>
         <PopulationCentreMap geojson={geojsonWithCharacter} />
       </TooltipProvider>
     );
 
-    await user.hover(document.querySelector('g') as SVGGElement);
+    await user.click(document.querySelector('g') as SVGGElement);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
@@ -466,13 +466,13 @@ describe('PopulationCentreMap', () => {
     };
     const user = userEvent.setup();
     render(
-      <TooltipProvider delayDuration={0} skipDelayDuration={0}>
+      <TooltipProvider>
         <PopulationCentreMap geojson={geojsonWithReadyField} />
       </TooltipProvider>
     );
 
     const field = document.querySelector('polygon[fill="#E4C158"]') as SVGPolygonElement;
-    await user.hover(field);
+    await user.click(field);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Ready to harvest');
