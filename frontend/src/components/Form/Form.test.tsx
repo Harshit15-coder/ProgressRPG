@@ -57,6 +57,52 @@ describe("Form", () => {
     expect(screen.queryByText("This field is required")).not.toBeInTheDocument();
   });
 
+  it("validates required checkboxes against their checked state", async () => {
+    const user = userEvent.setup();
+
+    const { rerender } = render(
+      <Form
+        title="Terms form"
+        onSubmit={(event) => event.preventDefault()}
+        fields={[
+          {
+            name: "agree_to_terms",
+            label: "I agree",
+            type: "checkbox",
+            checked: false,
+            onChange: vi.fn(),
+            required: true,
+          },
+        ]}
+      />
+    );
+
+    await user.click(screen.getByRole("checkbox"));
+    await user.tab();
+
+    expect(screen.getByText("This field is required")).toBeInTheDocument();
+
+    rerender(
+      <Form
+        title="Terms form"
+        onSubmit={(event) => event.preventDefault()}
+        fields={[
+          {
+            name: "agree_to_terms",
+            label: "I agree",
+            type: "checkbox",
+            checked: true,
+            onChange: vi.fn(),
+            required: true,
+          },
+        ]}
+      />
+    );
+
+    expect(screen.getByRole("checkbox")).toBeChecked();
+    expect(screen.queryByText("This field is required")).not.toBeInTheDocument();
+  });
+
   it("disables the submit button while submitting", () => {
     render(
       <Form

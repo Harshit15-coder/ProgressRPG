@@ -1,19 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Form from '../../components/Form/Form';
 import Input from '../../components/Input/Input';
+import Turnstile from '../../components/Turnstile/Turnstile';
 import WaitlistForm from '../../components/WaitlistForm/WaitlistForm';
 import useRegister from '../../hooks/useRegister';
 import { useRegistrationStatus } from '../../hooks/useRegistrationStatus';
 import styles from './RegisterPage.module.scss';
-
-declare global {
-  interface Window {
-    __turnstileCallback?: (token: string) => void;
-  }
-}
-
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
 function RegistrationForm({
   inviteToken,
@@ -34,13 +27,10 @@ function RegistrationForm({
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [formState, setFormState] = useState<'default' | 'submitted'>('default');
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
-  useEffect(() => {
-    // Expose a global callback for the Turnstile widget to call
-    window.__turnstileCallback = (token: string) => setTurnstileToken(token);
-    return () => {
-      delete window.__turnstileCallback;
-    };
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
   }, []);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,7 +44,14 @@ function RegistrationForm({
       return;
     }
 
-    if (!turnstileToken) {
+    if (!agreeToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy.');
+      return;
+    }
+
+    // Without a site key there is no widget to complete, so don't gate on a
+    // token the user has no way of producing (the backend still verifies).
+    if (turnstileSiteKey && !turnstileToken) {
       setError('Please complete the security check.');
       return;
     }
@@ -164,6 +161,7 @@ function RegistrationForm({
             checked={agreeToTerms}
             onChange={(e) => setAgreeToTerms(e.target.checked)}
             required
+            aria-invalid={!!error && !agreeToTerms}
           />
           <label htmlFor="agree_to_terms">
             I agree to the{' '}
@@ -177,11 +175,9 @@ function RegistrationForm({
             .
           </label>
         </div>
-        <div
-          className="cf-turnstile"
-          data-sitekey={TURNSTILE_SITE_KEY}
-          data-callback="__turnstileCallback"
-        />
+        {turnstileSiteKey && (
+          <Turnstile sitekey={turnstileSiteKey} onToken={handleTurnstileToken} />
+        )}
       </Form>
       {error && (
         <p className={styles.error} role="alert">
