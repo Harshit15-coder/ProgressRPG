@@ -46,6 +46,8 @@ export interface RegistrationStatus {
   registration_open: boolean;
   registration_enabled: boolean;
   self_serve_registration: boolean;
+  /** Public Cloudflare Turnstile site key; empty when Turnstile is unconfigured. */
+  turnstile_site_key?: string;
 }
 
 /** Game settings returned in fetch_info and /game_settings/ */

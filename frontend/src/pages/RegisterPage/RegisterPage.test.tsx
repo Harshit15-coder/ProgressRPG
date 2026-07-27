@@ -31,12 +31,13 @@ function installTurnstile() {
   };
 }
 
-function openRegistration() {
+function openRegistration(turnstileSiteKey = "site-key-123") {
   mockUseRegistrationStatus.mockReturnValue({
     data: {
       registration_open: true,
       registration_enabled: true,
       self_serve_registration: true,
+      turnstile_site_key: turnstileSiteKey,
     },
     isLoading: false,
   });
@@ -159,7 +160,6 @@ describe("RegisterPage", () => {
   it("renders the Turnstile widget when the form mounts after the script has loaded", () => {
     // Reproduces the SPA bug: the form only mounts once the registration-status
     // query resolves, long after Cloudflare's implicit DOM scan has run.
-    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "site-key-123");
     installTurnstile();
     openRegistration();
 
@@ -170,7 +170,6 @@ describe("RegisterPage", () => {
   });
 
   it("blocks submission until the security check produces a token", async () => {
-    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "site-key-123");
     installTurnstile();
     openRegistration();
     const user = userEvent.setup();
@@ -186,7 +185,6 @@ describe("RegisterPage", () => {
   });
 
   it("submits with the token once the security check completes", async () => {
-    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "site-key-123");
     installTurnstile();
     openRegistration();
     const user = userEvent.setup();
@@ -203,7 +201,7 @@ describe("RegisterPage", () => {
 
   it("does not gate submission on a token when no site key is configured", async () => {
     vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "");
-    openRegistration();
+    openRegistration("");
     const user = userEvent.setup();
 
     renderRegisterPage();
@@ -215,8 +213,18 @@ describe("RegisterPage", () => {
     await waitFor(() => expect(mockRegister).toHaveBeenCalledTimes(1));
   });
 
+  it("falls back to the build-time site key when the API returns none", () => {
+    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "env-key-456");
+    installTurnstile();
+    openRegistration("");
+
+    renderRegisterPage();
+
+    expect(turnstileWidgets).toHaveLength(1);
+    expect(turnstileWidgets[0].options.sitekey).toBe("env-key-456");
+  });
+
   it("requires the terms checkbox before submitting", async () => {
-    vi.stubEnv("VITE_TURNSTILE_SITE_KEY", "site-key-123");
     installTurnstile();
     openRegistration();
     const user = userEvent.setup();
