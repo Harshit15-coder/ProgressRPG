@@ -5,10 +5,12 @@ import Button from '../Button/Button';
 
 /**
  * `Tooltip` wraps a single focusable trigger element and shows supplementary
- * content on hover/focus via Radix. It must be nested under a
+ * content on click/tap or focus via Radix — hover never opens it, on either
+ * desktop or mobile (see #568). Clicking/tapping the trigger again, clicking
+ * anywhere else, or pressing Escape closes it. It must be nested under a
  * `TooltipProvider` (mounted once near the app root). Use tooltips only for
  * supplementary context — essential information must remain available
- * without hovering or focusing.
+ * without clicking or focusing.
  */
 const meta: Meta<typeof Tooltip> = {
   title: 'Shared/Tooltip',
@@ -22,7 +24,7 @@ const meta: Meta<typeof Tooltip> = {
     ),
   ],
   args: {
-    content: 'Additional context shown on hover or focus',
+    content: 'Additional context shown on click/tap or focus',
     placement: 'top',
   },
 };
@@ -33,16 +35,16 @@ type Story = StoryObj<typeof Tooltip>;
 export const Default: Story = {
   render: (args) => (
     <Tooltip {...args}>
-      <Button>Hover or focus me</Button>
+      <Button>Click or focus me</Button>
     </Tooltip>
   ),
   play: async ({ canvas, userEvent, canvasElement }) => {
-    const trigger = canvas.getByRole('button', { name: 'Hover or focus me' });
+    const trigger = canvas.getByRole('button', { name: 'Click or focus me' });
     await userEvent.tab();
     await expect(trigger).toHaveFocus();
     // Tooltip content renders via a Radix Portal into document.body.
     const tooltip = await within(canvasElement.ownerDocument.body).findByRole('tooltip');
-    await expect(tooltip).toHaveTextContent('Additional context shown on hover or focus');
+    await expect(tooltip).toHaveTextContent('Additional context shown on click/tap or focus');
   },
 };
 
