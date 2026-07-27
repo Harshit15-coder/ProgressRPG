@@ -258,6 +258,7 @@ class RegistrationStatusResponseSerializer(serializers.Serializer):
     registration_open = serializers.BooleanField()
     registration_enabled = serializers.BooleanField()
     self_serve_registration = serializers.BooleanField()
+    turnstile_site_key = serializers.CharField(allow_blank=True)
 
 
 class WaitlistJoinRequestSerializer(serializers.Serializer):

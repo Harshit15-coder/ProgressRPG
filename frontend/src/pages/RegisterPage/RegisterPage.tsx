@@ -8,12 +8,21 @@ import useRegister from '../../hooks/useRegister';
 import { useRegistrationStatus } from '../../hooks/useRegistrationStatus';
 import styles from './RegisterPage.module.scss';
 
+// The site key comes from the backend (see /registration_status/) so rotating
+// it or turning Turnstile on doesn't need a frontend rebuild. The build-time
+// env var stays supported as a local override.
+function resolveTurnstileSiteKey(apiSiteKey?: string): string | undefined {
+  return apiSiteKey || (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) || undefined;
+}
+
 function RegistrationForm({
   inviteToken,
   selfServe,
+  turnstileSiteKey,
 }: {
   inviteToken?: string;
   selfServe?: boolean;
+  turnstileSiteKey?: string;
 }): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,7 +36,6 @@ function RegistrationForm({
   const [agreeToTerms, setAgreeToTerms] = useState(false);
   const [formState, setFormState] = useState<'default' | 'submitted'>('default');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const turnstileSiteKey = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -250,6 +258,7 @@ export default function RegisterPage(): React.ReactElement {
           key={location.key}
           inviteToken={inviteToken}
           selfServe={data?.self_serve_registration}
+          turnstileSiteKey={resolveTurnstileSiteKey(data?.turnstile_site_key)}
         />
       </div>
     </div>

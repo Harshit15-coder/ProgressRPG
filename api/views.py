@@ -177,6 +177,10 @@ class RegistrationStatusAPIView(APIView):
                 "registration_open": registration_open,
                 "registration_enabled": game_settings.registration_enabled,
                 "self_serve_registration": game_settings.self_serve_registration,
+                # The site key is public, and serving it here keeps it out of
+                # the frontend build: rotating the key or enabling Turnstile
+                # needs only a backend env change, no rebuild.
+                "turnstile_site_key": settings.CF_TURNSTILE_SITE_KEY or "",
             }
         )
 

@@ -77,6 +77,18 @@ class RegistrationStatusAPITest(APITestCase):
         self.assertEqual(res.status_code, status.HTTP_200_OK)
         self.assertTrue(res.json()["self_serve_registration"])
 
+    def test_turnstile_site_key_reported_when_configured(self):
+        with override_settings(CF_TURNSTILE_SITE_KEY="0x-site-key"):
+            res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()["turnstile_site_key"], "0x-site-key")
+
+    def test_turnstile_site_key_blank_when_unconfigured(self):
+        with override_settings(CF_TURNSTILE_SITE_KEY=None):
+            res = self.client.get("/api/v1/registration_status/")
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.json()["turnstile_site_key"], "")
+
 
 class RegistrationKillSwitchTest(APITestCase):
     def setUp(self):
