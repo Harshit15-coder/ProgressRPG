@@ -164,32 +164,42 @@ def step_toward(movable, time_delta: float = 1.0, speed_modifier: float = 1.0):
         return False
 
     movable._journey = journey
-    next_node = journey.next_node()
-    if not next_node:
-        arrive(movable, journey)
-        return False
 
-    dx = next_node.location.x - movable.location.x
-    dy = next_node.location.y - movable.location.y
-    distance = (dx**2 + dy**2) ** 0.5
-    max_distance = movable.movement_speed * speed_modifier * time_delta
+    # Budget for this tick, spent across as many nodes as it reaches rather
+    # than being dropped when a single segment is shorter than the budget -
+    # otherwise a character crossing several short segments in one tick
+    # visibly slows down at each node instead of moving at a constant speed.
+    remaining_distance = movable.movement_speed * speed_modifier * time_delta
 
-    if distance <= max_distance:
-        movable.location = Point(next_node.location.x, next_node.location.y, srid=3857)
-
-        movable.current_node = next_node
-        journey.advance_node()
-
-        if journey.is_complete:
+    while remaining_distance > 0:
+        next_node = journey.next_node()
+        if not next_node:
             arrive(movable, journey)
             return False
-    else:
-        factor = max_distance / distance
-        new_x = movable.location.x + dx * factor
-        new_y = movable.location.y + dy * factor
-        movable.location = Point(new_x, new_y, srid=3857)
-        if not movable.is_moving:
-            movable.is_moving = True
+
+        dx = next_node.location.x - movable.location.x
+        dy = next_node.location.y - movable.location.y
+        distance = (dx**2 + dy**2) ** 0.5
+
+        if distance <= remaining_distance:
+            movable.location = Point(
+                next_node.location.x, next_node.location.y, srid=3857
+            )
+            movable.current_node = next_node
+            journey.advance_node()
+            remaining_distance -= distance
+
+            if journey.is_complete:
+                arrive(movable, journey)
+                return False
+        else:
+            factor = remaining_distance / distance
+            new_x = movable.location.x + dx * factor
+            new_y = movable.location.y + dy * factor
+            movable.location = Point(new_x, new_y, srid=3857)
+            if not movable.is_moving:
+                movable.is_moving = True
+            remaining_distance = 0
 
     return True
 
