@@ -15,6 +15,7 @@ from .models import (
     Waitlist,
 )
 from .services import waitlist_service
+from .services.registration_services import ensure_player_setup_for_user
 from character.models import PlayerCharacterLink, Character
 from core.models import GameSettings
 from payments.models import UserSubscription
@@ -245,6 +246,11 @@ class CustomUserAdmin(UserAdmin):
             # path as everyone else, keeping the registration cap accurate.
             obj.is_confirmed = True
         super().save_model(request, obj, form, change)
+        if not change:
+            # UserAdmin.save_model() just does obj.save() - it doesn't go
+            # through CustomUserManager.create_user(), so player setup
+            # (Player + ActivityTimer) has to be triggered explicitly here.
+            ensure_player_setup_for_user(obj)
 
     readonly_fields = [
         "created_at",
