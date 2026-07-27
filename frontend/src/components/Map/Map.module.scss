@@ -89,7 +89,9 @@
 .characterMarker {
   // Positioned via inline transform (translate); animate position changes
   // between polls so wandering reads as a slow drift, not a teleport.
-  transition: transform 4s linear;
+  // Matches MapPage's MAP_POLL_INTERVAL_MS so the glide from one poll lands
+  // right as the next one arrives, instead of gliding then sitting still.
+  transition: transform 2s linear;
 
   // No visible focus ring on click/selection - only show one for keyboard
   // navigation, where a visible indicator is actually needed.

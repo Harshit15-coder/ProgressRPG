@@ -5,9 +5,9 @@ import { apiFetch } from "../../utils/api";
 
 import styles from "./MapPage.module.scss";
 
-// Matches the wander_tick cadence (locations/tasks.py) so polling doesn't
-// outrun the decorative movement it's meant to reveal.
-const MAP_POLL_INTERVAL_MS = 10000;
+// Close to move_characters_tick's 1s cadence (locations/tasks.py) so the map
+// tracks actual journeys closely, without polling every single tick.
+const MAP_POLL_INTERVAL_MS = 2000;
 
 interface PopulationCentreListItem {
   id: number;
