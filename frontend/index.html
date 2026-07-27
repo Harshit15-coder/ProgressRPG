@@ -24,7 +24,9 @@
     />
     <link rel="canonical" href="https://progressrpg.com/" />
     <title>Progress RPG | ADHD-Friendly Body Doubling Productivity Game</title>
-    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
+    <!-- Explicit rendering: the widget is mounted by the React <Turnstile />
+         component, which can appear long after this script has loaded. -->
+    <script src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit" async defer></script>
   </head>
   <body>
     <div id="root"></div>

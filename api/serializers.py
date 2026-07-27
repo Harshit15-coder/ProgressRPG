@@ -314,7 +314,12 @@ class CustomRegisterSerializer(RegisterSerializer):
         write_only=True, required=False, allow_blank=True
     )
     agree_to_terms = serializers.BooleanField(write_only=True, required=True)
-    turnstile_token = serializers.CharField(write_only=True, required=True)
+    # Blank is allowed so deployments without a Turnstile site key (local dev,
+    # tests) can still register; verification below rejects a blank token
+    # whenever a secret *is* configured.
+    turnstile_token = serializers.CharField(
+        write_only=True, required=True, allow_blank=True
+    )
     email = serializers.EmailField(required=True)
     timezone = serializers.CharField(write_only=True, required=False)
 
