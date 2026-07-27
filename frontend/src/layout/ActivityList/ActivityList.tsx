@@ -27,20 +27,16 @@ export default function ActivityList() {
   if (loading) return <p>Loading activities...</p>;
   if (activities.length === 0) return <p>No activities yet.</p>;
 
-  // Cast to satisfy List's generic constraint (requires [key: string]: unknown)
-  type ActivityListItem = PlayerActivity & { [key: string]: unknown };
-  const listItems = activities as ActivityListItem[];
-
   return (
     <>
       <h2>Your Activities</h2>
       <List
-        items={listItems}
+        items={activities}
         renderItem={(activity) => (
-          <div key={activity.id as number}>
+          <div key={activity.id}>
             <p>
-              {activity.name as string} -{" "}
-              {new Date(activity.created_at as string).toLocaleString()}
+              {activity.name} -{" "}
+              {new Date(activity.created_at).toLocaleString()}
             </p>
           </div>
         )}

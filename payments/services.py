@@ -1,5 +1,6 @@
 import logging
 from datetime import datetime, timezone as dt_timezone
+from typing import TypedDict
 
 import stripe
 
@@ -321,6 +322,28 @@ def sync_subscription_from_stripe(user):
 # ---------------------------------------------------------------------------
 
 
+class _SyncPlansResult(TypedDict):
+    created: int
+    updated: int
+    skipped: int
+    removed: int
+    changes: list[str]
+
+
+class _SyncCustomersResult(TypedDict):
+    updated: int
+    skipped: int
+    changes: list[str]
+
+
+class _SyncSubscriptionsResult(TypedDict):
+    created: int
+    updated: int
+    deactivated: int
+    skipped: int
+    changes: list[str]
+
+
 def _sync_plans(dry_run=False):
     """
     Pull all active Stripe prices and reconcile local SubscriptionPlan records.
@@ -330,7 +353,13 @@ def _sync_plans(dry_run=False):
     from decimal import Decimal
 
     interval_map = {"month": "monthly", "year": "annual"}
-    result = {"created": 0, "updated": 0, "skipped": 0, "removed": 0, "changes": []}
+    result: _SyncPlansResult = {
+        "created": 0,
+        "updated": 0,
+        "skipped": 0,
+        "removed": 0,
+        "changes": [],
+    }
     seen_price_ids = set()
 
     prices = stripe.Price.list(active=True, expand=["data.product"], limit=100)
@@ -464,7 +493,7 @@ def _sync_customers(dry_run=False):
     """
     from users.models import CustomUser
 
-    result = {"updated": 0, "skipped": 0, "changes": []}
+    result: _SyncCustomersResult = {"updated": 0, "skipped": 0, "changes": []}
     customers = stripe.Customer.list(limit=100)
     for customer in customers.auto_paging_iter():
         email = getattr(customer, "email", None)
@@ -508,7 +537,13 @@ def _sync_subscriptions(dry_run=False):
     """
     from users.models import CustomUser
 
-    result = {"created": 0, "updated": 0, "deactivated": 0, "skipped": 0, "changes": []}
+    result: _SyncSubscriptionsResult = {
+        "created": 0,
+        "updated": 0,
+        "deactivated": 0,
+        "skipped": 0,
+        "changes": [],
+    }
     seen_stripe_ids = set()
 
     subscriptions = stripe.Subscription.list(
@@ -522,7 +557,11 @@ def _sync_subscriptions(dry_run=False):
         email = (
             getattr(customer, "email", None) if not isinstance(customer, str) else None
         )
-        customer_id = customer.id if not isinstance(customer, str) else customer
+        customer_id = (
+            customer.id
+            if customer is not None and not isinstance(customer, str)
+            else customer
+        )
 
         user = CustomUser.objects.filter(stripe_customer_id=customer_id).first()
         if user is None and email:

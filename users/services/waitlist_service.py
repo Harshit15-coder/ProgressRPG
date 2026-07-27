@@ -1,5 +1,7 @@
 import secrets
 from datetime import timedelta
+from typing import Any, NotRequired, TypedDict
+
 from django.conf import settings
 from django.db import transaction
 from django.utils import timezone
@@ -8,7 +10,15 @@ from users.models import Waitlist
 from users.services.registration_services import verified_user_count
 from users.utils import send_email_to_users
 
-NUDGE_SCHEDULE = [
+
+class _NudgeMilestone(TypedDict):
+    days: int
+    field: str
+    template: str
+    terminal: NotRequired[bool]
+
+
+NUDGE_SCHEDULE: list[_NudgeMilestone] = [
     {"days": 3, "field": "nudge_3day_sent_at", "template": "waitlist_nudge_message"},
     {"days": 7, "field": "nudge_7day_sent_at", "template": "waitlist_nudge_message"},
     {"days": 30, "field": "nudge_30day_sent_at", "template": "waitlist_nudge_message"},
@@ -30,9 +40,24 @@ def build_invite_url(token: str) -> str:
     return f"{frontend_url}/waitlist/redeem/{token}"
 
 
+def send_signup_confirmation_email(entry: Waitlist) -> None:
+    """Sends the "you're on the waitlist" confirmation for a new signup."""
+    context: dict[str, Any] = {"current_year": timezone.now().year}
+    transaction.on_commit(
+        lambda: send_email_to_users(
+            users=[entry.email],
+            subject="You're on the Progress RPG waitlist",
+            template_base="emails/waitlist_signup_confirmation",
+            context=context,
+            cc_admin=False,
+        )
+    )
+
+
 def send_invite_email(entry: Waitlist) -> None:
     """Queues (or re-queues) the invitation email for an already-invited entry."""
-    context = {
+    assert entry.invite_token, "send_invite_email requires an already-invited entry"
+    context: dict[str, Any] = {
         "invite_url": build_invite_url(entry.invite_token),
         "current_year": timezone.now().year,
     }
@@ -95,7 +120,7 @@ def invite_up_to_headroom() -> int:
 
 def send_nudge_email(entry: Waitlist, template: str, days: int) -> None:
     is_removal = template == "waitlist_removed_message"
-    context = {
+    context: dict[str, Any] = {
         "day": days,
         "current_year": timezone.now().year,
     }
@@ -104,6 +129,7 @@ def send_nudge_email(entry: Waitlist, template: str, days: int) -> None:
             settings, "FRONTEND_URL", "http://localhost:5173"
         )
     else:
+        assert entry.invite_token, "send_nudge_email requires an already-invited entry"
         context["invite_url"] = build_invite_url(entry.invite_token)
 
     subject = (
@@ -152,7 +178,7 @@ def send_due_nudges() -> int:
         for entry in entries:
             send_nudge_email(entry, milestone["template"], milestone["days"])
 
-            update_fields = {field: now}
+            update_fields: dict[str, Any] = {field: now}
             if milestone.get("terminal"):
                 update_fields["status"] = Waitlist.Status.REMOVED
 

@@ -1,4 +1,5 @@
 from collections import defaultdict
+from typing import TYPE_CHECKING
 
 from django.contrib.gis.db import models as gis_models
 from django.contrib.gis.geos import Point
@@ -9,6 +10,9 @@ from django.utils import timezone
 from django.utils.functional import cached_property
 from .services import movement as movement_service
 from .utils import relative_distance_direction
+
+if TYPE_CHECKING:
+    from django.db.models import Manager
 
 ##########################################################
 ##### MOVABLE OBJECTS/BEINGS
@@ -47,6 +51,13 @@ class Movable(models.Model):
     @property
     def is_inside(self):
         return bool(self.current_node and self.current_node.building)
+
+    if TYPE_CHECKING:
+        # Provided by the concrete subclass (Character), via Journey's
+        # `related_name="journeys"`. `_journey` is a transient per-request
+        # cache set by movement services/tasks to avoid a repeat query.
+        journeys: "Manager[Journey]"
+        _journey: "Journey | None"
 
     @property
     def current_journey(self):
@@ -275,7 +286,7 @@ class Journey(models.Model):
         if self.status != "active":
             return False
 
-        if self.current_index < len(self.path_nodes) - 1:
+        if self.path_nodes and self.current_index < len(self.path_nodes) - 1:
             self.current_index += 1
             self.save(update_fields=["current_index"])
             return True
@@ -335,6 +346,7 @@ class Building(models.Model):
         ("mill", "Mill"),
         ("bakery", "Bakery"),
         ("communal", "Communal"),
+        ("field_shelter", "Field Shelter"),
     ]
 
     name = models.CharField(max_length=255, unique=True)
@@ -361,7 +373,19 @@ class Building(models.Model):
     parent_for_navigation = "population_centre"
 
     def __str__(self):
-        return f"{self.name} ({self.building_type})"
+        return f"{self.name}"
+
+    @property
+    def display_name(self):
+        """
+        Player-facing name, stripped of the "of (Village Name)" qualifier
+        that generation commands (e.g. spawn_villages) bake into `name` for
+        backend bookkeeping/uniqueness - e.g. "Bakery of (Driftmoor
+        village)" -> "Bakery", "House 3 of (Driftmoor village)" -> "House 3".
+        Falls back to the full name unchanged when it doesn't match that
+        pattern (e.g. hand-created buildings in tests/admin).
+        """
+        return self.name.split(" of (")[0]
 
     class Meta:
         indexes = [
@@ -376,6 +400,8 @@ class InteriorSpace(models.Model):
         HYGIENE = "hygiene", "Hygiene"
         KITCHEN = "kitchen", "Kitchen"
         STORAGE = "storage", "Storage"
+        GRAIN_STORAGE = "grain_storage", "Grain Storage"
+        FLOUR_STORAGE = "flour_storage", "Flour Storage"
         WORKSHOP = "workshop", "Workshop"
         ANIMALS = "animals", "Animals"
         MEETING = "meeting", "Meeting"
@@ -392,7 +418,7 @@ class InteriorSpace(models.Model):
     parent_for_navigation = "building"
 
     def __str__(self):
-        return f"{self.name} ({self.usage})"
+        return f"{self.name}"
 
 
 ##########################################################
@@ -423,7 +449,7 @@ class LandArea(models.Model):
     parent_for_navigation = "population_centre"
 
     def __str__(self):
-        return f"{self.name} ({self.size:.1f} ha)"
+        return f"{self.name}"
 
 
 class Subzone(models.Model):
@@ -457,7 +483,7 @@ class Subzone(models.Model):
     parent_for_navigation = "land_area"
 
     def __str__(self):
-        return f"{self.usage} ({self.size:.1f} ha)"
+        return f"Subzone: {self.usage}"
 
 
 ##########################################################

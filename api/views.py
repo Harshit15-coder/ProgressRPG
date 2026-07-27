@@ -1,4 +1,6 @@
 # api/views.py
+from datetime import timedelta
+
 from asgiref.sync import async_to_sync
 from django.conf import settings
 from django.contrib.auth import login, logout
@@ -83,6 +85,7 @@ from progression.serializers import PlayerActivitySerializer
 
 from users.models import Player, TutorialStep, Waitlist
 from users.serializers import PlayerSerializer, TutorialStepSerializer
+from users.services import waitlist_service
 from users.services.registration_services import verified_user_count
 from users.utils import send_email_to_users
 
@@ -102,11 +105,11 @@ class AppConfigView(APIView):
 
     @extend_schema(
         responses=inline_serializer(
-            name="AppConfigResponseSerializer",
+            name="AppConfigResponse",
             fields={
                 "stripe_live_mode": drf_serializers.BooleanField(),
-                "stripe_billing_portal_url": drf_serializers.CharField(),
-                "feature_flags": drf_serializers.JSONField(),
+                "stripe_billing_portal_url": drf_serializers.URLField(),
+                "feature_flags": drf_serializers.DictField(),
                 "trial_period_days": drf_serializers.IntegerField(),
             },
         )
@@ -175,6 +178,11 @@ class RegistrationStatusAPIView(APIView):
                 "registration_open": registration_open,
                 "registration_enabled": game_settings.registration_enabled,
                 "self_serve_registration": game_settings.self_serve_registration,
+                "waitlist_signup_provider": game_settings.waitlist_signup_provider,
+                # The site key is public, and serving it here keeps it out of
+                # the frontend build: rotating the key or enabling Turnstile
+                # needs only a backend env change, no rebuild.
+                "turnstile_site_key": settings.CF_TURNSTILE_SITE_KEY or "",
             }
         )
 
@@ -195,9 +203,11 @@ class WaitlistJoinAPIView(APIView):
         ).exists()
         if not already_waiting:
             try:
-                Waitlist.objects.create(email=email, status=Waitlist.Status.WAITING)
+                entry = Waitlist.objects.create(email=email, status=Waitlist.Status.WAITING)
             except IntegrityError:
                 pass  # race with a concurrent signup — treat as already-waiting
+            else:
+                waitlist_service.send_signup_confirmation_email(entry)
 
         return Response(
             {"detail": "You're on the waitlist."}, status=status.HTTP_200_OK
@@ -274,6 +284,7 @@ class CustomTokenObtainPairView(TokenObtainPairView):
 
     @csrf_exempt
     @api_view(["POST"])
+    @staticmethod
     def test_post_view(request):
         permission_classes = [IsAuthenticated]
         return Response(
@@ -380,7 +391,7 @@ class MeViewSet(viewsets.ViewSet):
     def announcements(self, request):
         player = request.user.player
 
-        published_announcements = list(Announcement.objects.published())
+        published_announcements = list(Announcement.objects.filter(is_published=True))
         read_ids = set(
             PlayerAnnouncementState.objects.filter(
                 player=player,
@@ -421,7 +432,7 @@ class MeViewSet(viewsets.ViewSet):
 
         player = request.user.player
         announcement = get_object_or_404(
-            Announcement.objects.published(),
+            Announcement.objects.filter(is_published=True),
             id=serializer.validated_data["announcement_id"],
         )
 
@@ -446,7 +457,7 @@ class MeViewSet(viewsets.ViewSet):
         player = request.user.player
         now = timezone.now()
 
-        published = Announcement.objects.published()
+        published = Announcement.objects.filter(is_published=True)
         existing_states = PlayerAnnouncementState.objects.filter(
             player=player,
             announcement__in=published,
@@ -796,7 +807,7 @@ class DeleteAccountAPIView(APIView):
         logger.info(f"User {user.username} (ID: {user.id}) initiated account deletion.")
 
         user.pending_deletion = True
-        user.delete_at = timezone.now() + timezone.timedelta(days=14)
+        user.delete_at = timezone.now() + timedelta(days=14)
         user.save()
 
         send_mail(

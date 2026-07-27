@@ -165,7 +165,9 @@ class Command(BaseCommand):
             if char.id in id_list:
                 building = random.choice(buildings)
                 char.assign_home(building)
-                char.move_to(building.node.first())
+                node = building.nodes.first()
+                if node is not None:
+                    char.move_to(node)
 
     def generate_for_centre(self, centre: PopulationCentre):
         buildings = list(centre.buildings.filter(building_type="residential"))
@@ -177,7 +179,6 @@ class Command(BaseCommand):
             f"{centre.name}: Buildings={building_count}, Generating {num_chars} characters..."
         )
 
-        characters = []
         for _ in range(num_chars):
             building = random.choice(buildings)
 
@@ -199,7 +200,9 @@ class Command(BaseCommand):
                 can_link=can_link,
             )
             char.assign_home(building)
-            char.move_to(building.node.first())
+            node = building.nodes.first()
+            if node is not None:
+                char.move_to(node)
             char.save()
 
     def generate_nodes(self, pop_centre: PopulationCentre, buildings, num: int):

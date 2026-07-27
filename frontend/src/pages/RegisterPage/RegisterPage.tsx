@@ -1,26 +1,28 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import Form from '../../components/Form/Form';
 import Input from '../../components/Input/Input';
+import Turnstile from '../../components/Turnstile/Turnstile';
 import WaitlistForm from '../../components/WaitlistForm/WaitlistForm';
 import useRegister from '../../hooks/useRegister';
 import { useRegistrationStatus } from '../../hooks/useRegistrationStatus';
 import styles from './RegisterPage.module.scss';
 
-declare global {
-  interface Window {
-    __turnstileCallback?: (token: string) => void;
-  }
+// The site key comes from the backend (see /registration_status/) so rotating
+// it or turning Turnstile on doesn't need a frontend rebuild. The build-time
+// env var stays supported as a local override.
+function resolveTurnstileSiteKey(apiSiteKey?: string): string | undefined {
+  return apiSiteKey || (import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined) || undefined;
 }
-
-const TURNSTILE_SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY as string | undefined;
 
 function RegistrationForm({
   inviteToken,
   selfServe,
+  turnstileSiteKey,
 }: {
   inviteToken?: string;
   selfServe?: boolean;
+  turnstileSiteKey?: string;
 }): React.ReactElement {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -35,12 +37,8 @@ function RegistrationForm({
   const [formState, setFormState] = useState<'default' | 'submitted'>('default');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  useEffect(() => {
-    // Expose a global callback for the Turnstile widget to call
-    window.__turnstileCallback = (token: string) => setTurnstileToken(token);
-    return () => {
-      delete window.__turnstileCallback;
-    };
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
   }, []);
 
   const handleRegister = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -54,7 +52,14 @@ function RegistrationForm({
       return;
     }
 
-    if (!turnstileToken) {
+    if (!agreeToTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy.');
+      return;
+    }
+
+    // Without a site key there is no widget to complete, so don't gate on a
+    // token the user has no way of producing (the backend still verifies).
+    if (turnstileSiteKey && !turnstileToken) {
       setError('Please complete the security check.');
       return;
     }
@@ -164,6 +169,7 @@ function RegistrationForm({
             checked={agreeToTerms}
             onChange={(e) => setAgreeToTerms(e.target.checked)}
             required
+            aria-invalid={!!error && !agreeToTerms}
           />
           <label htmlFor="agree_to_terms">
             I agree to the{' '}
@@ -177,11 +183,9 @@ function RegistrationForm({
             .
           </label>
         </div>
-        <div
-          className="cf-turnstile"
-          data-sitekey={TURNSTILE_SITE_KEY}
-          data-callback="__turnstileCallback"
-        />
+        {turnstileSiteKey && (
+          <Turnstile sitekey={turnstileSiteKey} onToken={handleTurnstileToken} />
+        )}
       </Form>
       {error && (
         <p className={styles.error} role="alert">
@@ -226,17 +230,21 @@ export default function RegisterPage(): React.ReactElement {
   }
 
   // Invited users always get the registration form, even if the cap has
-  // since been reached again — their invite is proof of a slot at invite time.
-  if (!inviteToken && data && !data.registration_open) {
+  // since been reached again, or self-serve is off — their invite is proof
+  // of a slot at invite time.
+  if (!inviteToken && data && (!data.registration_open || !data.self_serve_registration)) {
+    const title = !data.registration_open
+      ? 'Registration is temporarily full'
+      : 'Registration is by invite only';
+    const body = !data.registration_open
+      ? "We've reached our current capacity for new players. Join the waitlist and we'll be in touch."
+      : "We're inviting new players from the waitlist. Join the waitlist and we'll be in touch.";
     return (
       <div className={styles.page}>
         <div className={styles.formFrame}>
-          <h1 className={styles.title}>Registration is temporarily full</h1>
+          <h1 className={styles.title}>{title}</h1>
           <div className={styles.content}>
-            <p>
-              We&apos;ve reached our current capacity for new players. Join the waitlist and
-              we&apos;ll be in touch.
-            </p>
+            <p>{body}</p>
             <WaitlistForm />
             <p className={styles.footer}>
               Already have an account? <a href="/login">Log in here</a>.
@@ -254,6 +262,7 @@ export default function RegisterPage(): React.ReactElement {
           key={location.key}
           inviteToken={inviteToken}
           selfServe={data?.self_serve_registration}
+          turnstileSiteKey={resolveTurnstileSiteKey(data?.turnstile_site_key)}
         />
       </div>
     </div>

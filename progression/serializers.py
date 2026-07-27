@@ -3,6 +3,8 @@
 from django.utils import timezone
 from rest_framework import serializers
 
+from users.models import Player
+
 from .models import (
     Category,
     Role,
@@ -83,7 +85,9 @@ class TimeRecordBaseSerializer(serializers.ModelSerializer):
 
 
 class CategorySerializer(GroupBaseSerializer):
-    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
 
     class Meta(GroupBaseSerializer.Meta):
         model = Category
@@ -103,7 +107,9 @@ class RoleSerializer(GroupBaseSerializer):
 
 
 class PlayerSkillSerializer(SkillBaseSerializer):
-    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
 
     class Meta(SkillBaseSerializer.Meta):
         model = PlayerSkill
@@ -123,7 +129,9 @@ class CharacterSkillSerializer(SkillBaseSerializer):
 
 
 class PlayerActivitySerializer(TimeRecordBaseSerializer):
-    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
     group_key = serializers.CharField(read_only=True)
 
     class Meta(TimeRecordBaseSerializer.Meta):
@@ -184,7 +192,9 @@ class CharacterQuestSerializer(TimeRecordBaseSerializer):
 
 
 class ProjectSerializer(serializers.ModelSerializer):
-    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
     total_time = serializers.IntegerField(read_only=True)
     total_records = serializers.IntegerField(read_only=True)
 
@@ -205,7 +215,9 @@ class ProjectSerializer(serializers.ModelSerializer):
 
 
 class TaskSerializer(serializers.ModelSerializer):
-    player = serializers.PrimaryKeyRelatedField(read_only=True)
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
     total_time = serializers.IntegerField(read_only=True)
     total_records = serializers.IntegerField(read_only=True)
     last_worked_on = serializers.DateTimeField(read_only=True)

@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { fetchActivities } from "../api/activities";
@@ -29,6 +29,8 @@ type EntityType = "activity" | "task";
 
 const ACTIVITY_LIST_CACHE_KEY = ["entity-search", "activity", "activities"];
 const TASK_LIST_CACHE_KEY = ["entity-search", "activity", "tasks"];
+
+const EMPTY_ENTITIES: SearchEntity[] = [];
 
 const ENTITY_CONFIG: Record<EntityType, { queryKey: string[]; fetchAndNormalize: () => Promise<SearchEntity[]> }> = {
   activity: {
@@ -192,14 +194,18 @@ export function useEntitySearchCache(type: EntityType) {
     [type, config.queryKey, queryClient]
   );
 
-  const activities = (queryClient.getQueryData<SearchEntity[]>(ACTIVITY_LIST_CACHE_KEY)) ?? [];
-  const taskEntities = (queryClient.getQueryData<SearchEntity[]>(TASK_LIST_CACHE_KEY)) ?? [];
+  const activities = (queryClient.getQueryData<SearchEntity[]>(ACTIVITY_LIST_CACHE_KEY)) ?? EMPTY_ENTITIES;
+  const taskEntities = (queryClient.getQueryData<SearchEntity[]>(TASK_LIST_CACHE_KEY)) ?? EMPTY_ENTITIES;
 
-  const entities = type === "task"
-    ? (query.data ?? [])
-    : (includesTasks
-      ? dedupeEntities([...(query.data ?? []), ...taskEntities])
-      : (query.data ?? []));
+  const entities = useMemo(
+    () =>
+      type === "task"
+        ? (query.data ?? [])
+        : includesTasks
+          ? dedupeEntities([...(query.data ?? []), ...taskEntities])
+          : (query.data ?? []),
+    [type, query.data, includesTasks, taskEntities],
+  );
 
   return {
     ...query,

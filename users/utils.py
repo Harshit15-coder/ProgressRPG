@@ -16,6 +16,8 @@ Author:
 
 """
 
+from datetime import timedelta
+
 from django.conf import settings
 from django.contrib.sessions.models import Session
 from django.core.mail import EmailMultiAlternatives
@@ -57,9 +59,7 @@ def assign_character_to_player(player):
         tut_quest = Quest.objects.filter(name="[TUTORIAL] Getting started").first()
         if not tut_quest:
             logger.warning(f"Tutorial quest '[TUTORIAL] Getting started' not found!")
-        elif created or player.created_at > (
-            timezone.now() - timezone.timedelta(days=14)
-        ):
+        elif created or player.created_at > (timezone.now() - timedelta(days=14)):
             qt.change_quest(tut_quest, 60)
 
     return character

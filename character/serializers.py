@@ -1,4 +1,5 @@
 from rest_framework import serializers
+from rest_framework.relations import PrimaryKeyRelatedField
 
 from .models import Character
 
@@ -9,7 +10,7 @@ class CharacterSerializer(serializers.ModelSerializer):
     total_activities = serializers.IntegerField(read_only=True)
     current_activity = serializers.SerializerMethodField()
     is_npc = serializers.BooleanField(read_only=True)
-    population_centre_id = serializers.PrimaryKeyRelatedField(
+    population_centre_id: PrimaryKeyRelatedField = serializers.PrimaryKeyRelatedField(
         source="population_centre", read_only=True
     )
     location = serializers.SerializerMethodField()
@@ -50,7 +51,7 @@ class CharacterSerializer(serializers.ModelSerializer):
     def get_coins(self, obj) -> int:
         return obj.get_currency("coins").balance
 
-    def get_location(self, obj) -> dict:
+    def get_location(self, obj) -> dict | None:
         # obj must have x and y attributes, or replace with obj.position.x / obj.position.y
         if not obj.current_node:
             return None

@@ -1,8 +1,26 @@
 @use '../../styles/base/variables' as v;
 @use '../../styles/semantic/colors' as c;
 
+.trigger {
+  // Click/tap opens the tooltip now (see #568), so a long-press on a
+  // trigger must never fall through to the browser's native
+  // text-selection/callout gesture - only our own tap handling should run.
+  touch-action: manipulation;
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 .content {
   z-index: v.$z-index-tooltip;
+  // Read-only content, never something to click/hover on its own - but on
+  // small trigger shapes (map markers/subzones at low zoom) the portaled
+  // tooltip can render directly under the cursor, which makes the browser
+  // see the pointer leave the trigger, closes the tooltip, then reopens it
+  // once the pointer is "back" over the trigger - a rapid open/close flicker.
+  // Letting pointer events pass through avoids the tooltip ever intercepting
+  // the hover in the first place.
+  pointer-events: none;
   max-width: min(20rem, calc(100vw - (2 * #{v.$spacing-md})));
   border: 1px solid rgba(c.$color-border-primary, 0.22);
   border-radius: v.$border-radius;

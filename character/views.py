@@ -3,7 +3,6 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 
-import character
 from .models import Character
 from .serializers import CharacterSerializer
 from .filters import CharacterFilter

@@ -18,5 +18,5 @@ class ErrorResponseSerializer(serializers.Serializer):
 
 
 class SyncSubscriptionResponseSerializer(serializers.Serializer):
-    status = serializers.CharField()
+    status = serializers.ChoiceField(choices=["active", "trialing", "none"])
     synced = serializers.BooleanField()

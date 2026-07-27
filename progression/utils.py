@@ -26,7 +26,10 @@ def copy_quest(character: Character, quest: Quest):
         duration=0,
     )
 
-    char_quest.results = {
+    # CharacterQuest has no `results` field, so this doesn't persist — see
+    # character_services.character_apply_quest_results, which reads
+    # quest.results and always falls back to {}.
+    char_quest.results = {  # type: ignore[attr-defined]
         "coin_reward": getattr(quest, "coin_reward", 0),
         "xp_rate": getattr(quest, "xp_rate", 0),
         "dynamic_rewards": getattr(quest, "dynamic_rewards", {}),

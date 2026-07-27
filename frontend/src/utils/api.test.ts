@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { jwtDecode } from "jwt-decode";
 
-import { getValidAccessToken } from "./api";
+import { getValidAccessToken, setUnauthorizedHandler } from "./api";
+import { getStoredAuthTokens, storeAuthTokens } from "./authStorage";
 
 vi.mock("jwt-decode", () => ({
   jwtDecode: vi.fn(),
@@ -9,8 +10,7 @@ vi.mock("jwt-decode", () => ({
 
 describe("getValidAccessToken", () => {
   beforeEach(() => {
-    localStorage.setItem("accessToken", "expiring-token");
-    localStorage.setItem("refreshToken", "refresh-token");
+    storeAuthTokens("expiring-token", "refresh-token", true);
     (jwtDecode as unknown as ReturnType<typeof vi.fn>).mockReturnValue({
       exp: Date.now() / 1000 - 10, // already expired
     });
@@ -19,6 +19,8 @@ describe("getValidAccessToken", () => {
 
   afterEach(() => {
     localStorage.clear();
+    sessionStorage.clear();
+    setUnauthorizedHandler(null);
     vi.clearAllMocks();
   });
 
@@ -31,7 +33,7 @@ describe("getValidAccessToken", () => {
     const token = await getValidAccessToken();
 
     expect(token).toBe("new-access-token");
-    expect(localStorage.getItem("accessToken")).toBe("new-access-token");
+    expect(getStoredAuthTokens().accessToken).toBe("new-access-token");
   });
 
   it("logs the user out when the refresh response is missing access_token", async () => {
@@ -40,14 +42,12 @@ describe("getValidAccessToken", () => {
       json: async () => ({ access: "unexpected-shape" }),
     });
 
-    const expiredHandler = vi.fn();
-    window.addEventListener("auth:expired", expiredHandler);
+    const unauthorizedHandler = vi.fn();
+    setUnauthorizedHandler(unauthorizedHandler);
 
     await expect(getValidAccessToken()).rejects.toThrow("Token refresh failed");
 
-    expect(expiredHandler).toHaveBeenCalled();
-    expect(localStorage.getItem("accessToken")).toBeNull();
-
-    window.removeEventListener("auth:expired", expiredHandler);
+    expect(unauthorizedHandler).toHaveBeenCalled();
+    expect(getStoredAuthTokens().accessToken).toBeNull();
   });
 });

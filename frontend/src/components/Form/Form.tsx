@@ -10,6 +10,7 @@ interface FormField {
   label?: string;
   type?: string;
   value?: string;
+  checked?: boolean;
   onChange?: (value: string | boolean) => void;
   placeholder?: string;
   helpText?: string;
@@ -58,6 +59,11 @@ export default function Form({
 
     if (!touched[field.name]) return '';
 
+    // Checkboxes carry their state in `checked`, not `value`.
+    if (field.type === 'checkbox') {
+      return field.required && !field.checked ? 'This field is required' : '';
+    }
+
     if (field.required && !field.value) {
       return 'This field is required';
     }
@@ -93,6 +99,7 @@ export default function Form({
                 label={field.label || field.name}
                 type={field.type}
                 value={field.value}
+                checked={field.checked}
                 onChange={field.onChange}
                 placeholder={field.placeholder}
                 helpText={field.helpText}

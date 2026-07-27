@@ -31,7 +31,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, progression.mixins.PlayerOwnedMixin),
+            bases=(progression.mixins.PlayerOwnedMixin,),
         ),
         migrations.CreateModel(
             name="CharacterActivity",
@@ -157,7 +157,7 @@ class Migration(migrations.Migration):
                 "db_table": "progression_activity",
                 "ordering": ["-created_at"],
             },
-            bases=(models.Model, progression.mixins.PlayerOwnedMixin),
+            bases=(progression.mixins.PlayerOwnedMixin,),
         ),
         migrations.CreateModel(
             name="PlayerSkill",
@@ -181,7 +181,7 @@ class Migration(migrations.Migration):
             options={
                 "abstract": False,
             },
-            bases=(models.Model, progression.mixins.PlayerOwnedMixin),
+            bases=(progression.mixins.PlayerOwnedMixin,),
         ),
         migrations.CreateModel(
             name="Project",
@@ -205,7 +205,7 @@ class Migration(migrations.Migration):
                 ("is_complete", models.BooleanField(default=False)),
                 ("completed_at", models.DateTimeField(blank=True, null=True)),
             ],
-            bases=(models.Model, progression.mixins.PlayerOwnedMixin),
+            bases=(progression.mixins.PlayerOwnedMixin,),
         ),
         migrations.CreateModel(
             name="Role",
@@ -250,6 +250,6 @@ class Migration(migrations.Migration):
                 ("is_complete", models.BooleanField(default=False)),
                 ("completed_at", models.DateTimeField(blank=True, null=True)),
             ],
-            bases=(models.Model, progression.mixins.PlayerOwnedMixin),
+            bases=(progression.mixins.PlayerOwnedMixin,),
         ),
     ]

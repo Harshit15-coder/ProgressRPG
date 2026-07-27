@@ -1,4 +1,5 @@
 import requests as http_requests
+from typing import Any, cast
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from django.conf import settings
@@ -10,7 +11,7 @@ from rest_framework_simplejwt.serializers import (
     TokenObtainPairSerializer,
     TokenRefreshSerializer,
 )
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework_simplejwt.tokens import RefreshToken, Token
 
 from core.models import Announcement, GameSettings
 from users.models import Player, InviteCode, UserLogin, Waitlist
@@ -53,10 +54,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         attrs["username"] = attrs.get("email")
 
         data = super().validate(attrs)
+        assert self.user is not None
         UserLogin.objects.create(user=self.user)
 
         if remember_me:
-            refresh = RefreshToken(data["refresh"])
+            refresh_token = data.get("refresh")
+            if not isinstance(refresh_token, str):
+                raise serializers.ValidationError("Invalid refresh token payload.")
+            # SimpleJWT accepts encoded token strings at runtime, but stubs type this as Token|None.
+            refresh = RefreshToken(cast(Token, refresh_token))
             refresh.set_exp(lifetime=settings.LONG_SESSION_REFRESH_TOKEN_LIFETIME)
             data["refresh"] = str(refresh)
             data["access"] = str(refresh.access_token)
@@ -252,6 +258,8 @@ class RegistrationStatusResponseSerializer(serializers.Serializer):
     registration_open = serializers.BooleanField()
     registration_enabled = serializers.BooleanField()
     self_serve_registration = serializers.BooleanField()
+    waitlist_signup_provider = serializers.ChoiceField(choices=["mailchimp", "internal"])
+    turnstile_site_key = serializers.CharField(allow_blank=True)
 
 
 class WaitlistJoinRequestSerializer(serializers.Serializer):
@@ -308,7 +316,12 @@ class CustomRegisterSerializer(RegisterSerializer):
         write_only=True, required=False, allow_blank=True
     )
     agree_to_terms = serializers.BooleanField(write_only=True, required=True)
-    turnstile_token = serializers.CharField(write_only=True, required=True)
+    # Blank is allowed so deployments without a Turnstile site key (local dev,
+    # tests) can still register; verification below rejects a blank token
+    # whenever a secret *is* configured.
+    turnstile_token = serializers.CharField(
+        write_only=True, required=True, allow_blank=True
+    )
     email = serializers.EmailField(required=True)
     timezone = serializers.CharField(write_only=True, required=False)
 
@@ -333,7 +346,12 @@ class CustomRegisterSerializer(RegisterSerializer):
         self.fields.pop("username", None)
 
     def get_email_context(self):
-        context = super().get_email_context()
+        context: dict[str, Any] = {}
+        base_get_email_context = getattr(super(), "get_email_context", None)
+        if callable(base_get_email_context):
+            base_context = base_get_email_context()
+            if isinstance(base_context, dict):
+                context.update(base_context)
         request = self.context.get("request")
         if request:
             current_site = get_current_site(request)
@@ -442,7 +460,11 @@ class CustomRegisterSerializer(RegisterSerializer):
     def save(self, request):
         user = super().save(request)
         timezone_name = self.validated_data.get("timezone")
-        if timezone_name:
-            user.timezone = timezone_name
+        if isinstance(timezone_name, str) and timezone_name:
+            if not hasattr(user, "timezone"):
+                raise serializers.ValidationError(
+                    "User model does not support timezone."
+                )
+            setattr(user, "timezone", timezone_name)
             user.save(update_fields=["timezone"])
         return user

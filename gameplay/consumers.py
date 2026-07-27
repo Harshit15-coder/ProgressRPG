@@ -25,6 +25,9 @@ logger_errors = logging.getLogger("errors")
 
 
 class TimerConsumer(AsyncJsonWebsocketConsumer):
+    player: Player
+    player_group: str
+
     @database_sync_to_async
     def get_online_count(self):
         count = cache.get(ONLINE_COUNT_CACHE_KEY)

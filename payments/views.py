@@ -1,5 +1,9 @@
 import json
 import stripe
+from stripe.params.checkout import (
+    SessionCreateParams,
+    SessionCreateParamsSubscriptionData,
+)
 from django.conf import settings
 from django.http import HttpResponse
 from django.utils import timezone
@@ -11,12 +15,14 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 import logging
 
+from drf_spectacular.utils import extend_schema
+
 from .serializers import (
     StripeWebhookResponseSerializer,
     CreateCheckoutSessionRequestSerializer,
     CreateCheckoutSessionResponseSerializer,
-    ErrorResponseSerializer,
     SyncSubscriptionResponseSerializer,
+    ErrorResponseSerializer,
 )
 from core.models import GameSettings
 from .models import StripeEvent, SubscriptionPlan, UserSubscription
@@ -178,7 +184,7 @@ class CreateCheckoutSessionView(APIView):
         offer_trial = offer_trial and not request.user.has_previous_subscription
 
         try:
-            subscription_data = {
+            subscription_data: SessionCreateParamsSubscriptionData = {
                 "metadata": {
                     "user_id": str(request.user.id),
                     "billing_plan": "annual" if interval == "annual" else "monthly",
@@ -192,7 +198,7 @@ class CreateCheckoutSessionView(APIView):
             if offer_trial:
                 subscription_data["trial_period_days"] = trial_period_days
 
-            session_kwargs = {
+            session_kwargs: SessionCreateParams = {
                 "mode": "subscription",
                 "payment_method_types": ["card"],
                 "payment_method_collection": "if_required",
@@ -257,10 +263,11 @@ class SyncSubscriptionView(APIView):
     serializer_class = SyncSubscriptionResponseSerializer
 
     @extend_schema(
+        request=None,
         responses={
             200: SyncSubscriptionResponseSerializer,
             502: ErrorResponseSerializer,
-        }
+        },
     )
     def post(self, request):
         try:
