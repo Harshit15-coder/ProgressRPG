@@ -211,44 +211,56 @@ interface PositionedCharacter {
   isWalking?: boolean;
 }
 
+// A walker's position is never stepped incrementally frame-to-frame (that
+// approach let small per-poll speed mismatches between client and server
+// silently accumulate over the whole journey, surfacing as a character
+// lagging further and further behind, then snapping/rushing to catch up).
+// Instead each poll records a fresh checkpoint - the authoritative position
+// the server reported, the remaining path from there, and the client
+// timestamp it was received - and every frame recomputes position from
+// scratch as a pure function of that checkpoint and elapsed real time.
+// Whatever drift builds up within a single poll interval (small, since it's
+// only ever one interval's worth) is wiped out by the next poll's fresh
+// checkpoint rather than compounding across the journey.
 interface WalkerState {
-  pos: [number, number];
+  checkpointPos: [number, number];
   path: [number, number][];
   speed: number;
+  receivedAt: number;
 }
 
-// If the authoritative polled position lands further than this from where
-// the client has locally walked a character to, treat it as a correction
-// leg (see the resync effect below) rather than ordinary interpolation lag -
-// a drift this big means a reroute (e.g. a schedule-driven commute reversal),
-// a missed poll, or the client running out of its previously-known path
-// before this poll refreshed it.
-const WALKER_RESYNC_DRIFT_THRESHOLD = 3;
-
-// Advances a walker's position along its remaining path by `distance` units,
-// consuming as many waypoints as it reaches in one call rather than stopping
-// at the first one short of the full distance - the same carry-over-leftover-
-// budget approach as the backend's step_toward (locations/services/
-// movement.py), so a character crossing several short segments in one frame
-// doesn't visibly slow down at each waypoint.
-function advanceWalker(walker: WalkerState, distance: number): void {
+// Walks `distance` units from `start` along `path`, consuming as many
+// waypoints as it reaches rather than stopping at the first one short of the
+// full distance - the same carry-over-leftover-budget approach as the
+// backend's step_toward (locations/services/movement.py), so a character
+// crossing several short segments doesn't visibly slow down at each one.
+// Holds at the final point rather than extrapolating past it if `distance`
+// exceeds the path's total length (e.g. the client's clock has run ahead of
+// the server's capped path preview - the next poll will supply more path).
+function positionAlongPath(
+  start: [number, number],
+  path: [number, number][],
+  distance: number
+): [number, number] {
+  let pos = start;
   let remaining = distance;
-  while (remaining > 0 && walker.path.length > 0) {
-    const [nx, ny] = walker.path[0];
-    const dx = nx - walker.pos[0];
-    const dy = ny - walker.pos[1];
+
+  for (const [nx, ny] of path) {
+    const dx = nx - pos[0];
+    const dy = ny - pos[1];
     const segmentDistance = Math.hypot(dx, dy);
 
     if (segmentDistance <= remaining) {
-      walker.pos = [nx, ny];
-      walker.path = walker.path.slice(1);
+      pos = [nx, ny];
       remaining -= segmentDistance;
     } else {
       const factor = segmentDistance === 0 ? 0 : remaining / segmentDistance;
-      walker.pos = [walker.pos[0] + dx * factor, walker.pos[1] + dy * factor];
-      remaining = 0;
+      pos = [pos[0] + dx * factor, pos[1] + dy * factor];
+      break;
     }
   }
+
+  return pos;
 }
 
 function buildingFootprintRings(features: GeoJSONFeature[]): Ring[] {
@@ -600,19 +612,15 @@ export default function PopulationCentreMap({
   const walkersRef = useRef<Map<string, WalkerState>>(new Map());
   const walkerNodeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
 
-  // Resyncs each walking character's stored path/speed to the latest poll
-  // whenever the underlying geojson changes. The tracked position is never
-  // snapped straight to the authoritative one, even when it's drifted far
-  // (a reroute, a missed poll, or the client having walked past the end of
-  // its previously-known, capped-length path before this poll refreshed
-  // it - see JOURNEY_PATH_PREVIEW_LIMIT) - an instant jump there reads as
-  // teleporting. Instead the authoritative point is inserted as the next
-  // waypoint, so the animation loop walks the character there at its normal
-  // speed like any other leg of the route, then continues on with the fresh
-  // path - smooth in every case, just a sharper turn when the drift is
-  // large.
+  // Resets each walking character's checkpoint to the latest poll whenever
+  // the underlying geojson changes: the authoritative position, its
+  // remaining path, its speed, and the moment this checkpoint was taken.
+  // Unconditional - there's no drift to weigh here, since the animation loop
+  // below never accumulates state across polls; it only ever measures time
+  // elapsed since this checkpoint.
   useEffect(() => {
     const activeIds = new Set<string>();
+    const receivedAt = performance.now();
 
     for (const feature of walkingFeatures) {
       const id = String(feature.properties?.id);
@@ -621,17 +629,7 @@ export default function PopulationCentreMap({
       const path = feature.properties?.path ?? [];
       const speed = Number(feature.properties?.effective_speed) || 0;
 
-      const existing = walkersRef.current.get(id);
-      if (!existing) {
-        walkersRef.current.set(id, { pos: [x, y], path, speed });
-        continue;
-      }
-
-      existing.path =
-        distanceBetween(existing.pos, [x, y]) > WALKER_RESYNC_DRIFT_THRESHOLD
-          ? [[x, y], ...path]
-          : path;
-      existing.speed = speed;
+      walkersRef.current.set(id, { checkpointPos: [x, y], path, speed, receivedAt });
     }
 
     // Characters no longer walking (arrived, or gone from the map) fall back
@@ -644,29 +642,30 @@ export default function PopulationCentreMap({
   }, [walkingFeatures]);
 
   // Drives smooth per-frame movement for walking characters between polls.
-  // Writes positions straight to the DOM node (bypassing React state) so a
-  // full re-render isn't needed every frame; positionedCharacters below also
-  // reads the same walker ref for its initial/poll-driven render, so both
-  // stay consistent with whatever the loop has most recently written.
+  // Each frame recomputes position from scratch - the checkpoint plus how
+  // much time has passed since it was taken - rather than stepping forward
+  // from wherever the previous frame left off, so nothing compounds across
+  // frames or across polls (see the WalkerState comment above). Writes
+  // positions straight to the DOM node (bypassing React state) so a full
+  // re-render isn't needed every frame; positionedCharacters below also
+  // reads the same checkpoint for its initial/poll-driven render.
   useEffect(() => {
     let frameId: number;
-    let lastTimestamp: number | null = null;
 
-    const step = (timestamp: number) => {
-      if (lastTimestamp !== null) {
-        const deltaSeconds = (timestamp - lastTimestamp) / 1000;
-        walkersRef.current.forEach((walker, id) => {
-          advanceWalker(walker, walker.speed * deltaSeconds);
-          const node = walkerNodeRefs.current.get(id);
-          if (node) {
-            node.setAttribute(
-              "transform",
-              `translate(${walker.pos[0]}, ${walker.pos[1]})`
-            );
-          }
-        });
-      }
-      lastTimestamp = timestamp;
+    const step = () => {
+      const now = performance.now();
+      walkersRef.current.forEach((walker, id) => {
+        const elapsedSeconds = (now - walker.receivedAt) / 1000;
+        const pos = positionAlongPath(
+          walker.checkpointPos,
+          walker.path,
+          walker.speed * elapsedSeconds
+        );
+        const node = walkerNodeRefs.current.get(id);
+        if (node) {
+          node.setAttribute("transform", `translate(${pos[0]}, ${pos[1]})`);
+        }
+      });
       frameId = requestAnimationFrame(step);
     };
 
@@ -679,7 +678,7 @@ export default function PopulationCentreMap({
     const walkingPositioned: PositionedCharacter[] = walkingFeatures.map((feature) => {
       const id = String(feature.properties?.id);
       const [x, y] = feature.geometry.coordinates as [number, number];
-      const pos = walkersRef.current.get(id)?.pos ?? [x, y];
+      const pos = walkersRef.current.get(id)?.checkpointPos ?? [x, y];
       return { feature, cx: pos[0], cy: pos[1], isWalking: true };
     });
 

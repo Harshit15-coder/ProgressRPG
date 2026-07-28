@@ -666,7 +666,7 @@ describe('PopulationCentreMap path-aware interpolation (#615)', () => {
     expect(markerTransform(marker)).toEqual([50, 50]);
   });
 
-  it('glides toward a large resync correction instead of snapping to it instantly (#615 follow-up)', () => {
+  it('adopts a fresh poll as the new authoritative checkpoint rather than extrapolating from the previous one (#615 follow-up)', () => {
     const { container, rerender } = renderMap({ geojson: walkingGeojson });
     const marker = container.querySelector('g') as SVGGElement;
 
@@ -678,10 +678,9 @@ describe('PopulationCentreMap path-aware interpolation (#615)', () => {
     expect(midX).toBeGreaterThan(0);
     expect(midX).toBeLessThan(10);
 
-    // A fresh poll reports the character much further along a completely
-    // different route than the client knew about (e.g. it ran past the end
-    // of a capped path preview, or was rerouted) - well beyond
-    // WALKER_RESYNC_DRIFT_THRESHOLD from where the client currently has it.
+    // A fresh poll reports the character on a completely different route
+    // than the client knew about (e.g. a reroute, or the client having run
+    // past the end of a capped path preview between polls).
     const correctedGeojson = {
       bbox: [0, 0, 100, 100] as [number, number, number, number],
       features: [
@@ -703,18 +702,55 @@ describe('PopulationCentreMap path-aware interpolation (#615)', () => {
       </TooltipProvider>
     );
 
-    // Immediately after the correcting poll, the marker should still be
-    // near where the client had it - not instantly teleported to (50, 50).
-    const distanceTo50 = ([x, y]: [number, number]) => Math.hypot(x - 50, y - 50);
+    // The poll is trusted outright as the character's new position, not
+    // treated as a target to glide toward from wherever the client's own
+    // (possibly wrong) extrapolation had drifted to - the whole point of
+    // recomputing from a fresh checkpoint every poll is that error never
+    // gets a chance to compound across polls in the first place.
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
     const justAfter = markerTransform(marker);
-    expect(distanceTo50(justAfter)).toBeGreaterThan(3);
+    expect(Math.hypot(justAfter[0] - 50, justAfter[1] - 50)).toBeLessThan(0.5);
 
-    // But it should be walking straight toward the corrected point rather
-    // than stalled - and eventually arrive there.
+    // And it continues walking normally from there along the fresh path.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const later = markerTransform(marker);
+    expect(later[0]).toBeGreaterThan(justAfter[0]);
+    expect(later[1]).toBeCloseTo(50, 5);
+  });
+
+  it('recomputes position fresh each frame instead of accumulating step-to-step error (#615 follow-up)', () => {
+    // Two renders of the same walking character: one where time is advanced
+    // in a single 1000ms jump, one where the same 1000ms passes across many
+    // small frames. If position were stepped incrementally frame-by-frame
+    // (the earlier implementation), many small steps could drift from one
+    // big step over time; recomputing from the checkpoint every frame keeps
+    // them identical regardless of how the elapsed time was divided up.
+    const { container: singleStepContainer } = renderMap({ geojson: walkingGeojson });
     act(() => {
       vi.advanceTimersByTime(1000);
     });
-    const closer = markerTransform(marker);
-    expect(distanceTo50(closer)).toBeLessThan(distanceTo50(justAfter));
+    const singleStepPos = markerTransform(
+      singleStepContainer.querySelector('g') as SVGGElement
+    );
+
+    const { container: manyStepsContainer } = renderMap({ geojson: walkingGeojson });
+    act(() => {
+      for (let i = 0; i < 50; i++) {
+        vi.advanceTimersByTime(20);
+      }
+    });
+    const manyStepsPos = markerTransform(
+      manyStepsContainer.querySelector('g') as SVGGElement
+    );
+
+    // A small tolerance accounts for fake-timer rAF scheduling granularity,
+    // not accumulated simulation error - the two should land in the same
+    // place regardless of how the elapsed time was chunked into frames.
+    expect(manyStepsPos[0]).toBeCloseTo(singleStepPos[0], 1);
+    expect(manyStepsPos[1]).toBeCloseTo(singleStepPos[1], 1);
   });
 });
