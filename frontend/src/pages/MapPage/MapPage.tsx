@@ -47,11 +47,24 @@ export default function MapPage(): React.ReactElement {
     if (pcId == null) return;
 
     let cancelled = false;
+    // Successive polls can resolve out of order (ordinary network jitter -
+    // no two requests here are guaranteed to complete in the order they
+    // were sent). `cancelled` alone doesn't guard against that: it only
+    // gets set once the whole effect tears down, not between one poll and
+    // the next, so a slow response from an earlier poll could still land
+    // after - and overwrite - a faster, newer one. That regresses every
+    // walking character's position by a couple of seconds all at once
+    // (Map.tsx resets each one's animation checkpoint on every geojson
+    // change), reading as a synchronized jump backward. Tagging each
+    // request with a sequence number and only applying the latest-issued
+    // one's response closes that gap.
+    let latestRequestId = 0;
 
     const fetchData = async () => {
+      const requestId = ++latestRequestId;
       try {
         const data = await apiFetch(`/population-centres/${pcId}/map/`);
-        if (!cancelled) setGeojson(data);
+        if (!cancelled && requestId === latestRequestId) setGeojson(data);
       } catch (err) {
         console.error("Error fetching map:", err);
       }
