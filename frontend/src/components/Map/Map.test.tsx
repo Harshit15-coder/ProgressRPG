@@ -592,7 +592,7 @@ describe('PopulationCentreMap path-aware interpolation (#615)', () => {
           path: [
             [10, 0],
             [10, 10],
-          ],
+          ] as [number, number][],
           effective_speed: 5,
         },
       },
