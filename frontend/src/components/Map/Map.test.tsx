@@ -665,4 +665,56 @@ describe('PopulationCentreMap path-aware interpolation (#615)', () => {
 
     expect(markerTransform(marker)).toEqual([50, 50]);
   });
+
+  it('glides toward a large resync correction instead of snapping to it instantly (#615 follow-up)', () => {
+    const { container, rerender } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    // Walk partway along the first (known) segment.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const [midX] = markerTransform(marker);
+    expect(midX).toBeGreaterThan(0);
+    expect(midX).toBeLessThan(10);
+
+    // A fresh poll reports the character much further along a completely
+    // different route than the client knew about (e.g. it ran past the end
+    // of a capped path preview, or was rerouted) - well beyond
+    // WALKER_RESYNC_DRIFT_THRESHOLD from where the client currently has it.
+    const correctedGeojson = {
+      bbox: [0, 0, 100, 100] as [number, number, number, number],
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Walker',
+            path: [[60, 50]] as [number, number][],
+            effective_speed: 5,
+          },
+        },
+      ],
+    };
+    rerender(
+      <TooltipProvider>
+        <PopulationCentreMap geojson={correctedGeojson} />
+      </TooltipProvider>
+    );
+
+    // Immediately after the correcting poll, the marker should still be
+    // near where the client had it - not instantly teleported to (50, 50).
+    const distanceTo50 = ([x, y]: [number, number]) => Math.hypot(x - 50, y - 50);
+    const justAfter = markerTransform(marker);
+    expect(distanceTo50(justAfter)).toBeGreaterThan(3);
+
+    // But it should be walking straight toward the corrected point rather
+    // than stalled - and eventually arrive there.
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const closer = markerTransform(marker);
+    expect(distanceTo50(closer)).toBeLessThan(distanceTo50(justAfter));
+  });
 });

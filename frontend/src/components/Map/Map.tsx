@@ -218,11 +218,11 @@ interface WalkerState {
 }
 
 // If the authoritative polled position lands further than this from where
-// the client has locally walked a character to, snap straight to the poll
-// instead of gliding - a drift this big means a reroute (e.g. a schedule-
-// driven commute reversal) or a missed poll, not just normal interpolation
-// lag, and trying to glide across it would read as the character cutting
-// through walls/buildings to get there.
+// the client has locally walked a character to, treat it as a correction
+// leg (see the resync effect below) rather than ordinary interpolation lag -
+// a drift this big means a reroute (e.g. a schedule-driven commute reversal),
+// a missed poll, or the client running out of its previously-known path
+// before this poll refreshed it.
 const WALKER_RESYNC_DRIFT_THRESHOLD = 3;
 
 // Advances a walker's position along its remaining path by `distance` units,
@@ -601,10 +601,16 @@ export default function PopulationCentreMap({
   const walkerNodeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
 
   // Resyncs each walking character's stored path/speed to the latest poll
-  // whenever the underlying geojson changes. Only snaps the tracked position
-  // itself if it's drifted far from the authoritative one (a reroute or a
-  // missed poll) - otherwise the animation loop keeps walking smoothly from
-  // wherever it currently has the character, picking up the fresh path.
+  // whenever the underlying geojson changes. The tracked position is never
+  // snapped straight to the authoritative one, even when it's drifted far
+  // (a reroute, a missed poll, or the client having walked past the end of
+  // its previously-known, capped-length path before this poll refreshed
+  // it - see JOURNEY_PATH_PREVIEW_LIMIT) - an instant jump there reads as
+  // teleporting. Instead the authoritative point is inserted as the next
+  // waypoint, so the animation loop walks the character there at its normal
+  // speed like any other leg of the route, then continues on with the fresh
+  // path - smooth in every case, just a sharper turn when the drift is
+  // large.
   useEffect(() => {
     const activeIds = new Set<string>();
 
@@ -621,10 +627,10 @@ export default function PopulationCentreMap({
         continue;
       }
 
-      if (distanceBetween(existing.pos, [x, y]) > WALKER_RESYNC_DRIFT_THRESHOLD) {
-        existing.pos = [x, y];
-      }
-      existing.path = path;
+      existing.path =
+        distanceBetween(existing.pos, [x, y]) > WALKER_RESYNC_DRIFT_THRESHOLD
+          ? [[x, y], ...path]
+          : path;
       existing.speed = speed;
     }
 
