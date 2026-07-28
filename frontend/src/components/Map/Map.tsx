@@ -9,6 +9,11 @@ interface GeoJSONFeatureProperties {
   feature_type?: string;
   name?: string;
   id?: number;
+  // Remaining waypoints (capped server-side, see JOURNEY_PATH_PREVIEW_LIMIT
+  // in locations/serializers.py) for a character with an active journey;
+  // null/absent for an idle character.
+  path?: [number, number][] | null;
+  effective_speed?: number;
   [key: string]: unknown;
 }
 
@@ -203,6 +208,47 @@ interface PositionedCharacter {
   feature: GeoJSONFeature;
   cx: number;
   cy: number;
+  isWalking?: boolean;
+}
+
+interface WalkerState {
+  pos: [number, number];
+  path: [number, number][];
+  speed: number;
+}
+
+// If the authoritative polled position lands further than this from where
+// the client has locally walked a character to, snap straight to the poll
+// instead of gliding - a drift this big means a reroute (e.g. a schedule-
+// driven commute reversal) or a missed poll, not just normal interpolation
+// lag, and trying to glide across it would read as the character cutting
+// through walls/buildings to get there.
+const WALKER_RESYNC_DRIFT_THRESHOLD = 3;
+
+// Advances a walker's position along its remaining path by `distance` units,
+// consuming as many waypoints as it reaches in one call rather than stopping
+// at the first one short of the full distance - the same carry-over-leftover-
+// budget approach as the backend's step_toward (locations/services/
+// movement.py), so a character crossing several short segments in one frame
+// doesn't visibly slow down at each waypoint.
+function advanceWalker(walker: WalkerState, distance: number): void {
+  let remaining = distance;
+  while (remaining > 0 && walker.path.length > 0) {
+    const [nx, ny] = walker.path[0];
+    const dx = nx - walker.pos[0];
+    const dy = ny - walker.pos[1];
+    const segmentDistance = Math.hypot(dx, dy);
+
+    if (segmentDistance <= remaining) {
+      walker.pos = [nx, ny];
+      walker.path = walker.path.slice(1);
+      remaining -= segmentDistance;
+    } else {
+      const factor = segmentDistance === 0 ? 0 : remaining / segmentDistance;
+      walker.pos = [walker.pos[0] + dx * factor, walker.pos[1] + dy * factor];
+      remaining = 0;
+    }
+  }
 }
 
 function buildingFootprintRings(features: GeoJSONFeature[]): Ring[] {
@@ -529,14 +575,112 @@ export default function PopulationCentreMap({
     [features]
   );
 
-  const positionedCharacters = useMemo(
-    () =>
-      scatterCharacters(
-        features.filter((f) => f.properties?.feature_type === "character"),
-        buildingFootprints
-      ),
-    [features, buildingFootprints]
+  const characterFeatures = useMemo(
+    () => features.filter((f) => f.properties?.feature_type === "character"),
+    [features]
   );
+
+  // Characters with an active journey (a non-empty `path` from the backend,
+  // see CharacterPointFeatureSerializer) are animated by the walker loop
+  // below instead of the idle scatter-inside-building placement, which only
+  // makes sense for characters standing still.
+  const walkingFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
+    [characterFeatures]
+  );
+  const idleFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
+    [characterFeatures]
+  );
+
+  // Per-character walker state (current interpolated position, remaining
+  // path, speed), keyed by character id. Lives in a ref rather than state -
+  // it's updated up to 60x/sec by the animation loop below, and driving that
+  // through setState would re-render the whole map every frame.
+  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
+  const walkerNodeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
+
+  // Resyncs each walking character's stored path/speed to the latest poll
+  // whenever the underlying geojson changes. Only snaps the tracked position
+  // itself if it's drifted far from the authoritative one (a reroute or a
+  // missed poll) - otherwise the animation loop keeps walking smoothly from
+  // wherever it currently has the character, picking up the fresh path.
+  useEffect(() => {
+    const activeIds = new Set<string>();
+
+    for (const feature of walkingFeatures) {
+      const id = String(feature.properties?.id);
+      activeIds.add(id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const path = feature.properties?.path ?? [];
+      const speed = Number(feature.properties?.effective_speed) || 0;
+
+      const existing = walkersRef.current.get(id);
+      if (!existing) {
+        walkersRef.current.set(id, { pos: [x, y], path, speed });
+        continue;
+      }
+
+      if (distanceBetween(existing.pos, [x, y]) > WALKER_RESYNC_DRIFT_THRESHOLD) {
+        existing.pos = [x, y];
+      }
+      existing.path = path;
+      existing.speed = speed;
+    }
+
+    // Characters no longer walking (arrived, or gone from the map) fall back
+    // to idle placement next render - drop their stale walker state so a
+    // later journey starts clean instead of resuming from wherever this one
+    // left off.
+    for (const id of walkersRef.current.keys()) {
+      if (!activeIds.has(id)) walkersRef.current.delete(id);
+    }
+  }, [walkingFeatures]);
+
+  // Drives smooth per-frame movement for walking characters between polls.
+  // Writes positions straight to the DOM node (bypassing React state) so a
+  // full re-render isn't needed every frame; positionedCharacters below also
+  // reads the same walker ref for its initial/poll-driven render, so both
+  // stay consistent with whatever the loop has most recently written.
+  useEffect(() => {
+    let frameId: number;
+    let lastTimestamp: number | null = null;
+
+    const step = (timestamp: number) => {
+      if (lastTimestamp !== null) {
+        const deltaSeconds = (timestamp - lastTimestamp) / 1000;
+        walkersRef.current.forEach((walker, id) => {
+          advanceWalker(walker, walker.speed * deltaSeconds);
+          const node = walkerNodeRefs.current.get(id);
+          if (node) {
+            node.setAttribute(
+              "transform",
+              `translate(${walker.pos[0]}, ${walker.pos[1]})`
+            );
+          }
+        });
+      }
+      lastTimestamp = timestamp;
+      frameId = requestAnimationFrame(step);
+    };
+
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const positionedCharacters = useMemo(() => {
+    const idlePositioned = scatterCharacters(idleFeatures, buildingFootprints);
+    const walkingPositioned: PositionedCharacter[] = walkingFeatures.map((feature) => {
+      const id = String(feature.properties?.id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const pos = walkersRef.current.get(id)?.pos ?? [x, y];
+      return { feature, cx: pos[0], cy: pos[1], isWalking: true };
+    });
+
+    // Same painter's-algorithm ordering as before: lower on screen (larger
+    // cy) paints last so it sits above characters "behind" it.
+    return [...idlePositioned, ...walkingPositioned].sort((a, b) => a.cy - b.cy);
+  }, [idleFeatures, walkingFeatures, buildingFootprints]);
 
   // Browser page zoom fires a burst of resize events while the SVG's
   // rendered size is being recalculated; some browsers momentarily
@@ -662,8 +806,9 @@ export default function PopulationCentreMap({
           })}
 
       {/* Characters */}
-      {positionedCharacters.map(({ feature: f, cx, cy }) => {
+      {positionedCharacters.map(({ feature: f, cx, cy, isWalking }) => {
           const colour = colourForCharacter(f.properties?.id);
+          const id = String(f.properties?.id);
           return (
             <Tooltip
               key={`char-${f.properties?.id}`}
@@ -679,12 +824,30 @@ export default function PopulationCentreMap({
             >
               <g
                 tabIndex={0}
+                // Walking characters are driven by the rAF loop writing
+                // straight to the DOM node every frame - a CSS transition
+                // would fight those per-frame updates, so it's suppressed
+                // for them the same way it already is during a resize.
+                // Idle characters keep the transition so decorative
+                // wandering between polls still reads as a drift, not a
+                // teleport.
                 className={
-                  suppressTransition
+                  suppressTransition || isWalking
                     ? `${styles.characterMarker} ${styles.noTransition}`
                     : styles.characterMarker
                 }
                 transform={`translate(${cx}, ${cy})`}
+                ref={
+                  isWalking
+                    ? (node) => {
+                        if (node) {
+                          walkerNodeRefs.current.set(id, node);
+                        } else {
+                          walkerNodeRefs.current.delete(id);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {/* Placeholder person glyph: head + body, coloured per character.
                     Sized relative to a village ~100-200 GIS units wide, not

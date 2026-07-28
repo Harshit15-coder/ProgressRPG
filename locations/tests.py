@@ -7,11 +7,14 @@ from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
 from django.test.utils import CaptureQueriesContext
+from django.urls import reverse
 from django.utils import timezone
+from rest_framework.test import APIClient
 from unittest.mock import patch
 
 from .management.commands.spawn_villages import create_building_footprint
 from .models import Node, Path, Building, Journey, PopulationCentre, LandArea, Subzone
+from .serializers import CharacterPointFeatureSerializer, JOURNEY_PATH_PREVIEW_LIMIT
 from .services.schedule import sync_character_location, target_role_for
 from .services.wander import wander
 from .tasks import commute_tick, move_characters_tick, wander_tick
@@ -145,6 +148,42 @@ class LocationsModelsTestCase(TestCase):
         self.assertEqual(journey.status, "complete")
         self.assertIsNotNone(journey.finished_at)
 
+    def test_remaining_path_nodes_excludes_current_node_and_respects_limit(self):
+        journey = Journey.objects.create(
+            character=Character.objects.create(
+                first_name="J2",
+                location=Point(0, 0, srid=3857),
+                current_node=self.node_a,
+            ),
+            start_node=self.node_a,
+            destination_node=self.node_c,
+            path_nodes=[self.node_a.pk, self.node_b.pk, self.node_c.pk],
+            current_index=0,
+            status="active",
+        )
+
+        self.assertEqual(journey.remaining_path_nodes(), [self.node_b, self.node_c])
+        self.assertEqual(journey.remaining_path_nodes(limit=1), [self.node_b])
+
+        journey.advance_node()
+        journey.refresh_from_db()
+        self.assertEqual(journey.remaining_path_nodes(), [self.node_c])
+
+    def test_remaining_path_nodes_empty_when_no_path(self):
+        journey = Journey.objects.create(
+            character=Character.objects.create(
+                first_name="J3",
+                location=Point(0, 0, srid=3857),
+                current_node=self.node_a,
+            ),
+            start_node=self.node_a,
+            destination_node=self.node_a,
+            path_nodes=None,
+            current_index=0,
+            status="active",
+        )
+        self.assertEqual(journey.remaining_path_nodes(), [])
+
     def test_journey_arrival_via_move_characters_tick_does_not_raise(self):
         """Regression test: arrive() used to reference nonexistent
         current_content_type/current_object_id fields, which raised
@@ -174,6 +213,154 @@ class LocationsModelsTestCase(TestCase):
 
         journey = Journey.objects.filter(character=char).first()
         self.assertEqual(journey.status, "complete")
+
+
+class CharacterPointFeatureSerializerJourneyTest(TestCase):
+    """Path-aware movement interpolation (#615): the map feature for a
+    character exposes their remaining journey (capped) and effective speed,
+    so the frontend can walk them along the real path instead of tweening
+    blindly between two polled points."""
+
+    def setUp(self):
+        self.node_a = Node.objects.create(name="A", location=Point(0, 0, srid=3857))
+        self.node_b = Node.objects.create(name="B", location=Point(10, 0, srid=3857))
+        self.node_c = Node.objects.create(name="C", location=Point(20, 0, srid=3857))
+        Path.objects.create(from_node=self.node_a, to_node=self.node_b)
+        Path.objects.create(from_node=self.node_b, to_node=self.node_c)
+
+    def test_idle_character_has_no_path(self):
+        character = Character.objects.create(
+            first_name="Idle",
+            location=Point(0, 0, srid=3857),
+            current_node=self.node_a,
+            movement_speed=2.5,
+        )
+
+        props = CharacterPointFeatureSerializer(character).data["properties"]
+
+        self.assertIsNone(props["path"])
+        self.assertEqual(props["effective_speed"], 2.5)
+
+    def test_moving_character_exposes_remaining_path_and_speed(self):
+        character = Character.objects.create(
+            first_name="Walker",
+            location=Point(0, 0, srid=3857),
+            current_node=self.node_a,
+            is_moving=True,
+            movement_speed=3.0,
+        )
+        Journey.objects.create(
+            character=character,
+            start_node=self.node_a,
+            destination_node=self.node_c,
+            path_nodes=[self.node_a.pk, self.node_b.pk, self.node_c.pk],
+            current_index=0,
+            status="active",
+        )
+
+        props = CharacterPointFeatureSerializer(character).data["properties"]
+
+        self.assertEqual(props["path"], [[10.0, 0.0], [20.0, 0.0]])
+        self.assertEqual(props["effective_speed"], 3.0)
+
+    def test_path_is_capped_to_preview_limit(self):
+        nodes = [self.node_a, self.node_b, self.node_c]
+        for i in range(JOURNEY_PATH_PREVIEW_LIMIT + 5):
+            nodes.append(
+                Node.objects.create(
+                    name=f"Extra{i}", location=Point(30 + i * 10, 0, srid=3857)
+                )
+            )
+            Path.objects.create(from_node=nodes[-2], to_node=nodes[-1])
+
+        character = Character.objects.create(
+            first_name="LongHauler",
+            location=Point(0, 0, srid=3857),
+            current_node=self.node_a,
+            is_moving=True,
+        )
+        Journey.objects.create(
+            character=character,
+            start_node=self.node_a,
+            destination_node=nodes[-1],
+            path_nodes=[n.pk for n in nodes],
+            current_index=0,
+            status="active",
+        )
+
+        props = CharacterPointFeatureSerializer(character).data["properties"]
+
+        self.assertEqual(len(props["path"]), JOURNEY_PATH_PREVIEW_LIMIT)
+
+
+class PopulationCentreMapViewJourneyTest(TestCase):
+    """Guards against reintroducing an N+1 query per moving character when
+    the map endpoint looks up active journeys (see prefetch in
+    PopulationCentreMapView.get)."""
+
+    def setUp(self):
+        self.centre = PopulationCentre.objects.create(
+            name="Map Journey Village", location=Point(0, 0, srid=3857)
+        )
+        self.node_a = Node.objects.create(name="A", location=Point(0, 0, srid=3857))
+        self.node_b = Node.objects.create(name="B", location=Point(10, 0, srid=3857))
+        Path.objects.create(from_node=self.node_a, to_node=self.node_b)
+
+        self.moving_characters = []
+        for i in range(5):
+            character = Character.objects.create(
+                first_name=f"Mover{i}",
+                location=Point(0, 0, srid=3857),
+                current_node=self.node_a,
+                population_centre=self.centre,
+                is_moving=True,
+            )
+            Journey.objects.create(
+                character=character,
+                start_node=self.node_a,
+                destination_node=self.node_b,
+                path_nodes=[self.node_a.pk, self.node_b.pk],
+                current_index=0,
+                status="active",
+            )
+            self.moving_characters.append(character)
+
+        user = get_user_model().objects.create_user(
+            email="map-viewer@example.com", password="testpassword123"
+        )
+        self.client = APIClient()
+        self.client.force_authenticate(user=user)
+
+    def test_map_response_includes_path_for_each_moving_character(self):
+        url = reverse("populationcentre-map", args=[self.centre.pk])
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        character_features = [
+            f
+            for f in response.data["features"]
+            if f["properties"].get("feature_type") == "character"
+        ]
+        self.assertEqual(len(character_features), len(self.moving_characters))
+        for feature in character_features:
+            self.assertEqual(feature["properties"]["path"], [[10.0, 0.0]])
+
+    def test_map_response_does_not_scale_journey_queries_with_character_count(self):
+        url = reverse("populationcentre-map", args=[self.centre.pk])
+
+        with CaptureQueriesContext(connection) as ctx:
+            response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        journey_queries = [
+            q["sql"] for q in ctx.captured_queries if "locations_journey" in q["sql"]
+        ]
+        self.assertEqual(
+            len(journey_queries),
+            1,
+            "active journeys should be prefetched in one query instead of "
+            f"one per character: {journey_queries}",
+        )
 
 
 class PopulationCentreVillagePointsTest(TestCase):

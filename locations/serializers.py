@@ -62,6 +62,16 @@ class PointFeatureSerializer(GeoJSONFeatureSerializer):
         }
 
 
+# Cap on how many upcoming path nodes a moving character's map feature
+# carries per poll, rather than its full remaining route. Keeps response
+# size bounded independent of how many villages a future multi-village map
+# response might cover (see .claude/plans/issue-615-path-aware-movement-
+# interpolation-plan.md) - the frontend just re-extends the preview on the
+# following poll as the character advances, so this only needs to comfortably
+# cover the distance travelled in one poll interval, not the whole journey.
+JOURNEY_PATH_PREVIEW_LIMIT = 10
+
+
 class CharacterPointFeatureSerializer(PointFeatureSerializer):
     feature_type = "character"
 
@@ -74,14 +84,32 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
                 return location.location.display_name
         return None
 
+    def _active_journey(self, obj):
+        journeys = getattr(obj, "active_journey_list", None)
+        if journeys is not None:
+            return journeys[0] if journeys else None
+        return obj.journeys.filter(status="active").first()
+
     def get_properties(self, obj):
         needs = getattr(obj, "needs", None)
+        journey = self._active_journey(obj)
+        path = None
+        if journey is not None:
+            path = [
+                [float(node.location.x), float(node.location.y)]
+                for node in journey.remaining_path_nodes(
+                    limit=JOURNEY_PATH_PREVIEW_LIMIT
+                )
+            ]
+
         return {
             "id": obj.id,
             "name": obj.name,
             "home": self._primary_location_name(obj, CharacterLocation.Role.HOME),
             "work": self._primary_location_name(obj, CharacterLocation.Role.WORK),
             "hunger_label": needs.hunger_label() if needs else None,
+            "effective_speed": obj.movement_speed,
+            "path": path,
         }
 
 
