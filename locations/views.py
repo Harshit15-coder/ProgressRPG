@@ -1,3 +1,4 @@
+from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
@@ -65,7 +66,14 @@ class PopulationCentreMapView(APIView):
         )
         characters = population_centre.residents.select_related(
             "needs"
-        ).prefetch_related("locations__location")
+        ).prefetch_related(
+            "locations__location",
+            Prefetch(
+                "journeys",
+                queryset=Journey.objects.filter(status="active"),
+                to_attr="active_journey_list",
+            ),
+        )
 
         features = []
         features.append(BoundaryFeatureSerializer(population_centre).data)

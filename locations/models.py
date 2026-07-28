@@ -307,6 +307,23 @@ class Journey(models.Model):
             return Node.objects.get(pk=self.path_nodes[self.current_index + 1])
         return None
 
+    def remaining_path_nodes(self, limit=None):
+        """
+        Nodes still ahead of the character (excluding their current node),
+        in path order. Optionally capped to the first `limit` of them -
+        used to bound response size when previewing a journey to clients
+        rather than sending the full remaining route every time.
+        """
+        if not self.path_nodes:
+            return []
+
+        remaining_ids = self.path_nodes[self.current_index + 1 :]
+        if limit is not None:
+            remaining_ids = remaining_ids[:limit]
+
+        nodes = Node.objects.in_bulk(remaining_ids)
+        return [nodes[node_id] for node_id in remaining_ids if node_id in nodes]
+
     def cancel(self):
         """
         Stop any movement in progress and clear the target.

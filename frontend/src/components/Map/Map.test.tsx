@@ -1,9 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import PopulationCentreMap from './Map';
 import { TooltipProvider } from '../Tooltip/Tooltip';
+
+function markerTransform(g: Element): [number, number] {
+  const transform = g.getAttribute('transform') || '';
+  const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+  return [Number(match?.[1]), Number(match?.[2])];
+}
 
 function renderMap(props: ComponentProps<typeof PopulationCentreMap>) {
   return render(
@@ -562,5 +568,101 @@ describe('PopulationCentreMap', () => {
     const path = container.querySelector('polyline');
     expect(path).not.toBeNull();
     expect(path?.getAttribute('opacity')).toBe('0');
+  });
+});
+
+describe('PopulationCentreMap path-aware interpolation (#615)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const walkingGeojson = {
+    bbox: [0, 0, 100, 100] as [number, number, number, number],
+    features: [
+      {
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {
+          feature_type: 'character',
+          id: 1,
+          name: 'Walker',
+          path: [
+            [10, 0],
+            [10, 10],
+          ],
+          effective_speed: 5,
+        },
+      },
+    ],
+  };
+
+  it('walks a moving character along its path over time instead of staying put', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+    expect(markerTransform(marker)).toEqual([0, 0]);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const [x, y] = markerTransform(marker);
+    // At speed 5/sec after ~1s it should have covered noticeable ground
+    // along the first segment (0,0) -> (10,0), without overshooting it.
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThanOrEqual(10);
+    expect(y).toBe(0);
+  });
+
+  it('continues onto the next path segment after reaching a waypoint, without stalling', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    act(() => {
+      // speed 5/sec * 3s = 15 units of travel: 10 along the first segment
+      // (0,0)->(10,0), then 5 more into the second (10,0)->(10,10).
+      vi.advanceTimersByTime(3000);
+    });
+
+    const [x, y] = markerTransform(marker);
+    expect(x).toBe(10);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(10);
+  });
+
+  it('holds position at the end of its known path instead of extrapolating past it', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    act(() => {
+      // Far more time than needed to cover the whole known path (20 units
+      // at speed 5/sec = 4s) - should stop at the last node, not run past it.
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(markerTransform(marker)).toEqual([10, 10]);
+  });
+
+  it('does not animate an idle character (no active journey)', () => {
+    const idleGeojson = {
+      ...walkingGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 2, name: 'Idle', path: null },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: idleGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+    expect(markerTransform(marker)).toEqual([50, 50]);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(markerTransform(marker)).toEqual([50, 50]);
   });
 });

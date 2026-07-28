@@ -88,9 +88,12 @@
 
 .characterMarker {
   // Positioned via inline transform (translate); animate position changes
-  // between polls so wandering reads as a slow drift, not a teleport.
+  // between polls so idle wandering reads as a slow drift, not a teleport.
   // Matches MapPage's MAP_POLL_INTERVAL_MS so the glide from one poll lands
   // right as the next one arrives, instead of gliding then sitting still.
+  // Characters mid-journey are driven every frame by Map.tsx's requestAnimationFrame
+  // walker instead, which applies .noTransition below so this transition
+  // doesn't fight those per-frame updates.
   transition: transform 2s linear;
 
   // No visible focus ring on click/selection - only show one for keyboard
@@ -104,7 +107,8 @@
 }
 
 .noTransition {
-  // Applied while the window is resizing (including browser page zoom) -
-  // see Map.tsx for why.
+  // Applied while the window is resizing (including browser page zoom, see
+  // Map.tsx) and to any character being walked frame-by-frame along their
+  // path rather than tweened between polls.
   transition: none;
 }
