@@ -1,12 +1,12 @@
 @use '../styles/utilities/mixins' as m;
-@use '../styles/base/variables' as v;
+@use '../styles/semantic/spacing' as sp;
 @use '../styles/semantic/colors' as c;
 
 @mixin two-column-layout {
   display: flex;
   justify-content: center;
   align-items: flex-start;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
   max-width: 100vw;
   flex-direction: column;
@@ -22,11 +22,11 @@
   justify-content: flex-start;
   flex-direction: column;
   align-items: flex-start;
-  gap: v.$spacing-gap;
-  padding: v.$padding-base;
+  gap: sp.$spacing-gap;
+  padding: sp.$padding-base;
   background: c.$color-bg;
   border: 1px solid rgba(c.$color-border-primary, 0.8);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   align-self: stretch;
   max-width: 100%;
 
@@ -42,5 +42,5 @@
 @mixin bodyRow {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
 }

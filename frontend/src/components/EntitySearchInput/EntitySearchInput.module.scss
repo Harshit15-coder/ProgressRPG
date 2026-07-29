@@ -1,5 +1,6 @@
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -12,9 +13,9 @@
 .input {
   width: 100%;
   min-width: 0;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   box-sizing: border-box;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   @include t.apply-text-style(t.$text-body);
   @include m.border-interactive(
     rgba(c.$color-border-primary, 0.4),
@@ -33,15 +34,15 @@
 
 .dropdown {
   position: absolute;
-  top: calc(100% + #{v.$spacing-xs});
+  top: calc(100% + #{sp.$spacing-xs});
   left: 0;
   right: 0;
   z-index: v.$z-index-tooltip;
   margin: 0;
-  padding: v.$spacing-xs 0;
+  padding: sp.$spacing-xs 0;
   list-style: none;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.98);
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
 }
@@ -57,7 +58,7 @@
   left: auto;
   right: auto;
   z-index: v.$z-index-dropdown;
-  margin-top: v.$spacing-xs;
+  margin-top: sp.$spacing-xs;
   border-color: rgba(c.$color-border-primary, 0.12);
   background: rgba(c.$color-bg, 0.6);
   box-shadow: none;
@@ -76,7 +77,7 @@
   width: 100%;
   border: 0;
   background: transparent;
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   text-align: left;
   color: c.$color-text-body;
   cursor: pointer;
@@ -92,7 +93,7 @@
 }
 
 .groupLabel {
-  padding: v.$spacing-xs v.$spacing-md;
+  padding: sp.$spacing-xs sp.$spacing-md;
   font-size: 0.8em;
   color: rgba(c.$color-text-body, 0.5);
   text-transform: uppercase;
@@ -106,8 +107,8 @@
 }
 
 .emptyMessage {
-  margin: v.$spacing-xs 0 0;
-  padding: v.$spacing-sm v.$padding-base;
+  margin: sp.$spacing-xs 0 0;
+  padding: sp.$spacing-sm sp.$padding-base;
   color: rgba(c.$color-text-body, 0.6);
   box-sizing: border-box;
   min-height: var(--entity-search-persistent-min-height, auto);

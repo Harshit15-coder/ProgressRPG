@@ -1,4 +1,5 @@
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
@@ -14,7 +15,7 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: min(96vw, 720px);
   /* Required by Radix to be a list */
   list-style: none;
@@ -30,7 +31,7 @@
 
   /* Base look */
   background: rgba(c.$color-bg, 1);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   padding: 0;
   overflow: hidden;
 
@@ -86,7 +87,7 @@
 @keyframes fadeInUp {
   from {
     opacity: 0;
-    transform: translateY(-(v.$spacing-sm));
+    transform: translateY(-(sp.$spacing-sm));
   }
   to {
     opacity: 1;
@@ -101,6 +102,6 @@
   }
   to {
     opacity: 0;
-    transform: translateY(-(v.$spacing-sm));
+    transform: translateY(-(sp.$spacing-sm));
   }
 }

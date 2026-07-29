@@ -1,6 +1,6 @@
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/utilities/list-pages' as lp;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 
 .page {
@@ -96,7 +96,7 @@
 .taskTimestamps {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .timestampLabel {
@@ -111,7 +111,7 @@
 .filterToggle {
   align-self: flex-start;
   font-size: 0.875em;
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   min-width: 9rem;
 }
 
@@ -119,7 +119,7 @@
   border: none;
   background: transparent;
   color: c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   width: 1.75rem;
   height: 1.75rem;
   font-size: 1.25rem;

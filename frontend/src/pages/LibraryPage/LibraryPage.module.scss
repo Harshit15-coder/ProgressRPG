@@ -1,4 +1,4 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/typography' as t;
 
@@ -8,12 +8,12 @@
   align-items: center;
   width: 100%;
   margin: 0 auto;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
 }
 
 .header {
   text-align: center;
-  margin-bottom: v.$spacing-lg;
+  margin-bottom: sp.$spacing-lg;
 
   h1 {
     @include t.apply-text-style(t.$text-heading-1);
@@ -29,13 +29,13 @@
 .tabBar {
   display: flex;
   justify-content: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   border-bottom: 1px solid rgba(c.$color-border-primary, 0.25);
-  margin-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
 }
 
 .tab {
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;

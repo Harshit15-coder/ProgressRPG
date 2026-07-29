@@ -1,17 +1,17 @@
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/utilities/tier-colors' as tc;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
 .section {
-  padding: v.$padding-lg;
+  padding: sp.$padding-lg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
 
   h2 {
-    margin: 0 0 v.$spacing-md 0;
+    margin: 0 0 sp.$spacing-md 0;
     @include t.apply-text-style(t.$text-heading-2);
     color: c.$color-border-primary;
   }
@@ -20,7 +20,7 @@
 .achievementGrid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 }
 
 .achievementBadge {
@@ -29,19 +29,19 @@
 
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   min-width: 0;
-  padding: v.$spacing-md;
+  padding: sp.$spacing-md;
   border: 1px solid rgba(c.$color-border-primary, 0.16);
   border-left: 0.35rem solid var(--achievement-color);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: var(--achievement-bg);
 }
 
 .achievementHeader {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   min-width: 0;
 
   h3,
@@ -77,7 +77,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   color: c.$color-text-body;
   @include t.apply-text-style(t.$text-body);
 }

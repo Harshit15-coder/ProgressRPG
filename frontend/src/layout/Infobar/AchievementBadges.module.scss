@@ -1,12 +1,12 @@
 @use '../../styles/utilities/tier-colors' as tc;
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 
 .badgeRow {
   display: flex;
   align-items: center;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   flex-shrink: 0;
 }
 

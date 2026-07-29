@@ -1,4 +1,9 @@
-
+// Layout & UI constants that aren't part of the tokens/ design-token
+// scale (spacing/color/typography — see semantic/_spacing.scss for that
+// pattern). Breakpoints drive respond-to(), z-index establishes the
+// stacking order across components, and durations/easing drive
+// transitions. They stay here, rather than in tokens/ or semantic/,
+// because nothing composes them the way the spacing scale is composed.
 
 $breakpoints: (
   sm: 576px,
@@ -8,25 +13,6 @@ $breakpoints: (
   xxl: 1440px
 );
 
-
-// Spacing
-$spacing-xs: 0.25rem;
-$spacing-sm: 0.5rem; // 8px
-$spacing-md: 1rem; // 16px
-$spacing-lg: 2rem;
-$spacing-xl: 4rem;
-$spacing-2xl: 6rem;
-$spacing-3xl: 8rem;
-
-$spacing-gap: $spacing-sm;
-
-$padding-vertical: $spacing-sm;
-$padding-horizontal: $spacing-md;
-
-$padding-sm: $spacing-xs $spacing-sm;
-$padding-base: $padding-vertical $padding-horizontal;
-$padding-lg: $spacing-md $spacing-lg;
-
 $z-index-base: 1;
 $z-index-dropdown: 10;
 $z-index-header: 50;
@@ -35,14 +21,7 @@ $z-index-toast: 200;
 $z-index-tooltip: 300;
 $z-index-overlay: 999;
 
-$border-radius: $spacing-sm;
-$button-padding: $spacing-xs $spacing-md;
-$button-radius: $spacing-md;
-$content-padding: $spacing-lg;
-
-
 // Animations
-
 $duration-fast: 150ms;
 $duration-base: 250ms;
 $duration-slow: 400ms;

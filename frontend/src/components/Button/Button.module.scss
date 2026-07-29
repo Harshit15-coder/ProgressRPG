@@ -1,4 +1,4 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
@@ -8,9 +8,9 @@
   justify-content: center;
   align-items: center;
 
-  padding: v.$button-padding;
-  gap: v.$spacing-gap;
-  border-radius: v.$button-radius;
+  padding: sp.$button-padding;
+  gap: sp.$spacing-gap;
+  border-radius: sp.$button-radius;
   border: 1px solid transparent;
 
   cursor: pointer;

@@ -1,4 +1,5 @@
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/semantic/typography' as t;
@@ -26,7 +27,7 @@
 }
 
 .nav-drawer-header {
-    padding: v.$spacing-md;
+    padding: sp.$spacing-md;
     display: flex;
     justify-content: flex-end;
     align-items: center;
@@ -36,7 +37,7 @@
     width: 40px;
     height: 40px;
     border: 1px solid rgba(c.$color-border-primary, 0.3);
-    border-radius: v.$border-radius;
+    border-radius: sp.$border-radius;
     background: transparent;
     color: c.$color-border-primary;
     font-size: 1.5em;
@@ -61,11 +62,11 @@
 
 .nav-drawer-links {
     list-style: none;
-    padding: v.$spacing-md;
+    padding: sp.$spacing-md;
     margin: 0;
     display: flex;
     flex-direction: column;
-    gap: v.$spacing-sm;
+    gap: sp.$spacing-sm;
 }
 
 .nav-drawer-links li {
@@ -76,10 +77,10 @@
 .nav-drawer-links a {
     text-decoration: none;
     width: 100%;
-    padding: v.$padding-base;
+    padding: sp.$padding-base;
     display: flex;
     align-items: center;
-    gap: v.$spacing-xs;
+    gap: sp.$spacing-xs;
     @include t.apply-text-style(t.$text-body);
 
     span[aria-hidden] {
