@@ -1,7 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { jwtDecode } from "jwt-decode";
 
-import { apiFetch, ApiFetchError, getValidAccessToken, setUnauthorizedHandler } from "./api";
+import {
+  apiFetch,
+  ApiFetchError,
+  getValidAccessToken,
+  setMaintenanceHandler,
+  setNetworkErrorHandler,
+  setUnauthorizedHandler,
+} from "./api";
 import { getStoredAuthTokens, storeAuthTokens } from "./authStorage";
 
 vi.mock("jwt-decode", () => ({
@@ -55,27 +62,24 @@ describe("getValidAccessToken", () => {
 describe("apiFetch", () => {
   beforeEach(() => {
     globalThis.fetch = vi.fn();
-    Object.defineProperty(window, "location", {
-      value: { href: "" },
-      writable: true,
-    });
   });
 
   afterEach(() => {
+    setMaintenanceHandler(null);
+    setNetworkErrorHandler(null);
     vi.clearAllMocks();
     vi.useRealTimers();
   });
 
   const okResponse = { ok: true, status: 200, json: async () => ({ ok: true }) };
 
-  it("succeeds on the first attempt with no retry and no redirect", async () => {
+  it("succeeds on the first attempt with no retry", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce(okResponse);
 
     const result = await apiFetch("/me/", {}, "test-token");
 
     expect(result).toEqual({ ok: true });
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe("");
   });
 
   it("recovers after one transient network error", async () => {
@@ -90,7 +94,6 @@ describe("apiFetch", () => {
 
     expect(result).toEqual({ ok: true });
     expect(globalThis.fetch).toHaveBeenCalledTimes(2);
-    expect(window.location.href).toBe("");
   });
 
   it("recovers after two transient network errors", async () => {
@@ -107,10 +110,9 @@ describe("apiFetch", () => {
 
     expect(result).toEqual({ ok: true });
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
-    expect(window.location.href).toBe("");
   });
 
-  it("redirects to /unavailable once all retries are exhausted", async () => {
+  it("rejects with a network ApiFetchError once retries are exhausted, without a handler registered", async () => {
     vi.useFakeTimers();
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new TypeError("Failed to fetch"));
 
@@ -123,7 +125,23 @@ describe("apiFetch", () => {
     await expectation;
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(3);
-    expect(window.location.href).toBe("/unavailable");
+  });
+
+  it("invokes the registered network-error handler once retries are exhausted", async () => {
+    vi.useFakeTimers();
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(new TypeError("Failed to fetch"));
+    const networkErrorHandler = vi.fn();
+    setNetworkErrorHandler(networkErrorHandler);
+
+    const promise = apiFetch("/me/", {}, "test-token");
+    const expectation = expect(promise).rejects.toMatchObject({
+      kind: "network",
+    } satisfies Partial<ApiFetchError>);
+    await vi.advanceTimersByTimeAsync(300);
+    await vi.advanceTimersByTimeAsync(600);
+    await expectation;
+
+    expect(networkErrorHandler).toHaveBeenCalledTimes(1);
   });
 
   it("does not retry a non-network error", async () => {
@@ -132,7 +150,6 @@ describe("apiFetch", () => {
     await expect(apiFetch("/me/", {}, "test-token")).rejects.toThrow("boom");
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe("");
   });
 
   it("does not retry a 401 response", async () => {
@@ -143,10 +160,9 @@ describe("apiFetch", () => {
     } satisfies Partial<ApiFetchError>);
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe("");
   });
 
-  it("does not retry a 503 response and redirects to /maintenance", async () => {
+  it("does not retry a 503 response, rejecting with a service_unavailable ApiFetchError without a handler registered", async () => {
     (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 503 });
 
     await expect(apiFetch("/me/", {}, "test-token")).rejects.toMatchObject({
@@ -154,6 +170,17 @@ describe("apiFetch", () => {
     } satisfies Partial<ApiFetchError>);
 
     expect(globalThis.fetch).toHaveBeenCalledTimes(1);
-    expect(window.location.href).toBe("/maintenance");
+  });
+
+  it("invokes the registered maintenance handler on a 503 response", async () => {
+    (globalThis.fetch as ReturnType<typeof vi.fn>).mockResolvedValueOnce({ ok: false, status: 503 });
+    const maintenanceHandler = vi.fn();
+    setMaintenanceHandler(maintenanceHandler);
+
+    await expect(apiFetch("/me/", {}, "test-token")).rejects.toMatchObject({
+      kind: "service_unavailable",
+    } satisfies Partial<ApiFetchError>);
+
+    expect(maintenanceHandler).toHaveBeenCalledTimes(1);
   });
 });

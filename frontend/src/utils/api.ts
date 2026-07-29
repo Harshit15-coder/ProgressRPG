@@ -71,6 +71,26 @@ export function setUnauthorizedHandler(handler: UnauthorizedHandler | null): voi
   unauthorizedHandler = handler;
 }
 
+// Same rationale as unauthorizedHandler above: api.ts has no window/router of
+// its own (see #570 — keeping it DOM-free is prep for a non-browser runtime
+// like React Native), so maintenance/network-failure navigation is delegated
+// to whatever's registered rather than assigned via window.location directly.
+// Unregistered is a valid, safe state (e.g. in tests): the caller still gets
+// the typed ApiFetchError below either way, it just doesn't navigate anywhere.
+type MaintenanceHandler = () => void;
+let maintenanceHandler: MaintenanceHandler | null = null;
+
+export function setMaintenanceHandler(handler: MaintenanceHandler | null): void {
+  maintenanceHandler = handler;
+}
+
+type NetworkErrorHandler = () => void;
+let networkErrorHandler: NetworkErrorHandler | null = null;
+
+export function setNetworkErrorHandler(handler: NetworkErrorHandler | null): void {
+  networkErrorHandler = handler;
+}
+
 function handleUnauthorized(): void {
   // Cleared here unconditionally, not left solely to the registered handler:
   // this covers a request firing before AuthProvider has mounted, or in a
@@ -171,7 +191,7 @@ export async function apiFetch<T = unknown>(
     }
 
     if (response.status === 503) {
-      window.location.href = "/maintenance";
+      maintenanceHandler?.();
       return Promise.reject(new ApiFetchError("service_unavailable", "Maintenance mode"));
     }
 
@@ -193,7 +213,7 @@ export async function apiFetch<T = unknown>(
     }
   } catch (err) {
     if (err instanceof TypeError) {
-      window.location.href = "/unavailable";
+      networkErrorHandler?.();
       return Promise.reject(new ApiFetchError("network", err.message));
     }
     console.error("apiFetch error:", err);
