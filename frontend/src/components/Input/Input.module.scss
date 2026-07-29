@@ -2,7 +2,6 @@
 @use '../../styles/base/variables' as v;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
-@use '../../styles/base/a11y' as a;
 @use 'sass:map';
 
 .inputGroup {
@@ -18,7 +17,6 @@
 }
 
 .label {
-  //@include a.visually-hidden;
   @include t.apply-text-style(t.$text-label)
 }
 

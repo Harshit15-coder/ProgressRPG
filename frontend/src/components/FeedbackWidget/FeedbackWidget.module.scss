@@ -9,7 +9,7 @@
   position: fixed;
   bottom: 1rem;
   right: 1rem;
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
 
   .feedbackButton {
     padding: map.get(sp.$gap, sm) map.get(sp.$gap, md);
@@ -24,7 +24,7 @@
   border-radius: v.$border-radius;
   @include m.box-shadow(md);
   padding: map.get(sp.$gap, md);
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
   position: relative;
   @include m.slide-up(0.2s);
 

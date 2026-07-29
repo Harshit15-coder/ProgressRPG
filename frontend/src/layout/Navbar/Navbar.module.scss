@@ -106,7 +106,7 @@
   border-radius: v.$border-radius;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   padding: v.$spacing-sm;
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
 }
 
 .announcementsPopoverHeader {
@@ -273,7 +273,7 @@
   border-radius: v.$border-radius;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
   padding: v.$spacing-xs 0;
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
   outline: none;
 }
 
