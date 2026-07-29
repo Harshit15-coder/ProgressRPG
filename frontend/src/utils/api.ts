@@ -6,6 +6,30 @@ import { clearAuthStorage, getStoredAuthTokens, updateStoredAccessToken } from "
 
 const API_URL = `${API_BASE_URL}/api/v1`;
 
+const NETWORK_RETRY_ATTEMPTS = 2; // retries after the initial attempt (3 attempts total)
+const NETWORK_RETRY_DELAY_MS = [300, 600]; // delay before retry attempt N (index 0 = before 1st retry)
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+// A single flaky connection shouldn't take down the whole app (see #538) -
+// retry transient network failures (fetch() throwing TypeError) a couple of
+// times before giving up. Non-network errors and HTTP error statuses (401,
+// 503, etc.) are handled by the caller and never enter this loop.
+async function fetchWithRetry(input: string, init: RequestInit): Promise<Response> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      return await fetch(input, init);
+    } catch (err) {
+      if (!(err instanceof TypeError) || attempt >= NETWORK_RETRY_ATTEMPTS) {
+        throw err;
+      }
+      await delay(NETWORK_RETRY_DELAY_MS[attempt]);
+    }
+  }
+}
+
 type ResponseType = "json" | "blob" | "text" | "raw";
 
 interface ApiFetchOptions extends Omit<RequestInit, "headers"> {
@@ -136,7 +160,7 @@ export async function apiFetch<T = unknown>(
       "Content-Type": "application/json",
     };
 
-    const response = await fetch(`${API_URL}${path}`, {
+    const response = await fetchWithRetry(`${API_URL}${path}`, {
       ...fetchOptions,
       headers,
     });
