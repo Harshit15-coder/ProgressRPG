@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 
 .page {
   @include m.page-layout();
@@ -8,6 +8,6 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
 }

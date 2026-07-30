@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -12,7 +12,7 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
   align-items: center;
 }

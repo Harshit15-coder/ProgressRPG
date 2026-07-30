@@ -1,5 +1,4 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/spacing' as sp;
@@ -11,8 +10,8 @@ $row-control-height: 44px;
   position: relative;
   width: min(100%, 720px);
   border: 1px solid rgba(c.$color-border-primary, 0.15);
-  border-radius: v.$border-radius;
-  padding: v.$padding-base;
+  border-radius: sp.$border-radius;
+  padding: sp.$padding-base;
   background: rgba(c.$color-player, 0.14);
 }
 
@@ -65,8 +64,8 @@ $row-control-height: 44px;
   text-align: left;
   border: 2px solid transparent;
   background: transparent;
-  border-radius: v.$border-radius;
-  padding: v.$padding-sm;
+  border-radius: sp.$border-radius;
+  padding: sp.$padding-sm;
   font-size: 1.05rem;
   cursor: pointer;
   color: c.$color-text-body;
@@ -103,13 +102,13 @@ $row-control-height: 44px;
   justify-content: center;
   height: $row-control-height;
   @include m.border(rgba(c.$color-border-primary, 0.3));
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   // $padding-base is itself a 2-value shorthand ($padding-vertical
   // $padding-horizontal) — `0 $padding-base` silently expanded to a 3-value
   // padding (0 top, $padding-vertical left/right, $padding-horizontal
   // bottom), which is what was pushing the digits off-center. Use the
   // horizontal-only variable instead so this stays a clean 2-value shorthand.
-  padding: 0 v.$padding-horizontal;
+  padding: 0 sp.$padding-horizontal;
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-size: 1.1rem;
@@ -123,7 +122,7 @@ $row-control-height: 44px;
 }
 
 .limitWarning {
-  margin: v.$spacing-sm 0 0;
+  margin: sp.$spacing-sm 0 0;
   text-align: left;
   color: c.$color-text-body;
 }
@@ -131,7 +130,7 @@ $row-control-height: 44px;
 .supportButtonRow {
   display: flex;
   justify-content: center;
-  padding-top: v.$spacing-md;
+  padding-top: sp.$spacing-md;
 }
 
 .supportModeButton {

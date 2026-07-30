@@ -1,25 +1,25 @@
-@use '../base/variables' as v;
+@use '../semantic/spacing' as sp;
 @use '../semantic/typography' as t;
 @use '../semantic/colors' as c;
 
 @mixin list-page-header {
   text-align: center;
-  margin-bottom: v.$spacing-lg;
+  margin-bottom: sp.$spacing-lg;
 
   h1 {
     @include t.apply-text-style(t.$text-heading-1);
-    margin-bottom: v.$spacing-md;
+    margin-bottom: sp.$spacing-md;
   }
 }
 
 @mixin list-page-add-form {
   display: flex;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   align-items: flex-start;
   width: 100%;
   max-width: 900px;
-  margin: 0 auto v.$spacing-md;
-  padding-right: v.$spacing-sm;
+  margin: 0 auto sp.$spacing-md;
+  padding-right: sp.$spacing-sm;
 }
 
 @mixin list-page-add-input {
@@ -47,10 +47,10 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-md;
-  padding: v.$padding-base;
+  gap: sp.$spacing-md;
+  padding: sp.$padding-base;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
   transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease, transform 0.2s ease;
   position: relative;
@@ -68,7 +68,7 @@
 @mixin list-page-details {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   flex: 1;
 
   .name {
@@ -84,9 +84,9 @@
 }
 
 @mixin list-page-edit-input {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 2px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   font-size: 1em;
   font-family: inherit;
   transition: border-color 0.2s ease;
@@ -99,14 +99,14 @@
 
 @mixin list-page-actions {
   display: flex;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   flex-wrap: wrap;
   justify-content: flex-end;
 }
 
 @mixin list-page-action-button-base {
-  padding: v.$spacing-xs v.$spacing-sm;
-  border-radius: v.$border-radius;
+  padding: sp.$spacing-xs sp.$spacing-sm;
+  border-radius: sp.$border-radius;
   cursor: pointer;
   font-size: 0.85em;
   transition: all 0.2s ease;
@@ -115,7 +115,7 @@
 
 @mixin list-page-empty-state {
   text-align: center;
-  padding: v.$padding-lg;
+  padding: sp.$padding-lg;
   color: rgba(0, 0, 0, 0.6);
 
   p {

@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -11,8 +11,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  margin-bottom: v.$spacing-lg;
-  gap: v.$spacing-sm;
+  margin-bottom: sp.$spacing-lg;
+  gap: sp.$spacing-sm;
 
   h1 {
     margin: 0;
@@ -22,9 +22,9 @@
 }
 
 .backLink {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   color: c.$color-border-primary;
   text-decoration: none;
@@ -46,20 +46,20 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xl;
+  gap: sp.$spacing-xl;
   width: 100%;
   max-width: 700px;
   margin: 0 auto;
 }
 
 .section {
-  padding: v.$padding-lg;
+  padding: sp.$padding-lg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
 
   h2 {
-    margin: 0 0 v.$spacing-md 0;
+    margin: 0 0 sp.$spacing-md 0;
     @include t.apply-text-style(t.$text-heading-2);
   }
 }
@@ -71,19 +71,19 @@
 }
 
 .description {
-  margin-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
   color: rgba(0, 0, 0, 0.7);
   @include t.apply-text-style(t.$text-body);
 }
 
 .currentInfo {
   display: flex;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   align-items: baseline;
-  margin-bottom: v.$spacing-md;
-  padding: v.$spacing-sm;
+  margin-bottom: sp.$spacing-md;
+  padding: sp.$spacing-sm;
   background: rgba(c.$color-border-primary, 0.05);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
 
   .currentLabel {
     margin: 0;
@@ -103,13 +103,13 @@
 .form {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 }
 
 .formGroup {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
 
   label {
     font-weight: 500;
@@ -118,9 +118,9 @@
 }
 
 .input {
-  padding: v.$spacing-sm;
+  padding: sp.$spacing-sm;
   border: 2px solid rgba(c.$color-border-primary, 0.3);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   font-size: 1em;
   font-family: inherit;
   transition: border-color 0.2s ease;
@@ -133,11 +133,11 @@
 }
 
 .primaryButton {
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: 1px solid #5a4cff;
   background: #5a4cff;
   color: white;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   cursor: pointer;
   font-size: 1em;
   transition: all 0.2s ease;
@@ -159,11 +159,11 @@
 }
 
 .secondaryButton {
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: 1px solid c.$color-border-primary;
   background: transparent;
   color: c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   cursor: pointer;
   font-size: 1em;
   transition: all 0.2s ease;
@@ -186,11 +186,11 @@
 }
 
 .dangerButton {
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: 1px solid #d32f2f;
   background: transparent;
   color: #d32f2f;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   cursor: pointer;
   font-size: 1em;
   transition: all 0.2s ease;
@@ -229,10 +229,10 @@
 .deleteConfirmation {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
-  padding: v.$padding-base;
+  gap: sp.$spacing-md;
+  padding: sp.$padding-base;
   border: 2px solid #d32f2f;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(211, 47, 47, 0.05);
 }
 
@@ -245,6 +245,6 @@
 
 .buttonGroup {
   display: flex;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   flex-wrap: wrap;
 }

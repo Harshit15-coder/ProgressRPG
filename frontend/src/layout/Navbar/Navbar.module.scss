@@ -16,7 +16,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   width: 100%;
   max-width: 100%;
   background: c.$color-bg;
@@ -28,8 +28,8 @@
   flex-direction: row;
   align-items: center;
   align-self: stretch;
-  gap: v.$spacing-md;
-  margin: 0 v.$spacing-sm;
+  gap: sp.$spacing-md;
+  margin: 0 sp.$spacing-sm;
   @include t.apply-text-style(t.$text-heading-2);
 }
 
@@ -63,7 +63,7 @@
     // Tighter than Button's own default padding ($button-padding) - with
     // several nav buttons sharing one row, the default spacing left too
     // little room for a label to fit on one line.
-    padding: v.$spacing-xs v.$spacing-sm;
+    padding: sp.$spacing-xs sp.$spacing-sm;
 }
 
 .unreadBadge {
@@ -103,18 +103,18 @@
   overflow: auto;
   background: c.$color-bg;
   border: 1px solid rgba(c.$color-border-primary, 0.25);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  padding: v.$spacing-sm;
-  z-index: v.$z-indexdropdown;
+  padding: sp.$spacing-sm;
+  z-index: v.$z-index-dropdown;
 }
 
 .announcementsPopoverHeader {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-sm;
-  margin-bottom: v.$spacing-sm;
+  gap: sp.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .announcementsList {
@@ -123,25 +123,25 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .announcementItem {
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
-  padding: v.$spacing-sm;
+  border-radius: sp.$border-radius;
+  padding: sp.$spacing-sm;
 }
 
 .announcementTitleRow {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   font-weight: 600;
 }
 
 .announcementSummary {
-  margin: v.$spacing-xs 0;
+  margin: sp.$spacing-xs 0;
   font-size: 0.9rem;
   opacity: 0.9;
 }
@@ -159,7 +159,7 @@
   &:focus-visible {
     outline: 2px solid rgba(c.$color-border-primary, 0.5);
     outline-offset: 2px;
-    border-radius: v.$border-radius;
+    border-radius: sp.$border-radius;
   }
 }
 
@@ -170,11 +170,11 @@
 .announcementMetaRight {
   display: inline-flex;
   align-items: center;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
 }
 
 .announcementBody {
-  margin: v.$spacing-xs 0 0;
+  margin: sp.$spacing-xs 0 0;
   font-size: 0.9rem;
   white-space: pre-wrap;
   line-height: 1.35;
@@ -219,7 +219,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   border: 1px solid rgba(c.$color-border-primary, 0.35);
   background: transparent;
   cursor: pointer;
@@ -243,7 +243,7 @@
   justify-content: center;
   width: 40px;
   height: 40px;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   border: 1px solid rgba(c.$color-border-primary, 0.35);
   color: inherit;
   text-decoration: none;
@@ -270,17 +270,17 @@
   min-width: 160px;
   background: c.$color-bg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
-  padding: v.$spacing-xs 0;
-  z-index: v.$z-indexdropdown;
+  padding: sp.$spacing-xs 0;
+  z-index: v.$z-index-dropdown;
   outline: none;
 }
 
 .accountDropdownItem {
   display: block;
   text-decoration: none;
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   @include t.apply-text-style(t.$text-body);
   @include c.apply-text-tone(map.get(c.$text-tone, default));
   width: 100%;
@@ -294,7 +294,7 @@
     width: 100%;
     display: flex;
     align-items: center;
-    gap: v.$spacing-xs;
+    gap: sp.$spacing-xs;
     text-decoration: none;
     color: inherit;
   }
@@ -307,10 +307,10 @@
 }
 
 .mobileAnnouncementsPanel {
-  margin: 0 v.$spacing-sm v.$spacing-sm;
-  padding: v.$spacing-sm;
+  margin: 0 sp.$spacing-sm sp.$spacing-sm;
+  padding: sp.$spacing-sm;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.95);
 }
 
@@ -318,8 +318,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-sm;
-  margin-bottom: v.$spacing-sm;
+  gap: sp.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 //.account {
@@ -331,7 +331,7 @@
   flex-direction: row;
   align-items: center;
   justify-content: space-between;
-  padding: v.$spacing-md;
+  padding: sp.$spacing-md;
   width: 100%;
   max-width: 100%;
 
@@ -363,7 +363,7 @@
 
   .leftLinks,
   .rightLinks {
-    gap: v.$spacing-xs;
+    gap: sp.$spacing-xs;
   }
 
   .navLink.navLink {
@@ -379,7 +379,7 @@
 @include m.respond-to(lg) {
   .leftLinks,
   .rightLinks {
-    gap: v.$spacing-md;
+    gap: sp.$spacing-md;
   }
 
   .navLink.navLink {

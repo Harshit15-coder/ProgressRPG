@@ -1,5 +1,5 @@
 @use 'sass:map';
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/tokens/typography' as tt;
@@ -8,9 +8,9 @@
 .progressBarWrapper {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   position: relative;
 }
 
@@ -32,12 +32,12 @@
 
 .progressTrack {
   width: 100%;
-  height: v.$spacing-lg;
+  height: sp.$spacing-lg;
   background-color: c.$color-bg;
   overflow: hidden;
   position: relative;
 
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   border: 1px solid rgba(c.$color-border-primary, 0.8);;
 }
 
@@ -47,11 +47,11 @@
   justify-content: center;
   height: 100%;
   transition: width 0.3s ease;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   border-top-left-radius: 0;
   border-bottom-left-radius: 0;
-  border-top-right-radius: v.$border-radius;
-  border-bottom-right-radius: v.$border-radius;
+  border-top-right-radius: sp.$border-radius;
+  border-bottom-right-radius: sp.$border-radius;
   white-space: nowrap;
   //padding: 0 0.5rem;
 }

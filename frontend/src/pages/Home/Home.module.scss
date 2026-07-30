@@ -1,6 +1,6 @@
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/tokens/colors' as tc;
 @use 'sass:map';
@@ -17,17 +17,17 @@
 .skipLink {
   position: absolute;
   top: -3rem;
-  left: v.$spacing-md;
+  left: sp.$spacing-md;
   z-index: 20;
-  padding: v.$spacing-sm v.$spacing-md;
-  border-radius: v.$border-radius;
+  padding: sp.$spacing-sm sp.$spacing-md;
+  border-radius: sp.$border-radius;
   background: tc.$color-light;
   color: map.get(tc.$primary-scale, 700);
   box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.18);
   text-decoration: none;
 
   &:focus {
-    top: v.$spacing-md;
+    top: sp.$spacing-md;
   }
 }
 
@@ -36,7 +36,7 @@
 .sectionHeading {
   @include t.apply-text-style(t.$text-heading-2);
   text-align: center;
-  margin-bottom: v.$spacing-lg;
+  margin-bottom: sp.$spacing-lg;
   scroll-margin-top: 6rem;
 }
 
@@ -50,7 +50,7 @@
     map.get(tc.$primary-scale, 300) 100%
   );
   color: tc.$color-light;
-  padding: v.$spacing-3xl v.$spacing-md;
+  padding: sp.$spacing-3xl sp.$spacing-md;
   display: flex;
   justify-content: center;
 }
@@ -62,7 +62,7 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: v.$spacing-lg;
+  gap: sp.$spacing-lg;
 }
 
 .heroHeading {
@@ -98,14 +98,14 @@
   width: 100%;
   max-width: 40rem;
   display: grid;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .heroHighlightItem {
   background: rgba(tc.$color-light, 0.14);
   border-left: 0.25rem solid rgba(tc.$color-light, 0.72);
-  border-radius: v.$border-radius;
-  padding: v.$spacing-sm v.$spacing-md;
+  border-radius: sp.$border-radius;
+  padding: sp.$spacing-sm sp.$spacing-md;
   text-align: left;
   @include t.apply-text-style(t.$text-body);
 }
@@ -114,7 +114,7 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
   max-width: 40rem;
 
@@ -123,8 +123,8 @@
     align-items: center;
     justify-content: center;
     min-height: 2.5rem;
-    padding: 0 v.$spacing-md;
-    border-radius: v.$button-radius;
+    padding: 0 sp.$spacing-md;
+    border-radius: sp.$button-radius;
     border: 1px solid rgba(c.$color-border-primary, 0.35);
     @include t.apply-text-style(t.$text-button);
     @include c.apply-button-variant(secondary);
@@ -151,15 +151,15 @@
 .heroSignupBox {
   background: map.get(tc.$secondary-scale, 100);
   border: 1px solid map.get(tc.$secondary-scale, 300);
-  border-radius: v.$border-radius;
-  padding: v.$spacing-xl v.$spacing-lg;
+  border-radius: sp.$border-radius;
+  padding: sp.$spacing-xl sp.$spacing-lg;
   max-width: 560px;
   width: 100%;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   box-shadow: 0 0.75rem 2rem rgba(0, 0, 0, 0.16);
 }
 
@@ -183,7 +183,7 @@
 // ─── Features ────────────────────────────────────────────────────────────────
 
 .features {
-  padding: v.$spacing-2xl v.$spacing-md;
+  padding: sp.$spacing-2xl sp.$spacing-md;
   background: c.$color-bg;
   display: flex;
   flex-direction: column;
@@ -196,7 +196,7 @@
   padding: 0;
   display: grid;
   grid-template-columns: 1fr;
-  gap: v.$spacing-lg;
+  gap: sp.$spacing-lg;
   width: 100%;
   max-width: 960px;
 
@@ -207,11 +207,11 @@
 
 .featureCard {
   background: map.get(tc.$secondary-scale, 100);
-  border-radius: v.$border-radius;
-  padding: v.$spacing-lg;
+  border-radius: sp.$border-radius;
+  padding: sp.$spacing-lg;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .featureIcon {
@@ -232,7 +232,7 @@
 // ─── How it works ─────────────────────────────────────────────────────────────
 
 .howItWorks {
-  padding: v.$spacing-2xl v.$spacing-md;
+  padding: sp.$spacing-2xl sp.$spacing-md;
   background: map.get(tc.$secondary-scale, 100);
   display: flex;
   flex-direction: column;
@@ -245,7 +245,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-lg;
+  gap: sp.$spacing-lg;
   width: 100%;
   max-width: 640px;
 }
@@ -253,12 +253,12 @@
 .step {
   display: flex;
   align-items: flex-start;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 
   strong {
     @include t.apply-text-style(t.$text-heading-3);
     display: block;
-    margin-bottom: v.$spacing-xs;
+    margin-bottom: sp.$spacing-xs;
   }
 
   p {
@@ -285,7 +285,7 @@
 // ─── Story / mission ───────────────────────────────────────────────────────────
 
 .storySection {
-  padding: v.$spacing-2xl v.$spacing-md;
+  padding: sp.$spacing-2xl sp.$spacing-md;
   background: c.$color-bg;
   display: flex;
   justify-content: center;
@@ -296,7 +296,7 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   text-align: center;
 }
 
@@ -329,13 +329,13 @@
   width: 100%;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .signupFieldGroup {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   width: 100%;
 }
 
@@ -353,7 +353,7 @@
 
 .signupFields {
   display: flex;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
   flex-wrap: wrap;
   justify-content: center;
@@ -361,9 +361,9 @@
 
 .signupInput {
   flex: 1 1 220px;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   border: 1px solid map.get(tc.$primary-scale, 300);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   @include t.apply-text-style(t.$text-body);
   background: tc.$color-light;
 
@@ -389,9 +389,9 @@
 }
 
 .signupSuccess {
-  padding: v.$spacing-md;
+  padding: sp.$spacing-md;
   background: map.get(tc.$secondary-scale, 200);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   border: 1px solid map.get(tc.$secondary-scale, 400);
 
   p {

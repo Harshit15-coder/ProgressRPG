@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use 'sass:map';
@@ -11,7 +11,7 @@
   justify-content: flex-start;
   align-items: center;
   min-height: 100vh;
-  padding-top: v.$spacing-2xl;
+  padding-top: sp.$spacing-2xl;
 }
 
 .formFrame {
@@ -19,14 +19,14 @@
 }
 
 .form {
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
 }
 
 .rememberMeField {
   flex-direction: row;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .rememberMeInput {
@@ -36,7 +36,7 @@
 
 .error {
   @include c.apply-text-tone(map.get(c.$text-tone, error));
-  margin-bottom: v.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
   text-align: center;
   @include t.apply-text-style(t.$text-body);
 }

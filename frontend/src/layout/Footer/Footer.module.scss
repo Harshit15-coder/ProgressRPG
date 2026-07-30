@@ -1,4 +1,4 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -7,15 +7,15 @@
   flex-direction: column;
   align-items: center;
   text-align: center;
-  padding: v.$padding-base;
-  gap: v.$spacing-lg;
-  margin-top: v.$spacing-md;
+  padding: sp.$padding-base;
+  gap: sp.$spacing-lg;
+  margin-top: sp.$spacing-md;
   width: 100%;
   background: c.$color-bg;
   @include t.apply-text-style(t.$text-body);
 
   a {
-    margin: 0 v.$spacing-sm;
+    margin: 0 sp.$spacing-sm;
     @include t.apply-text-style(t.$text-body);
 
     &:hover {
@@ -28,5 +28,5 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }

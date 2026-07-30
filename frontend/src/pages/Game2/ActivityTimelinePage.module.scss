@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -7,14 +7,14 @@
   @include m.page-layout();
 
   @include m.respond-to(sm, down) {
-    padding-inline: v.$spacing-sm;
+    padding-inline: sp.$spacing-sm;
   }
 }
 
 .activitiesLink {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   color: c.$color-border-primary;
   text-decoration: none;
@@ -38,8 +38,8 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
-  margin-top: v.$spacing-gap;
+  gap: sp.$spacing-gap;
+  margin-top: sp.$spacing-gap;
   width: 100%;
   align-items: center;
 }

@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -9,7 +9,7 @@
   justify-content: center;
   align-items: center;
   text-align: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .code {
@@ -24,10 +24,10 @@
 }
 
 .actions {
-  margin-top: v.$spacing-sm;
+  margin-top: sp.$spacing-sm;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   align-items: center;
 }
 
