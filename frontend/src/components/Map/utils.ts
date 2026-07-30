@@ -46,6 +46,58 @@ export function computeViewBox(
   return `${x} ${y} ${w} ${h}`;
 }
 
+/**
+ * MapLibre's rendering pipeline is Mercator-projection-based: it expects
+ * source coordinates as [lng, lat] and internally clamps/wraps latitude to
+ * roughly +-85 degrees (the standard Web Mercator-valid range - much
+ * tighter than longitude's +-180). Feeding it raw EPSG:3857 metres directly
+ * (which range into the millions) is far outside that domain.
+ *
+ * Since this map has no basemap/tile layer, nothing visually depends on
+ * these being real-world coordinates - MAP_COORD_SCALE is a synthetic,
+ * reversible unit conversion that keeps the game world's expected extent
+ * comfortably inside MapLibre's valid lat range, not a real projection.
+ *
+ * Villages are seeded 1-2km apart (see spawn_villages.py); a scale of
+ * 10,000 keeps the world addressable out to roughly +-850km (lat = +-85)
+ * before hitting MapLibre's clamp, several orders of magnitude beyond any
+ * currently seeded world size.
+ */
+export const MAP_COORD_SCALE = 10_000;
+
+export function toLngLat([x, y]: [number, number]): [number, number] {
+  return [x / MAP_COORD_SCALE, y / MAP_COORD_SCALE];
+}
+
+export function fromLngLat([lng, lat]: [number, number]): [number, number] {
+  return [lng * MAP_COORD_SCALE, lat * MAP_COORD_SCALE];
+}
+
+// A GeoJSON `coordinates` array is arbitrarily nested depending on geometry
+// type (Point: [x, y]; LineString: [[x, y], ...]; Polygon: [[[x, y], ...]]).
+// This recurses down to the leaf [x, y] pairs regardless of nesting depth.
+type CoordTree = [number, number] | CoordTree[];
+
+function mapCoordTree(
+  coords: CoordTree,
+  fn: (pt: [number, number]) => [number, number]
+): CoordTree {
+  if (typeof coords[0] === "number") {
+    return fn(coords as [number, number]);
+  }
+  return (coords as CoordTree[]).map((c) => mapCoordTree(c, fn));
+}
+
+/** Converts a whole GeoJSON `coordinates` tree from 3857 metres to synthetic lng/lat. */
+export function coordsToLngLat(coords: CoordTree): CoordTree {
+  return mapCoordTree(coords, toLngLat);
+}
+
+/** Converts a whole GeoJSON `coordinates` tree from synthetic lng/lat back to 3857 metres. */
+export function coordsFromLngLat(coords: CoordTree): CoordTree {
+  return mapCoordTree(coords, fromLngLat);
+}
+
 // Bare soil - a crop subzone with no field planted yet, or fallow.
 const FIELD_FILL_FALLOW = "#c2a878";
 // Wheat gold - a mature, ready-to-harvest field. Same value the map used
