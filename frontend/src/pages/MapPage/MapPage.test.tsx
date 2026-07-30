@@ -1,12 +1,16 @@
 import { act, render, screen } from '@testing-library/react';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import MapPage from './MapPage';
 
-const mockApiFetch = vi.fn();
+const mockFetchFirstPopulationCentreId = vi.fn();
+const mockFetchPopulationCentreMap = vi.fn();
 
-vi.mock('../../utils/api', () => ({
-  apiFetch: (...args: unknown[]) => mockApiFetch(...args),
+vi.mock('../../api/map', () => ({
+  fetchFirstPopulationCentreId: (...args: unknown[]) =>
+    mockFetchFirstPopulationCentreId(...args),
+  fetchPopulationCentreMap: (...args: unknown[]) => mockFetchPopulationCentreMap(...args),
 }));
 
 vi.mock('../../components/Map/Map', () => ({
@@ -15,66 +19,83 @@ vi.mock('../../components/Map/Map', () => ({
   ),
 }));
 
+function renderMapPage() {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+    },
+  });
+
+  return render(
+    <QueryClientProvider client={queryClient}>
+      <MapPage />
+    </QueryClientProvider>
+  );
+}
+
 describe('MapPage', () => {
   beforeEach(() => {
-    vi.useFakeTimers();
-    mockApiFetch.mockReset();
+    mockFetchFirstPopulationCentreId.mockReset();
+    mockFetchPopulationCentreMap.mockReset();
+    mockFetchFirstPopulationCentreId.mockResolvedValue(1);
   });
 
   afterEach(() => {
-    act(() => {
-      vi.runOnlyPendingTimers();
-    });
     vi.useRealTimers();
   });
 
-  it('ignores an out-of-order poll response that resolves after a newer one (#624)', async () => {
-    const mapCalls: { resolve: (value: unknown) => void }[] = [];
-
-    mockApiFetch.mockImplementation((url: string) => {
-      if (url === '/population-centres/') {
-        return Promise.resolve([{ id: 1 }]);
-      }
-      // Each poll to the map endpoint gets its own promise that this test
-      // resolves manually, in whatever order it chooses - simulating
-      // ordinary network jitter where responses needn't arrive in the
-      // order the requests were sent.
-      return new Promise((resolve) => {
-        mapCalls.push({ resolve });
-      });
+  it('renders the map once the population centre and its map data have loaded', async () => {
+    mockFetchPopulationCentreMap.mockResolvedValue({
+      meta: { population_centre_name: 'Driftmoor' },
     });
 
-    render(<MapPage />);
+    renderMapPage();
 
-    // Flush the population-centre lookup (mount effect) so pcId is set and
-    // the first map poll fires.
+    expect(await screen.findByTestId('map-stub')).toHaveTextContent('Driftmoor');
+  });
+
+  it('does not issue a second request while the previous poll is still in flight (#624)', async () => {
+    vi.useFakeTimers();
+    const pending: { resolve: (value: unknown) => void }[] = [];
+    mockFetchPopulationCentreMap.mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          pending.push({ resolve });
+        })
+    );
+
+    renderMapPage();
+
+    // Flush the population-centre lookup so pcId resolves and the first
+    // map fetch fires.
     await act(async () => {
-      await Promise.resolve();
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(0);
     });
-    expect(mapCalls).toHaveLength(1);
+    expect(mockFetchPopulationCentreMap).toHaveBeenCalledTimes(1);
 
-    // Advance to the next scheduled poll - a second, newer request goes out
-    // while the first is still pending.
+    // Advance past when a poll would normally re-fire. TanStack Query
+    // deduplicates fetches for the same query key while one is already in
+    // flight, so no second network call should go out until this one
+    // settles - this is what makes the old manual-polling race (#624),
+    // where a stale response could land after and overwrite a newer one,
+    // structurally impossible here rather than something to guard against
+    // after the fact.
     await act(async () => {
-      vi.advanceTimersByTime(2000);
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2000);
     });
-    expect(mapCalls).toHaveLength(2);
+    expect(mockFetchPopulationCentreMap).toHaveBeenCalledTimes(1);
 
-    // The newer (second) request resolves first...
     await act(async () => {
-      mapCalls[1].resolve({ meta: { population_centre_name: 'Newer village' } });
-      await Promise.resolve();
+      pending[0].resolve({ meta: { population_centre_name: 'Driftmoor' } });
+      await vi.advanceTimersByTimeAsync(0);
     });
-    expect(screen.getByTestId('map-stub').textContent).toBe('Newer village');
+    expect(screen.getByTestId('map-stub').textContent).toBe('Driftmoor');
 
-    // ...then the older (first) request finally resolves late. It must not
-    // overwrite the newer data that already rendered.
+    // Now that the in-flight fetch has settled, the next interval tick is
+    // free to fire a new one.
     await act(async () => {
-      mapCalls[0].resolve({ meta: { population_centre_name: 'Stale village' } });
-      await Promise.resolve();
+      await vi.advanceTimersByTimeAsync(2000);
     });
-    expect(screen.getByTestId('map-stub').textContent).toBe('Newer village');
+    expect(mockFetchPopulationCentreMap).toHaveBeenCalledTimes(2);
   });
 });
