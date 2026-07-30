@@ -9,6 +9,11 @@ interface GeoJSONFeatureProperties {
   feature_type?: string;
   name?: string;
   id?: number;
+  // Remaining waypoints (capped server-side, see JOURNEY_PATH_PREVIEW_LIMIT
+  // in locations/serializers.py) for a character with an active journey;
+  // null/absent for an idle character.
+  path?: [number, number][] | null;
+  effective_speed?: number;
   [key: string]: unknown;
 }
 
@@ -203,6 +208,59 @@ interface PositionedCharacter {
   feature: GeoJSONFeature;
   cx: number;
   cy: number;
+  isWalking?: boolean;
+}
+
+// A walker's position is never stepped incrementally frame-to-frame (that
+// approach let small per-poll speed mismatches between client and server
+// silently accumulate over the whole journey, surfacing as a character
+// lagging further and further behind, then snapping/rushing to catch up).
+// Instead each poll records a fresh checkpoint - the authoritative position
+// the server reported, the remaining path from there, and the client
+// timestamp it was received - and every frame recomputes position from
+// scratch as a pure function of that checkpoint and elapsed real time.
+// Whatever drift builds up within a single poll interval (small, since it's
+// only ever one interval's worth) is wiped out by the next poll's fresh
+// checkpoint rather than compounding across the journey.
+interface WalkerState {
+  checkpointPos: [number, number];
+  path: [number, number][];
+  speed: number;
+  receivedAt: number;
+}
+
+// Walks `distance` units from `start` along `path`, consuming as many
+// waypoints as it reaches rather than stopping at the first one short of the
+// full distance - the same carry-over-leftover-budget approach as the
+// backend's step_toward (locations/services/movement.py), so a character
+// crossing several short segments doesn't visibly slow down at each one.
+// Holds at the final point rather than extrapolating past it if `distance`
+// exceeds the path's total length (e.g. the client's clock has run ahead of
+// the server's capped path preview - the next poll will supply more path).
+function positionAlongPath(
+  start: [number, number],
+  path: [number, number][],
+  distance: number
+): [number, number] {
+  let pos = start;
+  let remaining = distance;
+
+  for (const [nx, ny] of path) {
+    const dx = nx - pos[0];
+    const dy = ny - pos[1];
+    const segmentDistance = Math.hypot(dx, dy);
+
+    if (segmentDistance <= remaining) {
+      pos = [nx, ny];
+      remaining -= segmentDistance;
+    } else {
+      const factor = segmentDistance === 0 ? 0 : remaining / segmentDistance;
+      pos = [pos[0] + dx * factor, pos[1] + dy * factor];
+      break;
+    }
+  }
+
+  return pos;
 }
 
 function buildingFootprintRings(features: GeoJSONFeature[]): Ring[] {
@@ -529,14 +587,105 @@ export default function PopulationCentreMap({
     [features]
   );
 
-  const positionedCharacters = useMemo(
-    () =>
-      scatterCharacters(
-        features.filter((f) => f.properties?.feature_type === "character"),
-        buildingFootprints
-      ),
-    [features, buildingFootprints]
+  const characterFeatures = useMemo(
+    () => features.filter((f) => f.properties?.feature_type === "character"),
+    [features]
   );
+
+  // Characters with an active journey (a non-empty `path` from the backend,
+  // see CharacterPointFeatureSerializer) are animated by the walker loop
+  // below instead of the idle scatter-inside-building placement, which only
+  // makes sense for characters standing still.
+  const walkingFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
+    [characterFeatures]
+  );
+  const idleFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
+    [characterFeatures]
+  );
+
+  // Per-character walker state (current interpolated position, remaining
+  // path, speed), keyed by character id. Lives in a ref rather than state -
+  // it's updated up to 60x/sec by the animation loop below, and driving that
+  // through setState would re-render the whole map every frame.
+  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
+  const walkerNodeRefs = useRef<Map<string, SVGGElement | null>>(new Map());
+
+  // Resets each walking character's checkpoint to the latest poll whenever
+  // the underlying geojson changes: the authoritative position, its
+  // remaining path, its speed, and the moment this checkpoint was taken.
+  // Unconditional - there's no drift to weigh here, since the animation loop
+  // below never accumulates state across polls; it only ever measures time
+  // elapsed since this checkpoint.
+  useEffect(() => {
+    const activeIds = new Set<string>();
+    const receivedAt = performance.now();
+
+    for (const feature of walkingFeatures) {
+      const id = String(feature.properties?.id);
+      activeIds.add(id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const path = feature.properties?.path ?? [];
+      const speed = Number(feature.properties?.effective_speed) || 0;
+
+      walkersRef.current.set(id, { checkpointPos: [x, y], path, speed, receivedAt });
+    }
+
+    // Characters no longer walking (arrived, or gone from the map) fall back
+    // to idle placement next render - drop their stale walker state so a
+    // later journey starts clean instead of resuming from wherever this one
+    // left off.
+    for (const id of walkersRef.current.keys()) {
+      if (!activeIds.has(id)) walkersRef.current.delete(id);
+    }
+  }, [walkingFeatures]);
+
+  // Drives smooth per-frame movement for walking characters between polls.
+  // Each frame recomputes position from scratch - the checkpoint plus how
+  // much time has passed since it was taken - rather than stepping forward
+  // from wherever the previous frame left off, so nothing compounds across
+  // frames or across polls (see the WalkerState comment above). Writes
+  // positions straight to the DOM node (bypassing React state) so a full
+  // re-render isn't needed every frame; positionedCharacters below also
+  // reads the same checkpoint for its initial/poll-driven render.
+  useEffect(() => {
+    let frameId: number;
+
+    const step = () => {
+      const now = performance.now();
+      walkersRef.current.forEach((walker, id) => {
+        const elapsedSeconds = (now - walker.receivedAt) / 1000;
+        const pos = positionAlongPath(
+          walker.checkpointPos,
+          walker.path,
+          walker.speed * elapsedSeconds
+        );
+        const node = walkerNodeRefs.current.get(id);
+        if (node) {
+          node.setAttribute("transform", `translate(${pos[0]}, ${pos[1]})`);
+        }
+      });
+      frameId = requestAnimationFrame(step);
+    };
+
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  const positionedCharacters = useMemo(() => {
+    const idlePositioned = scatterCharacters(idleFeatures, buildingFootprints);
+    const walkingPositioned: PositionedCharacter[] = walkingFeatures.map((feature) => {
+      const id = String(feature.properties?.id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const pos = walkersRef.current.get(id)?.checkpointPos ?? [x, y];
+      return { feature, cx: pos[0], cy: pos[1], isWalking: true };
+    });
+
+    // Same painter's-algorithm ordering as before: lower on screen (larger
+    // cy) paints last so it sits above characters "behind" it.
+    return [...idlePositioned, ...walkingPositioned].sort((a, b) => a.cy - b.cy);
+  }, [idleFeatures, walkingFeatures, buildingFootprints]);
 
   // Browser page zoom fires a burst of resize events while the SVG's
   // rendered size is being recalculated; some browsers momentarily
@@ -662,8 +811,9 @@ export default function PopulationCentreMap({
           })}
 
       {/* Characters */}
-      {positionedCharacters.map(({ feature: f, cx, cy }) => {
+      {positionedCharacters.map(({ feature: f, cx, cy, isWalking }) => {
           const colour = colourForCharacter(f.properties?.id);
+          const id = String(f.properties?.id);
           return (
             <Tooltip
               key={`char-${f.properties?.id}`}
@@ -679,12 +829,30 @@ export default function PopulationCentreMap({
             >
               <g
                 tabIndex={0}
+                // Walking characters are driven by the rAF loop writing
+                // straight to the DOM node every frame - a CSS transition
+                // would fight those per-frame updates, so it's suppressed
+                // for them the same way it already is during a resize.
+                // Idle characters keep the transition so decorative
+                // wandering between polls still reads as a drift, not a
+                // teleport.
                 className={
-                  suppressTransition
+                  suppressTransition || isWalking
                     ? `${styles.characterMarker} ${styles.noTransition}`
                     : styles.characterMarker
                 }
                 transform={`translate(${cx}, ${cy})`}
+                ref={
+                  isWalking
+                    ? (node) => {
+                        if (node) {
+                          walkerNodeRefs.current.set(id, node);
+                        } else {
+                          walkerNodeRefs.current.delete(id);
+                        }
+                      }
+                    : undefined
+                }
               >
                 {/* Placeholder person glyph: head + body, coloured per character.
                     Sized relative to a village ~100-200 GIS units wide, not

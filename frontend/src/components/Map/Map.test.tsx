@@ -1,9 +1,15 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import PopulationCentreMap from './Map';
 import { TooltipProvider } from '../Tooltip/Tooltip';
+
+function markerTransform(g: Element): [number, number] {
+  const transform = g.getAttribute('transform') || '';
+  const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
+  return [Number(match?.[1]), Number(match?.[2])];
+}
 
 function renderMap(props: ComponentProps<typeof PopulationCentreMap>) {
   return render(
@@ -562,5 +568,189 @@ describe('PopulationCentreMap', () => {
     const path = container.querySelector('polyline');
     expect(path).not.toBeNull();
     expect(path?.getAttribute('opacity')).toBe('0');
+  });
+});
+
+describe('PopulationCentreMap path-aware interpolation (#615)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const walkingGeojson = {
+    bbox: [0, 0, 100, 100] as [number, number, number, number],
+    features: [
+      {
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {
+          feature_type: 'character',
+          id: 1,
+          name: 'Walker',
+          path: [
+            [10, 0],
+            [10, 10],
+          ] as [number, number][],
+          effective_speed: 5,
+        },
+      },
+    ],
+  };
+
+  it('walks a moving character along its path over time instead of staying put', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+    expect(markerTransform(marker)).toEqual([0, 0]);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const [x, y] = markerTransform(marker);
+    // At speed 5/sec after ~1s it should have covered noticeable ground
+    // along the first segment (0,0) -> (10,0), without overshooting it.
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThanOrEqual(10);
+    expect(y).toBe(0);
+  });
+
+  it('continues onto the next path segment after reaching a waypoint, without stalling', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    act(() => {
+      // speed 5/sec * 3s = 15 units of travel: 10 along the first segment
+      // (0,0)->(10,0), then 5 more into the second (10,0)->(10,10).
+      vi.advanceTimersByTime(3000);
+    });
+
+    const [x, y] = markerTransform(marker);
+    expect(x).toBe(10);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(10);
+  });
+
+  it('holds position at the end of its known path instead of extrapolating past it', () => {
+    const { container } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    act(() => {
+      // Far more time than needed to cover the whole known path (20 units
+      // at speed 5/sec = 4s) - should stop at the last node, not run past it.
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(markerTransform(marker)).toEqual([10, 10]);
+  });
+
+  it('does not animate an idle character (no active journey)', () => {
+    const idleGeojson = {
+      ...walkingGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 2, name: 'Idle', path: null },
+        },
+      ],
+    };
+    const { container } = renderMap({ geojson: idleGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+    expect(markerTransform(marker)).toEqual([50, 50]);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(markerTransform(marker)).toEqual([50, 50]);
+  });
+
+  it('adopts a fresh poll as the new authoritative checkpoint rather than extrapolating from the previous one (#615 follow-up)', () => {
+    const { container, rerender } = renderMap({ geojson: walkingGeojson });
+    const marker = container.querySelector('g') as SVGGElement;
+
+    // Walk partway along the first (known) segment.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const [midX] = markerTransform(marker);
+    expect(midX).toBeGreaterThan(0);
+    expect(midX).toBeLessThan(10);
+
+    // A fresh poll reports the character on a completely different route
+    // than the client knew about (e.g. a reroute, or the client having run
+    // past the end of a capped path preview between polls).
+    const correctedGeojson = {
+      bbox: [0, 0, 100, 100] as [number, number, number, number],
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Walker',
+            path: [[60, 50]] as [number, number][],
+            effective_speed: 5,
+          },
+        },
+      ],
+    };
+    rerender(
+      <TooltipProvider>
+        <PopulationCentreMap geojson={correctedGeojson} />
+      </TooltipProvider>
+    );
+
+    // The poll is trusted outright as the character's new position, not
+    // treated as a target to glide toward from wherever the client's own
+    // (possibly wrong) extrapolation had drifted to - the whole point of
+    // recomputing from a fresh checkpoint every poll is that error never
+    // gets a chance to compound across polls in the first place.
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+    const justAfter = markerTransform(marker);
+    expect(Math.hypot(justAfter[0] - 50, justAfter[1] - 50)).toBeLessThan(0.5);
+
+    // And it continues walking normally from there along the fresh path.
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const later = markerTransform(marker);
+    expect(later[0]).toBeGreaterThan(justAfter[0]);
+    expect(later[1]).toBeCloseTo(50, 5);
+  });
+
+  it('recomputes position fresh each frame instead of accumulating step-to-step error (#615 follow-up)', () => {
+    // Two renders of the same walking character: one where time is advanced
+    // in a single 1000ms jump, one where the same 1000ms passes across many
+    // small frames. If position were stepped incrementally frame-by-frame
+    // (the earlier implementation), many small steps could drift from one
+    // big step over time; recomputing from the checkpoint every frame keeps
+    // them identical regardless of how the elapsed time was divided up.
+    const { container: singleStepContainer } = renderMap({ geojson: walkingGeojson });
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const singleStepPos = markerTransform(
+      singleStepContainer.querySelector('g') as SVGGElement
+    );
+
+    const { container: manyStepsContainer } = renderMap({ geojson: walkingGeojson });
+    act(() => {
+      for (let i = 0; i < 50; i++) {
+        vi.advanceTimersByTime(20);
+      }
+    });
+    const manyStepsPos = markerTransform(
+      manyStepsContainer.querySelector('g') as SVGGElement
+    );
+
+    // A small tolerance accounts for fake-timer rAF scheduling granularity,
+    // not accumulated simulation error - the two should land in the same
+    // place regardless of how the elapsed time was chunked into frames.
+    expect(manyStepsPos[0]).toBeCloseTo(singleStepPos[0], 1);
+    expect(manyStepsPos[1]).toBeCloseTo(singleStepPos[1], 1);
   });
 });
