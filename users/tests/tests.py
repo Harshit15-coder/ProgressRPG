@@ -20,6 +20,7 @@ from progress_rpg.middleware.timezone import UserTimezoneMiddleware
 from users.adapters import CustomAccountAdapter
 from users.achievements import achievement_goals_for_player
 from users.serializers import PlayerSerializer
+from gameplay.models import ActivityTimer
 from users.models import Player, UserLogin
 from progression.models import PlayerActivity
 from users.tasks import (
@@ -96,6 +97,31 @@ class UserCreationTest(TestCase):
 
         self.assertEqual(generated_name, generate_default_player_name(12345))
         self.assertRegex(generated_name, r"^player_\d{8}$")
+
+    def test_create_user_creates_activity_timer(self):
+        """Test that a new user's player gets an ActivityTimer."""
+        user = self.UserModel.objects.create_user(
+            email="testuser5@example.com", password="testpassword123"
+        )
+        self.assertTrue(ActivityTimer.objects.filter(player=user.player).exists())
+
+    def test_admin_created_user_gets_player_and_activity_timer(self):
+        """UserAdmin.save_model() just does obj.save() - it doesn't go
+        through CustomUserManager.create_user() - so CustomUserAdmin must
+        explicitly run player setup for admin-created users."""
+        from users.admin import CustomUserAdmin
+        from django.contrib import admin as django_admin
+
+        user = self.UserModel(email="testuser6@example.com")
+        user.set_password("testpassword123")
+
+        model_admin = CustomUserAdmin(self.UserModel, django_admin.site)
+        model_admin.save_model(request=None, obj=user, form=None, change=False)
+
+        self.assertTrue(Player.objects.filter(user=user).exists())
+        self.assertTrue(
+            ActivityTimer.objects.filter(player__user=user).exists()
+        )
 
 
 class PlayerNameValidationTest(TestCase):
