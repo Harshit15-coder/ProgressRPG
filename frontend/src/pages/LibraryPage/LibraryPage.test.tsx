@@ -34,22 +34,22 @@ describe("LibraryPage", () => {
       mockUseFeatureFlag.mockReturnValue(true);
     });
 
-    it("defaults to the Tasks tab, rendering TasksPanel", () => {
+    it("defaults to the Activities tab, rendering ActivitiesPanel", () => {
       render(<LibraryPage />);
 
       expect(screen.getByRole("heading", { name: "Your library" })).toBeInTheDocument();
-      expect(screen.getByTestId("tasks-panel")).toBeInTheDocument();
-      expect(screen.queryByTestId("coming-soon-panel")).not.toBeInTheDocument();
+      expect(screen.getByTestId("activities-panel")).toBeInTheDocument();
+      expect(screen.queryByTestId("tasks-panel")).not.toBeInTheDocument();
     });
 
-    it("switches to the Activities tab, rendering ActivitiesPanel", async () => {
+    it("switches to the Tasks tab, rendering TasksPanel", async () => {
       const user = userEvent.setup();
       render(<LibraryPage />);
 
-      await user.click(screen.getByRole("tab", { name: "Activities" }));
+      await user.click(screen.getByRole("tab", { name: "Tasks" }));
 
-      expect(screen.getByTestId("activities-panel")).toBeInTheDocument();
-      expect(screen.queryByTestId("tasks-panel")).not.toBeInTheDocument();
+      expect(screen.getByTestId("tasks-panel")).toBeInTheDocument();
+      expect(screen.queryByTestId("activities-panel")).not.toBeInTheDocument();
     });
 
     it("switches to the Skills tab, rendering SkillsPanel", async () => {
@@ -75,10 +75,12 @@ describe("LibraryPage", () => {
       mockUseFeatureFlag.mockReturnValue(false);
     });
 
-    it("still shows the Tasks tab but renders a coming-soon notice", () => {
+    it("still shows the Tasks tab but renders a coming-soon notice", async () => {
+      const user = userEvent.setup();
       render(<LibraryPage />);
 
-      expect(screen.getByRole("tab", { name: "Tasks" })).toBeInTheDocument();
+      await user.click(screen.getByRole("tab", { name: "Tasks" }));
+
       expect(screen.queryByTestId("tasks-panel")).not.toBeInTheDocument();
       expect(screen.getByTestId("coming-soon-panel")).toHaveTextContent("tasks coming soon");
     });

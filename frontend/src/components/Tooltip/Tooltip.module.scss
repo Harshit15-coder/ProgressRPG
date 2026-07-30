@@ -1,4 +1,5 @@
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 
 .trigger {
@@ -21,12 +22,12 @@
   // Letting pointer events pass through avoids the tooltip ever intercepting
   // the hover in the first place.
   pointer-events: none;
-  max-width: min(20rem, calc(100vw - (2 * #{v.$spacing-md})));
+  max-width: min(20rem, calc(100vw - (2 * #{sp.$spacing-md})));
   border: 1px solid rgba(c.$color-border-primary, 0.22);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg-invert, 0.96);
   color: c.$color-text-invert;
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   box-shadow: 0 12px 28px rgba(0, 0, 0, 0.18);
   font-size: 0.875rem;
   line-height: 1.4;

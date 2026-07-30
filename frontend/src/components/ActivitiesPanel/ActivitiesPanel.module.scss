@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use 'sass:map';
@@ -16,17 +16,17 @@
 
 .dateTabs {
   display: flex;
-  gap: v.$spacing-sm;
-  margin-bottom: v.$spacing-md;
+  gap: sp.$spacing-sm;
+  margin-bottom: sp.$spacing-md;
   flex-wrap: wrap;
   justify-content: center;
   width: 100%;
 }
 
 .dateButton {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid rgba(c.$color-border-primary, 0.4);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   cursor: pointer;
   font-size: 0.9em;
@@ -52,7 +52,7 @@
 .activitiesList {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   width: 100%;
   max-width: 900px;
   margin: 0 auto;
@@ -60,7 +60,7 @@
   max-height: min(62dvh, calc(100dvh - 25rem));
   overflow-y: auto;
   scrollbar-gutter: stable;
-  padding-right: v.$spacing-sm;
+  padding-right: sp.$spacing-sm;
 
   @include m.respond-to(md, down) {
     max-height: min(56vh, calc(100vh - 19rem));
@@ -96,9 +96,9 @@
 }
 
 .backLink {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   color: c.$color-border-primary;
   text-decoration: none;
@@ -106,7 +106,7 @@
   transition: all 0.2s ease;
   @include t.apply-text-style(t.$text-body);
   text-align: center;
-  margin-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
 
   &:hover {
     background: rgba(c.$color-border-primary, 0.1);
@@ -121,7 +121,7 @@
 
 .emptyState {
   text-align: center;
-  padding: v.$padding-lg;
+  padding: sp.$padding-lg;
   color: rgba(0, 0, 0, 0.6);
 
   p {

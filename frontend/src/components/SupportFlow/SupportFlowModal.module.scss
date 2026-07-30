@@ -1,12 +1,12 @@
 // SupportFlow/SupportFlowModal.module.scss
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/utilities/mixins' as m;
 
 .activityInputScreen {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   width: 100%;
 }
 
@@ -16,9 +16,9 @@
 
 .activityTextArea {
   width: 100%;
-  padding: v.$spacing-sm;
+  padding: sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: c.$color-bg;
   color: c.$color-text-body;
   font-size: 1rem;
@@ -29,7 +29,7 @@
 .durationRow {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   flex-wrap: wrap;
 }
 
@@ -41,24 +41,24 @@
 
 .durationInput {
   width: 5rem;
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: c.$color-bg;
   color: c.$color-text-body;
   font-size: 1rem;
 }
 
 .detailIntro {
-  margin-bottom: v.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .videoWrapper {
   width: 100%;
   aspect-ratio: 16 / 9;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   overflow: hidden;
-  margin-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
   background: rgba(c.$color-border-primary, 0.12);
 }
 
@@ -71,26 +71,26 @@
 .hint {
   font-size: 0.875rem;
   color: c.$color-text-muted;
-  margin-bottom: v.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .stepsList {
-  padding-left: v.$spacing-lg;
-  margin-bottom: v.$spacing-md;
+  padding-left: sp.$spacing-lg;
+  margin-bottom: sp.$spacing-md;
 
   li {
-    margin-bottom: v.$spacing-xs;
+    margin-bottom: sp.$spacing-xs;
   }
 }
 
 .tabBar {
   display: flex;
   border-bottom: 1px solid rgba(c.$color-border-primary, 0.25);
-  margin-bottom: v.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .tab {
-  padding: v.$spacing-xs v.$spacing-md;
+  padding: sp.$spacing-xs sp.$spacing-md;
   border: none;
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
@@ -115,7 +115,7 @@
 .taskPickList {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   max-height: 220px;
   overflow-y: auto;
 
@@ -136,10 +136,10 @@
 .taskPickRow {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
-  padding: v.$spacing-xs v.$spacing-sm;
+  gap: sp.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid rgba(c.$color-border-primary, 0.15);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
   width: 100%;
   box-sizing: border-box;
@@ -156,7 +156,7 @@
 
 .taskPickEmpty {
   text-align: center;
-  padding: v.$spacing-md;
+  padding: sp.$spacing-md;
   color: c.$color-text-muted;
   font-size: 0.9rem;
   margin: 0;
@@ -165,23 +165,23 @@
 .priorityThreeContainer {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
 }
 
 .priorityRow {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
 }
 
 .priorityInput {
   flex: 1 1 auto;
   min-width: 0;
-  padding: v.$spacing-sm;
+  padding: sp.$spacing-sm;
   border: 1px solid c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: c.$color-bg;
   color: c.$color-text-body;
   font-size: 1rem;
@@ -191,7 +191,7 @@
 .supportOptionList {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   width: 100%;
 }
 
@@ -199,8 +199,8 @@
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: v.$spacing-md;
-  padding-bottom: v.$spacing-sm;
+  gap: sp.$spacing-md;
+  padding-bottom: sp.$spacing-sm;
   border-bottom: 1px solid rgba(c.$color-border-primary, 0.25);
   width: 100%;
 
@@ -223,12 +223,12 @@
 
 .rewardBreakdown {
   display: grid;
-  gap: v.$spacing-sm;
-  margin-bottom: v.$spacing-md;
+  gap: sp.$spacing-sm;
+  margin-bottom: sp.$spacing-md;
   width: 100%;
-  padding: v.$spacing-md;
+  padding: sp.$spacing-md;
   border: 2px solid rgba(c.$color-border-primary, 0.4);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.9);
   box-shadow: 0 8px 24px rgba(c.$color-border-primary, 0.14);
 }
@@ -242,10 +242,10 @@
 .rewardBreakdownRow {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   align-items: center;
-  padding: v.$spacing-xs v.$spacing-sm;
-  border-radius: v.$border-radius;
+  padding: sp.$spacing-xs sp.$spacing-sm;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.65);
 }
 
@@ -270,15 +270,15 @@
 
 .taskCompletionPanel {
   width: 100%;
-  margin-bottom: v.$spacing-md;
-  padding: v.$spacing-xs v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
+  padding: sp.$spacing-xs sp.$spacing-md;
   border: 1px solid rgba(c.$color-border-primary, 0.5);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.45);
 }
 
 .taskCompletionTitle {
-  margin: 0 0 v.$spacing-xs;
+  margin: 0 0 sp.$spacing-xs;
   font-weight: 600;
   font-size: 0.95rem;
 }
@@ -287,7 +287,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 }
 
 .taskCompletionTime {
@@ -299,7 +299,7 @@
 .taskCompletionCheck {
   display: flex;
   align-items: center;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   font-size: 0.9rem;
   color: c.$color-text-muted;
   cursor: pointer;
@@ -314,7 +314,7 @@
 }
 
 .taskCompletionXp {
-  margin: v.$spacing-xs 0 0;
+  margin: sp.$spacing-xs 0 0;
   font-size: 0.9rem;
   font-weight: 600;
   color: c.$color-text-body;
@@ -323,14 +323,14 @@
 .upgradePanel {
   width: 100%;
   margin-bottom: 0;
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: 1px solid rgba(c.$color-border-primary, 0.5);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.45);
 
   p {
     margin-top: 0;
-    margin-bottom: v.$spacing-sm;
+    margin-bottom: sp.$spacing-sm;
     color: c.$color-text-muted;
   }
 
@@ -342,9 +342,9 @@
 .supportPanel {
   width: 100%;
   margin-bottom: 0;
-  padding: v.$spacing-sm v.$spacing-md;
+  padding: sp.$spacing-sm sp.$spacing-md;
   border: none;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.7);
 
   p {
@@ -355,7 +355,7 @@
 .supportPanelActions {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .supportCountdownButton {
@@ -403,5 +403,5 @@
 .actionRow {
   width: 100%;
   display: grid;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 }

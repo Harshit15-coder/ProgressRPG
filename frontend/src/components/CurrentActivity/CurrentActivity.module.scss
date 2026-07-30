@@ -1,23 +1,23 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/utilities/mixins' as m;
 
 .wrapper {
   width: min(100%, 720px);
   border: 1px solid rgba(c.$color-border-default, 0.7);
-  border-radius: v.$border-radius;
-  padding: v.$padding-base;
+  border-radius: sp.$border-radius;
+  padding: sp.$padding-base;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   background: rgba(c.$color-bg, 0.5);
   position: relative;
   box-sizing: border-box;
 }
 
 .heading {
-  margin: v.$spacing-sm 0;
-  margin-bottom: v.$spacing-md;
+  margin: sp.$spacing-sm 0;
+  margin-bottom: sp.$spacing-md;
 }
 
 .wrapper > * {
@@ -63,7 +63,7 @@
   content: "";
   position: absolute;
   inset: -2px;
-  border-radius: calc(#{v.$border-radius} + 1px);
+  border-radius: calc(#{sp.$border-radius} + 1px);
   padding: 1px;
   background: linear-gradient(
     to bottom,

@@ -1,14 +1,13 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
-@use '../../styles/base/a11y' as a;
 @use 'sass:map';
 
 .inputGroup {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
   max-width: 30rem;
 
@@ -18,17 +17,16 @@
 }
 
 .label {
-  //@include a.visually-hidden;
   @include t.apply-text-style(t.$text-label)
 }
 
 .required {
   //color: red;
-  margin-left: v.$spacing-xs;
+  margin-left: sp.$spacing-xs;
 }
 
 .inputField {
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   box-sizing: border-box;
   max-width: 30rem;
   @include m.border-interactive(
@@ -36,7 +34,7 @@
     c.$color-border-primary,
     c.$color-border-accent
   );
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   transition: border 0.2s, background 0.2s;
   @include t.apply-text-style(t.$text-body);
 
@@ -44,7 +42,7 @@
     outline: none;
     border-color: c.$color-border-primary;
     background-color: c.$color-bg;
-    border-radius: v.$border-radius;
+    border-radius: sp.$border-radius;
   }
 
   @include m.focus-outline(c.$color-border-accent);
@@ -96,7 +94,7 @@
   border: none;
   cursor: pointer;
   color: c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   transition: color 0.2s;
 
   &:hover {

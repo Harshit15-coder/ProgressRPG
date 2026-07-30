@@ -1,5 +1,5 @@
 @use '../styles/semantic/colors' as c;
-@use '../styles/base/variables' as v;
+@use '../styles/semantic/spacing' as sp;
 @use '../styles/utilities/mixins' as m;
 @use '../styles/tokens/colors' as tc;
 @use 'sass:map';
@@ -18,7 +18,7 @@
     map.get(tc.$primary-scale, 300) 100%
   );
   color: tc.$color-light;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   padding: 2.5rem 2rem;
   @include m.fade-in(0.4s);
 }
@@ -69,7 +69,7 @@
 .perkCard {
   background: c.$color-bg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   padding: 1.1rem 1.25rem;
   display: flex;
   gap: 1rem;
@@ -116,7 +116,7 @@
   margin-top: 1.5rem;
   padding: 1rem 1.25rem;
   border: 1px solid rgba(c.$color-status-danger, 0.3);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: c.$color-error-bg;
   color: c.$color-text-error;
 }

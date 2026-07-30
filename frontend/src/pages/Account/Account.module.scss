@@ -1,5 +1,5 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
@@ -10,20 +10,20 @@
 .content {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-lg;
+  gap: sp.$spacing-lg;
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
 }
 
 .section {
-  padding: v.$padding-lg;
+  padding: sp.$padding-lg;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
 
   h2 {
-    margin: 0 0 v.$spacing-md 0;
+    margin: 0 0 sp.$spacing-md 0;
     @include t.apply-text-style(t.$text-heading-2);
     color: c.$color-border-primary;
   }
@@ -32,16 +32,16 @@
 .infoGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 }
 
 .infoItem {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
-  padding: v.$spacing-sm;
+  gap: sp.$spacing-xs;
+  padding: sp.$spacing-sm;
   background: rgba(c.$color-border-primary, 0.05);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   transition: background 0.2s ease;
 
   &:hover {
@@ -90,7 +90,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   flex-wrap: wrap;
 }
 
@@ -101,7 +101,7 @@
 .nameEditor {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .rulesList {
@@ -129,14 +129,14 @@
 }
 
 .description {
-  margin-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
   color: rgba(0, 0, 0, 0.7);
   @include t.apply-text-style(t.$text-body);
 }
 
 .billingRow {
   display: grid;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   align-items: center;
 
   @include m.respond-to(md) {
@@ -151,13 +151,13 @@
 }
 
 .billingAction .description {
-  margin-bottom: v.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .input {
-  padding: v.$spacing-sm;
+  padding: sp.$spacing-sm;
   border: 2px solid rgba(c.$color-border-primary, 0.3);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   font-size: 1em;
   font-family: inherit;
   transition: border-color 0.2s ease;
@@ -172,10 +172,10 @@
 .deleteConfirmation {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
-  padding: v.$padding-base;
+  gap: sp.$spacing-md;
+  padding: sp.$padding-base;
   border: 2px solid #d32f2f;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(211, 47, 47, 0.05);
 }
 
@@ -188,25 +188,25 @@
 
 .buttonGroup {
   display: flex;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   flex-wrap: wrap;
 }
 
 .bioSection {
-  margin-bottom: v.$spacing-md;
-  padding-bottom: v.$spacing-md;
+  margin-bottom: sp.$spacing-md;
+  padding-bottom: sp.$spacing-md;
   border-bottom: 1px solid rgba(c.$color-border-primary, 0.1);
 
   .label {
     display: block;
-    margin-bottom: v.$spacing-xs;
+    margin-bottom: sp.$spacing-xs;
   }
 
   .bio {
     margin: 0;
-    padding: v.$spacing-sm;
+    padding: sp.$spacing-sm;
     background: rgba(c.$color-border-primary, 0.05);
-    border-radius: v.$border-radius;
+    border-radius: sp.$border-radius;
     color: rgba(0, 0, 0, 0.8);
     line-height: 1.6;
     @include t.apply-text-style(t.$text-body);

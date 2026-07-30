@@ -1,12 +1,12 @@
 @use 'sass:map';
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/typography' as t;
 
 .section {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
   width: 100%;
   align-items: center;
 }
@@ -23,7 +23,7 @@
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   max-width: 640px;
   margin: 0 auto;
   max-height: 360px;
@@ -33,9 +33,9 @@
 .item {
   display: flex;
   flex-direction: row;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   border: 1px solid rgba(c.$color-border-primary, 0.25);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.7);
 }
 
@@ -48,7 +48,7 @@
   @include t.apply-text-style(t.$text-body);
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
   min-width: 0;
 }

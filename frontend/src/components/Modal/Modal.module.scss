@@ -1,5 +1,6 @@
 // components/Modal/Modal.module.scss
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../layout/two-columns' as tc;
 @use 'sass:map';
@@ -29,12 +30,12 @@
   height: auto;
   max-height: 90vh;
   min-height: 0;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   overflow: hidden;
-  box-shadow: 0 v.$spacing-sm v.$spacing-md rgba(0,0,0,0.2);
+  box-shadow: 0 sp.$spacing-sm sp.$spacing-md rgba(0,0,0,0.2);
 
-  gap: v.$spacing-gap;
-  padding: v.$padding-base;
+  gap: sp.$spacing-gap;
+  padding: sp.$padding-base;
 }
 
 .modal:focus,
@@ -52,8 +53,8 @@
   overflow-y: auto;
   overflow-x: hidden;
   min-height: 0;
-  padding-top: v.$spacing-md;
-  padding-bottom: v.$spacing-md;
+  padding-top: sp.$spacing-md;
+  padding-bottom: sp.$spacing-md;
   @include tc.two-column-layout;
 
   justify-content: flex-start;
@@ -66,9 +67,9 @@
 .modalFooter {
   display: flex;
   align-items: center;
-  padding: v.$spacing-sm v.$padding-base;
+  padding: sp.$spacing-sm sp.$padding-base;
   border-top: 1px solid rgba(c.$color-border-primary, 0.4);
-  gap: v.$spacing-gap;
+  gap: sp.$spacing-gap;
 }
 
 .modalHeader {
@@ -77,7 +78,7 @@
   justify-content: center;
   align-items: center;
   min-height: 3.5rem;
-  padding: v.$spacing-sm 4.5rem;
+  padding: sp.$spacing-sm 4.5rem;
   border-bottom: 1px solid rgba(c.$color-border-primary, 0.4);
 }
 

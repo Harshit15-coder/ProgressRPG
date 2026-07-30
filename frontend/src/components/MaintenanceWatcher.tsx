@@ -2,6 +2,7 @@
 import React, { useEffect, useRef } from "react";
 import { useNavigate, Navigate, useLocation } from "react-router-dom";
 import { useMaintenanceContext } from "../context/MaintenanceContext";
+import { setMaintenanceHandler, setNetworkErrorHandler } from "../utils/api";
 
 export default function MaintenanceWatcher() {
   const { maintenance, setMaintenance } = useMaintenanceContext();
@@ -10,6 +11,20 @@ export default function MaintenanceWatcher() {
 
   const wasActiveRef = useRef(false);
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // apiFetch has no window/router of its own (#570) — a 503 flips maintenance
+  // state here, which the effect below already knows how to react to (same
+  // path the WebSocket-pushed maintenance state uses); a network TypeError
+  // navigates straight to /unavailable since there's no equivalent state for
+  // that page to react to declaratively.
+  useEffect(() => {
+    setMaintenanceHandler(() => setMaintenance((prev) => ({ ...prev, active: true })));
+    setNetworkErrorHandler(() => navigate("/unavailable"));
+    return () => {
+      setMaintenanceHandler(null);
+      setNetworkErrorHandler(null);
+    };
+  }, [navigate, setMaintenance]);
 
   useEffect(() => {
     if (maintenance.active && !wasActiveRef.current) {

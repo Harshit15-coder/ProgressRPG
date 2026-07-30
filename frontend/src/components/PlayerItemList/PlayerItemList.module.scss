@@ -1,4 +1,4 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/typography' as t;
 
@@ -17,7 +17,7 @@
   overflow-y: auto;
   flex: 1;
   min-height: 0;
-  padding-right: v.$spacing-sm;
+  padding-right: sp.$spacing-sm;
   scrollbar-gutter: stable;
 
   &::-webkit-scrollbar {
@@ -41,14 +41,14 @@
 .controls {
   display: flex;
   flex-wrap: wrap;
-  gap: v.$spacing-sm;
-  margin-bottom: v.$spacing-sm;
+  gap: sp.$spacing-sm;
+  margin-bottom: sp.$spacing-sm;
 }
 
 .controlGroup {
   display: flex;
   align-items: center;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   flex-wrap: wrap;
 }
 
@@ -58,9 +58,9 @@
 }
 
 .sortSelect {
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 1px solid rgba(c.$color-border-primary, 0.35);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   font-size: 0.875em;
   font-family: inherit;
@@ -74,16 +74,16 @@
 }
 
 .list {
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   overflow: visible;
 }
 
 .item {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   border: 1px solid rgba(c.$color-border-primary, 0.2);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
   transition:
     background 0.2s ease,
@@ -118,13 +118,13 @@
   flex: 1;
   min-width: 0;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .rowActions {
   display: flex;
   align-items: center;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   flex-shrink: 0;
   opacity: 0;
   pointer-events: none;
@@ -141,7 +141,7 @@
   border: none;
   background: transparent;
   color: c.$color-border-primary;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   width: 1.75rem;
   height: 1.75rem;
   font-size: 1rem;
@@ -188,7 +188,7 @@
   display: flex;
   flex: 1;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
 }
 
 .itemDetailsButton {
@@ -214,15 +214,15 @@
 .editTitleRow {
   display: flex;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .editInput {
   flex: 1;
   min-width: 0;
-  padding: v.$spacing-xs v.$spacing-sm;
+  padding: sp.$spacing-xs sp.$spacing-sm;
   border: 2px solid rgba(c.$color-status-success, 0.45);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   font-size: 1em;
   font-family: inherit;
   transition: border-color 0.2s ease;
@@ -235,7 +235,7 @@
 
 .editConfirmContent {
   display: grid;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   width: 100%;
 
   p {
@@ -247,13 +247,13 @@
   display: flex;
   justify-content: flex-start;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   flex-wrap: wrap;
 }
 
 .deleteConfirmContent {
   display: grid;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
 
   p {
     margin: 0;
@@ -264,13 +264,13 @@
   display: flex;
   justify-content: center;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
 }
 
 .editConfirmMeta {
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-xs;
+  gap: sp.$spacing-xs;
   margin: 0;
   color: rgba(0, 0, 0, 0.65);
   @include t.apply-text-style(t.$text-caption);

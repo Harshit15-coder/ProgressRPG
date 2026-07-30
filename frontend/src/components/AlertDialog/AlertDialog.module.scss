@@ -1,4 +1,5 @@
 @use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 
 .overlay {
@@ -17,11 +18,11 @@
 
   display: flex;
   flex-direction: column;
-  gap: v.$spacing-md;
+  gap: sp.$spacing-md;
   background: c.$color-bg;
-  border-radius: v.$border-radius;
-  box-shadow: 0 v.$spacing-sm v.$spacing-md rgba(0, 0, 0, 0.2);
-  padding: v.$spacing-lg;
+  border-radius: sp.$border-radius;
+  box-shadow: 0 sp.$spacing-sm sp.$spacing-md rgba(0, 0, 0, 0.2);
+  padding: sp.$spacing-lg;
   width: 90%;
   max-width: min(95vw, 440px);
 
@@ -47,8 +48,8 @@
 .actions {
   display: flex;
   justify-content: flex-end;
-  gap: v.$spacing-sm;
-  margin-top: v.$spacing-sm;
+  gap: sp.$spacing-sm;
+  margin-top: sp.$spacing-sm;
 }
 
 @media (prefers-reduced-motion: reduce) {

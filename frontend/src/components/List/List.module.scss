@@ -1,11 +1,11 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/utilities/mixins' as m;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 
 .listSection {
-  //padding: v.$spacing-xs 0;
-  gap: v.$spacing-gap;
+  //padding: sp.$spacing-xs 0;
+  gap: sp.$spacing-gap;
   align-self: stretch;
   display: flex;
 }
@@ -16,10 +16,10 @@
   align-items: flex-start;
   padding: 0;
   margin: 0;
-  //gap: v.$spacing-xs;
+  //gap: sp.$spacing-xs;
   width: 100%;
   list-style: none;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   overflow: hidden;
 }
 
@@ -28,11 +28,11 @@
   flex-direction: row;
   justify-content: space-between;
   align-items: center;
-  gap: v.$spacing-sm;
+  gap: sp.$spacing-sm;
   width: 100%;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   //border: 1px solid rgba(c.$color-border-primary, 0.2);
-  //border-radius: v.$border-radius;
+  //border-radius: sp.$border-radius;
   background: rgba(c.$color-bg, 0.4);
   transition: background 0.2s ease, box-shadow 0.2s ease, border-color 0.2s ease;
   position: relative;

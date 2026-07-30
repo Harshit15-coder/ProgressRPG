@@ -1,6 +1,6 @@
 /* components/CharacterActivityCurrent/CharacterActivityCurrent.module.scss */
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use 'sass:map';
@@ -9,11 +9,11 @@
   width: min(100%, 720px);
 
 
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
   font-size: 0.95rem;
 
   border: 1px solid rgba(c.$color-character, 0.15);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: rgba(c.$color-character, 0.08);
   @include t.apply-text-style(t.$text-body);
 }
@@ -31,10 +31,10 @@
 }
 
 .bonus {
-  margin-top: v.$spacing-xs;
+  margin-top: sp.$spacing-xs;
 }
 
 .bonusActive {
-  margin-top: v.$spacing-xs;
+  margin-top: sp.$spacing-xs;
   color: c.$color-text-heading;
 }
