@@ -1,11 +1,11 @@
 from asgiref.sync import async_to_sync
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import AnonymousUser
 from django.core.cache import cache
-from django.test import TransactionTestCase
+from django.test import SimpleTestCase, TransactionTestCase, TestCase
 
 from character.models import PlayerCharacterLink
 from gameplay.consumers import TimerConsumer
+from users.tests import user_factory
 
 
 class DummyChannelLayer:
@@ -43,10 +43,7 @@ class TimerConsumerNoCharacterTests(TransactionTestCase):
         # The online-count cache is shared real Redis state across tests;
         # clear it so a value cached by another test doesn't leak in here.
         cache.clear()
-        self.user = get_user_model().objects.create_user(
-            email="ws-no-character@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
         # Ensure this test user has no active player-character link.
@@ -112,7 +109,7 @@ class TimerConsumerNoCharacterTests(TransactionTestCase):
         self.assertEqual(group_messages[0][1]["count"], 1)
 
 
-class TimerConsumerAuthTests(TransactionTestCase):
+class TimerConsumerAuthTests(SimpleTestCase):
     """
     Tests for connect() when the JWT is missing or expired.
     The middleware sets AnonymousUser on the scope in both cases,
@@ -153,10 +150,7 @@ class TimerConsumerAuthTests(TransactionTestCase):
 class TimerConsumerDisconnectTests(TransactionTestCase):
     def setUp(self):
         cache.clear()
-        self.user = get_user_model().objects.create_user(
-            email="ws-disconnect@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     def _make_connected_consumer(self):
@@ -238,7 +232,7 @@ class TimerConsumerDisconnectTests(TransactionTestCase):
         async_to_sync(consumer.disconnect)(1000)
 
 
-class TimerConsumerOnlineCountEventTests(TransactionTestCase):
+class TimerConsumerOnlineCountEventTests(TestCase):
     def test_online_count_event_sends_payload(self):
         consumer = TimerConsumer()
         consumer.send_json = AsyncCallRecorder()
@@ -255,10 +249,7 @@ class TimerConsumerHeartbeatTests(TransactionTestCase):
     reconcile_stale_online_players doesn't sweep up live connections."""
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="ws-heartbeat@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     def test_ping_refreshes_last_seen(self):

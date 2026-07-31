@@ -11,20 +11,17 @@ last_seen heartbeat has gone stale.
 from datetime import timedelta
 from unittest.mock import patch
 
-from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 
 from gameplay.models import ActivityTimer
 from gameplay.tasks import STALE_TIMER_THRESHOLD, auto_complete_timers_for_stale_players
+from users.tests import user_factory
 
 
 class AutoCompleteStaleTimersTaskTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="stale-sweep@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         self.timer = self.player.activity_timer
 
@@ -126,10 +123,7 @@ class AutoCompleteStaleTimersTaskTests(TestCase):
             STALE_TIMER_THRESHOLD + timedelta(seconds=1)
         )
 
-        other_user = get_user_model().objects.create_user(
-            email="stale-sweep-2@example.com",
-            password="test-pass-123",
-        )
+        other_user = user_factory(with_player=True)
         other_player = other_user.player
         other_timer = other_player.activity_timer
         other_timer.status = "active"
@@ -149,10 +143,7 @@ class AutoCompleteStaleTimersTaskTests(TestCase):
 
 class RegisterConnectionLastSeenTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="register-connection@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     def test_register_connection_stamps_last_seen(self):

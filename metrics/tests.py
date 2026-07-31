@@ -1,6 +1,5 @@
 # metrics/tests.py
 
-from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.utils import timezone
 from django.core.cache import cache
@@ -8,21 +7,24 @@ from datetime import timedelta, datetime
 
 from users.models import Player
 from progression.models import PlayerActivity
-from .models import DailyEngagementSnapshot, UserEngagementMetrics, GlobalMetrics
+from .models import DailyEngagementSnapshot
 from .services import MetricsCalculator
 from .utils import track_user_session
 
-User = get_user_model()
+
+from users.tests import user_factory
 
 
 class BaseMetricsTestCase(TestCase):
     def setUp(self):
         """Set up test fixtures."""
-        self.user = User.objects.create_user(email="test@test.com", password="pass")
-        self.player, _ = Player.objects.get_or_create(user=self.user)
+        self.user = user_factory(
+            with_player=True, email="test@test.com", password="pass"
+        )
+        self.player = self.user.player
         self.player.name = "Test Player"
         self.player.save()
-        
+
         # Clear cache before each test
         cache.clear()
 
@@ -35,13 +37,13 @@ class SessionTrackingTests(BaseMetricsTestCase):
     def test_track_user_session_creates_snapshot(self):
         """Test that tracking a session creates a daily snapshot."""
         today = timezone.now().date()
-        
+
         # Track session
         new_session = track_user_session(self.player)
-        
+
         # Should be a new session
         self.assertTrue(new_session)
-        
+
         # Should create a snapshot
         snapshot = DailyEngagementSnapshot.objects.get(player=self.player, date=today)
         self.assertEqual(snapshot.session_count, 1)
@@ -50,11 +52,11 @@ class SessionTrackingTests(BaseMetricsTestCase):
         """Test that sessions timeout after 30 minutes."""
         cache_key = f"last_activity_{self.player.id}"
         now = timezone.now()
-        
+
         # Set last activity to 31 minutes ago
         last_activity = now - timedelta(minutes=31)
         cache.set(cache_key, last_activity, 3600)
-        
+
         # Track session - should be new session
         new_session = track_user_session(self.player)
         self.assertTrue(new_session)
@@ -64,9 +66,9 @@ class DailySnapshotTests(BaseMetricsTestCase):
     def test_calculate_daily_snapshot_no_activity(self):
         """Test calculating daily snapshot with no activities."""
         today = timezone.now().date()
-        
+
         snapshot = MetricsCalculator.calculate_daily_snapshot(self.player, today)
-        
+
         self.assertEqual(snapshot.player, self.player)
         self.assertEqual(snapshot.date, today)
         self.assertFalse(snapshot.had_activity)
@@ -78,18 +80,18 @@ class DailySnapshotTests(BaseMetricsTestCase):
         today = timezone.now().date()
         start_of_day = datetime.combine(today, datetime.min.time())
         start_of_day = timezone.make_aware(start_of_day)
-        
+
         # Create a completed activity
         activity = PlayerActivity.objects.create(
             player=self.player,
             name="Test Activity",
             duration=3600,  # 60 minutes in seconds
             is_complete=True,
-            completed_at=start_of_day + timedelta(hours=1)
+            completed_at=start_of_day + timedelta(hours=1),
         )
-        
+
         snapshot = MetricsCalculator.calculate_daily_snapshot(self.player, today)
-        
+
         self.assertTrue(snapshot.had_activity)
         self.assertEqual(snapshot.activities_count, 1)
         self.assertEqual(snapshot.minutes_active, 60)
@@ -101,8 +103,10 @@ class DailySnapshotsBulkTests(BaseMetricsTestCase):
         today = timezone.now().date()
         start_of_day = timezone.make_aware(datetime.combine(today, datetime.min.time()))
 
-        other_user = User.objects.create_user(email="other@test.com", password="pass")
-        other_player, _ = Player.objects.get_or_create(user=other_user)
+        other_user = user_factory(
+            with_player=True, email="other@test.com", password="pass"
+        )
+        other_player = other_user.player
 
         PlayerActivity.objects.create(
             player=self.player,
@@ -156,7 +160,7 @@ class WeeklyMetricsTests(BaseMetricsTestCase):
         """Test calculating weekly metrics."""
         today = timezone.now().date()
         week_start = today - timedelta(days=today.weekday())
-        
+
         # Create daily snapshots for the week
         for i in range(3):
             date = week_start + timedelta(days=i)
@@ -166,11 +170,11 @@ class WeeklyMetricsTests(BaseMetricsTestCase):
                 had_activity=True,
                 session_count=2,
                 activities_count=5,
-                minutes_active=120
+                minutes_active=120,
             )
-        
+
         metrics = MetricsCalculator.calculate_weekly_metrics(self.player, week_start)
-        
+
         self.assertEqual(metrics.player, self.player)
         self.assertEqual(metrics.week_start, week_start)
         self.assertEqual(metrics.active_days_count, 3)
@@ -183,7 +187,7 @@ class GlobalMetricsTests(BaseMetricsTestCase):
     def test_calculate_global_metrics(self):
         """Test calculating global metrics."""
         today = timezone.now().date()
-        
+
         # Create a daily snapshot
         DailyEngagementSnapshot.objects.create(
             player=self.player,
@@ -191,11 +195,11 @@ class GlobalMetricsTests(BaseMetricsTestCase):
             had_activity=True,
             session_count=3,
             activities_count=10,
-            minutes_active=200
+            minutes_active=200,
         )
-        
+
         metrics = MetricsCalculator.calculate_global_metrics(today)
-        
+
         self.assertEqual(metrics.date, today)
         self.assertGreaterEqual(metrics.total_users, 1)
         self.assertEqual(metrics.active_users_today, 1)
@@ -210,7 +214,7 @@ class RetentionRateTests(BaseMetricsTestCase):
         today = timezone.now().date()
         week_start = today - timedelta(days=today.weekday())
         prev_week_start = week_start - timedelta(days=7)
-        
+
         # Create snapshots for previous week
         for i in range(2):
             date = prev_week_start + timedelta(days=i)
@@ -220,9 +224,9 @@ class RetentionRateTests(BaseMetricsTestCase):
                 had_activity=True,
                 session_count=1,
                 activities_count=1,
-                minutes_active=60
+                minutes_active=60,
             )
-        
+
         # Create snapshots for current week (same player)
         for i in range(2):
             date = week_start + timedelta(days=i)
@@ -232,10 +236,10 @@ class RetentionRateTests(BaseMetricsTestCase):
                 had_activity=True,
                 session_count=1,
                 activities_count=1,
-                minutes_active=60
+                minutes_active=60,
             )
-        
+
         retention_rate = MetricsCalculator.calculate_retention_rate(week_start)
-        
+
         # Should be 100% since the same player was active both weeks
         self.assertEqual(retention_rate, 100.0)

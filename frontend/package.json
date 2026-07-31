@@ -40,6 +40,7 @@
     "fuse.js": "^7.0.0",
     "jsdom": "^27.1.0",
     "jwt-decode": "^4.0.0",
+    "maplibre-gl": "^6.0.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
     "react-error-boundary": "^6.0.0",
@@ -52,7 +53,7 @@
   "overrides": {
     "form-data": "4.0.6",
     "ws": "8.21.0",
-    "js-yaml": "4.2.0",
+    "js-yaml": "4.3.0",
     "@babel/core": "7.29.6"
   },
   "devDependencies": {
@@ -69,8 +70,8 @@
     "@types/node": "^25.7.0",
     "@types/react": "^19.2.2",
     "@types/react-dom": "^19.2.2",
-    "@vitest/browser-playwright": "^4.1.8",
-    "@vitest/coverage-v8": "^4.1.8",
+    "@vitest/browser-playwright": "^4.1.10",
+    "@vitest/coverage-v8": "^4.1.10",
     "axe-core": "^4.11.1",
     "axe-playwright": "^2.2.2",
     "eslint": "^9.39.0",
@@ -85,6 +86,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
     "vite-plugin-dts": "^5.0.3",
-    "vitest": "^4.1.8"
+    "vitest": "^4.1.10"
   }
 }
