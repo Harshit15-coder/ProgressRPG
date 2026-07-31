@@ -79,7 +79,8 @@ class PopulationCentreMapView(APIView):
         )
 
         features = []
-        features.append(BoundaryFeatureSerializer(population_centre).data)
+        if population_centre.boundary:
+            features.append(BoundaryFeatureSerializer(population_centre).data)
         features.extend(CharacterPointFeatureSerializer(characters, many=True).data)
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
         features.extend(SubzoneFeatureSerializer(crop_subzones, many=True).data)
