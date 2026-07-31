@@ -1,5 +1,5 @@
 @use '../../styles/utilities/list-pages' as lp;
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 
 .page {
   width: min(100%, 720px);
@@ -10,7 +10,7 @@
 
 .header {
   text-align: center;
-  margin-bottom: v.$spacing-lg;
+  margin-bottom: sp.$spacing-lg;
 }
 
 .emptyState {

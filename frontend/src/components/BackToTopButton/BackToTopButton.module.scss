@@ -1,11 +1,11 @@
-@use '../../styles/base/variables' as v;
+@use '../../styles/semantic/spacing' as sp;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/typography' as t;
 
 .backToTop {
   position: fixed;
-  right: v.$spacing-lg;
-  bottom: v.$spacing-lg;
+  right: sp.$spacing-lg;
+  bottom: sp.$spacing-lg;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -21,7 +21,7 @@
   overflow: hidden;
   padding: 0;
   border: 1px solid transparent;
-  border-radius: v.$button-radius;
+  border-radius: sp.$button-radius;
   @include t.apply-text-style(t.$text-button);
   @include c.apply-button-variant(primary);
   box-shadow: 0 0.5rem 1rem rgba(0, 0, 0, 0.18);

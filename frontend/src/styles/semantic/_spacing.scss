@@ -1,7 +1,44 @@
 @use '../tokens/spacing' as s;
 @use 'sass:map';
 
-// === Spacing ===
+// Composes the single spacing scale (tokens/_spacing.scss) into the
+// semantically-named values consumed across the app — following the same
+// tokens/ -> semantic/ pattern as colors and typography. This is now the
+// only home for spacing-derived values; base/_variables.scss holds only
+// breakpoints, z-index, and animation durations (none of which compose
+// from the spacing scale).
+//
+// $margin-*, $section-padding, $container-gap, and this file's previous,
+// separate $spacing-gap/$border-radius were dropped during consolidation:
+// they were defined but never referenced anywhere, and in $border-radius's
+// case duplicated a different value than the one actually in use app-wide.
+
+// === Flat scalars ===
+$spacing-xs: map.get(s.$spacing, xs);
+$spacing-sm: map.get(s.$spacing, sm); // 8px
+$spacing-md: map.get(s.$spacing, md); // 16px
+$spacing-lg: map.get(s.$spacing, lg);
+$spacing-xl: map.get(s.$spacing, xl);
+$spacing-2xl: map.get(s.$spacing, 2xl);
+$spacing-3xl: map.get(s.$spacing, 3xl);
+
+$spacing-gap: $spacing-sm;
+
+// === Padding shorthands ===
+$padding-vertical: $spacing-sm;
+$padding-horizontal: $spacing-md;
+
+$padding-sm: $spacing-xs $spacing-sm;
+$padding-base: $padding-vertical $padding-horizontal;
+$padding-lg: $spacing-md $spacing-lg;
+
+// === Component shortcuts ===
+$border-radius: $spacing-sm;
+$button-padding: $spacing-xs $spacing-md;
+$button-radius: $spacing-md;
+$content-padding: $spacing-lg;
+
+// === Gap / radius / shadow collections ===
 $gap: (
   xs: map.get(s.$spacing, xs),
   sm: map.get(s.$spacing, sm),
@@ -9,29 +46,14 @@ $gap: (
   lg: map.get(s.$spacing, lg),
 );
 
-$spacing-gap: map.get($gap, sm);
-
-// === Padding ===
 $padding-vertical-sm: map.get(s.$spacing, sm);
-$padding-vertical-md: map.get(s.$spacing, md);
 $padding-horizontal-sm: map.get(s.$spacing, md);
-$padding-horizontal-md: map.get(s.$spacing, lg);
 
 $spacing-padding: (
   base: $padding-vertical-sm $padding-horizontal-sm,
-  lg: $padding-vertical-md $padding-horizontal-md,
 );
 
-// === Margins ===
-$margin-xs: map.get(s.$spacing, xs);
-$margin-sm: map.get(s.$spacing, sm);
-$margin-md: map.get(s.$spacing, md);
-$margin-lg: map.get(s.$spacing, lg);
-
-// === Utility shortcuts ===
-$section-padding: map.get($spacing-padding, lg);
 $card-padding: map.get($spacing-padding, base);
-$container-gap: $spacing-gap;
 
 $radius: (
   sm: map.get(s.$spacing, xs),
@@ -44,5 +66,3 @@ $shadow: (
   md: 0 4px 8px rgba(0, 0, 0, 0.1),
   lg: 0 8px 16px rgba(0, 0, 0, 0.1)
 );
-
-$border-radius: map.get($radius, lg);

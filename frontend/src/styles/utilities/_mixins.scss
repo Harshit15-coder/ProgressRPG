@@ -90,14 +90,6 @@
   }
 }
 
-// Legacy a11y-focus for backward compatibility
-@mixin a11y-focus {
-  &:focus-visible {
-    outline: 2px solid v.$color-accent;
-    outline-offset: 2px;
-  }
-}
-
 // Animation mixins
 @mixin fade-in($duration: 0.25s, $delay: 0s) {
   opacity: 0;
@@ -159,7 +151,7 @@
   align-items: center;
   width: 100%;
   margin: 0 auto;
-  padding: v.$padding-base;
+  padding: sp.$padding-base;
 
   > * {
     width: 100%;

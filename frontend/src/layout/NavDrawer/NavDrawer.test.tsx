@@ -6,9 +6,14 @@ import { MemoryRouter } from "react-router-dom";
 import NavDrawer from "./NavDrawer";
 
 const mockUseAuth = vi.fn();
+const mockUseFeatureFlag = vi.fn();
 
 vi.mock("../../context/AuthContext", () => ({
   useAuth: () => mockUseAuth(),
+}));
+
+vi.mock("../../hooks/useFeatureFlag", () => ({
+  useFeatureFlag: (flag: string) => mockUseFeatureFlag(flag),
 }));
 
 function renderDrawer(props: Partial<React.ComponentProps<typeof NavDrawer>> = {}) {
@@ -31,6 +36,7 @@ const HIDDEN = { hidden: true } as const;
 describe("NavDrawer", () => {
   beforeEach(() => {
     mockUseAuth.mockReturnValue({ isAuthenticated: false });
+    mockUseFeatureFlag.mockReturnValue(false);
   });
 
   it("renders authenticated links when the user is logged in", () => {

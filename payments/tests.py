@@ -20,6 +20,8 @@ from payments.webhooks import (
     process_stripe_event,
 )
 
+from users.tests import user_factory
+
 
 def make_event(d):
     """Recursively convert a dict to a SimpleNamespace for attribute-style access."""
@@ -53,11 +55,7 @@ class ProvisionDefaultSubscriptionSignalTests(SimpleTestCase):
 
 class HandleSubscriptionEventTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="premium@example.com",
-            password="testpass123",
-            stripe_customer_id="cus_test_123",
-        )
+        self.user = user_factory(stripe_customer_id="cus_test_123")
         self.monthly_plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -569,10 +567,7 @@ class HandleSubscriptionEventTests(TestCase):
 
 class UserPremiumPropertyTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="premium-property@example.com",
-            password="testpass123",
-        )
+        self.user = user_factory()
         self.plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -607,10 +602,7 @@ class UserPremiumPropertyTests(TestCase):
 
 class UserTrialPropertyTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="trial-property@example.com",
-            password="testpass123",
-        )
+        self.user = user_factory()
         self.plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -850,10 +842,7 @@ class CreateCheckoutSessionViewTests(TestCase):
         )
 
     def test_blocks_duplicate_premium_checkout_for_active_premium_user(self):
-        user = get_user_model().objects.create_user(
-            email="already-premium@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
         UserSubscription.objects.create(
             user=user,
             plan=self.monthly_plan,
@@ -878,9 +867,8 @@ class CreateCheckoutSessionViewTests(TestCase):
     )
     @patch("payments.views.stripe.checkout.Session.create")
     def test_creates_checkout_session_for_annual_plan(self, mock_create_session):
-        user = get_user_model().objects.create_user(
+        user = user_factory(
             email="annual@example.com",
-            password="testpass123",
         )
 
         mock_create_session.return_value = SimpleNamespace(
@@ -922,10 +910,7 @@ class CreateCheckoutSessionViewTests(TestCase):
         self, mock_game_settings, mock_create_session
     ):
         mock_game_settings.return_value.trial_period_days = 7
-        user = get_user_model().objects.create_user(
-            email="new-trial@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
 
         mock_create_session.return_value = SimpleNamespace(
             url="https://checkout.example/session",
@@ -955,10 +940,7 @@ class CreateCheckoutSessionViewTests(TestCase):
         self, mock_game_settings, mock_create_session
     ):
         mock_game_settings.return_value.trial_period_days = 7
-        user = get_user_model().objects.create_user(
-            email="returning@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
         # Returning user: has a past (inactive) subscription
         UserSubscription.objects.create(
             user=user,
@@ -991,11 +973,7 @@ class CreateCheckoutSessionViewTests(TestCase):
     )
     @patch("payments.views.stripe.checkout.Session.create")
     def test_reuses_existing_customer_for_checkout(self, mock_create_session):
-        user = get_user_model().objects.create_user(
-            email="existing-customer@example.com",
-            password="testpass123",
-            stripe_customer_id="cus_existing_123",
-        )
+        user = user_factory(stripe_customer_id="cus_existing_123")
 
         mock_create_session.return_value = SimpleNamespace(
             url="https://checkout.example/session",
@@ -1033,10 +1011,7 @@ class CreateCheckoutSessionViewTests(TestCase):
         trusting the empty local record.
         """
         mock_game_settings.return_value.trial_period_days = 7
-        user = get_user_model().objects.create_user(
-            email="webhook-missed@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
 
         def fake_sync(synced_user):
             UserSubscription.objects.create(
@@ -1079,10 +1054,7 @@ class CreateCheckoutSessionViewTests(TestCase):
     ):
         mock_game_settings.return_value.trial_period_days = 7
         mock_sync.return_value = {"status": "none", "synced": True}
-        user = get_user_model().objects.create_user(
-            email="genuinely-new@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
 
         mock_create_session.return_value = SimpleNamespace(
             url="https://checkout.example/session",
@@ -1117,10 +1089,7 @@ class CreateCheckoutSessionViewTests(TestCase):
 
         mock_game_settings.return_value.trial_period_days = 7
         mock_sync.side_effect = stripe.error.APIConnectionError("boom")
-        user = get_user_model().objects.create_user(
-            email="stripe-down@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
 
         mock_create_session.return_value = SimpleNamespace(
             url="https://checkout.example/session",
@@ -1151,10 +1120,7 @@ class CreateCheckoutSessionViewTests(TestCase):
         self, mock_sync, mock_game_settings, mock_create_session
     ):
         mock_game_settings.return_value.trial_period_days = 7
-        user = get_user_model().objects.create_user(
-            email="already-has-local-record@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
         UserSubscription.objects.create(
             user=user,
             plan=self.monthly_plan,
@@ -1182,10 +1148,7 @@ class CreateCheckoutSessionViewTests(TestCase):
 
 class HasPreviousSubscriptionTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="prev-sub@example.com",
-            password="testpass123",
-        )
+        self.user = user_factory()
         self.plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -1218,10 +1181,7 @@ class HasPreviousSubscriptionTests(TestCase):
 
 class EndActiveSubscriptionTests(TestCase):
     def test_returns_none_without_active_subscription(self):
-        user = get_user_model().objects.create_user(
-            email="no-active-subscription@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
 
         with patch("payments.services.stripe.Subscription.cancel") as mock_cancel:
             result = end_active_subscription(user)
@@ -1231,10 +1191,7 @@ class EndActiveSubscriptionTests(TestCase):
 
     @patch("payments.services.stripe.Subscription.cancel")
     def test_cancels_active_subscription_and_deactivates_it(self, mock_cancel):
-        user = get_user_model().objects.create_user(
-            email="premium-downgrade@example.com",
-            password="testpass123",
-        )
+        user = user_factory()
         plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -1281,9 +1238,7 @@ class SyncSubscriptionBackfillTests(TestCase):
     """
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="backfill@example.com",
-            password="testpass123",
+        self.user = user_factory(
             stripe_customer_id="cus_backfill_123",
         )
         self.plan = SubscriptionPlan.objects.create(
@@ -1385,9 +1340,7 @@ class SyncSubscriptionBackfillTests(TestCase):
 
 class SyncSubscriptionTrialEndTests(TestCase):
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="sync-trial@example.com",
-            password="testpass123",
+        self.user = user_factory(
             stripe_customer_id="cus_sync_trial_123",
         )
         self.plan = SubscriptionPlan.objects.create(

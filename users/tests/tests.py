@@ -35,6 +35,8 @@ from users.validators import (
     generate_default_player_name,
 )
 
+from users.tests import user_factory
+
 from character.models import Character, PlayerCharacterLink
 from payments.models import SubscriptionPlan, UserSubscription
 
@@ -42,25 +44,25 @@ logging.getLogger("general").setLevel(logging.CRITICAL)
 
 
 class UserCreationTest(TestCase):
-    def setUp(self):
-        self.character = Character.objects.create(
+    @classmethod
+    def setUpTestData(cls):
+        cls.character = Character.objects.create(
             first_name="Jane", sex="Female", can_link=True
         )
-        self.UserModel = get_user_model()
+        cls.user = user_factory(
+            with_player=True, email="testuser@example.com", password="testpassword123"
+        )
 
     def test_create_user(self):
         """Test that a user can be created successfully."""
-        user = self.UserModel.objects.create_user(
-            email="testuser@example.com", password="testpassword123"
-        )
-        self.assertEqual(user.email, "testuser@example.com")
-        self.assertEqual(str(user.timezone), "UTC")
-        self.assertTrue(user.check_password("testpassword123"))
+        self.assertEqual(self.user.email, "testuser@example.com")
+        self.assertEqual(str(self.user.timezone), "UTC")
+        self.assertTrue(self.user.check_password("testpassword123"))
 
-        player = user.player
-        self.assertTrue(isinstance(user.player, Player))
-        self.assertEqual(user, user.player.user)
-        self.assertEqual(user.player.xp, 0)
+        player = self.user.player
+        self.assertTrue(isinstance(player, Player))
+        self.assertEqual(self.user, player.user)
+        self.assertEqual(player.xp, 0)
 
     def test_create_superuser(self):
         """Test that a superuser can be created successfully."""
@@ -73,21 +75,18 @@ class UserCreationTest(TestCase):
 
     def test_player_defaults(self):
         """Test default values for a new player."""
-        user = self.UserModel.objects.create_user(
-            email="testuser2@example.com", password="testpassword123"
-        )
-        player = user.player
+        player = self.user.player
         self.assertEqual(player.onboarding_step, 0)
         self.assertEqual(player.total_time, 0)
         self.assertEqual(player.total_activities, 0)
         self.assertRegex(player.name, r"^player_\d{8}$")
 
     def test_generated_player_names_are_unique(self):
-        user1 = self.UserModel.objects.create_user(
-            email="testuser3@example.com", password="testpassword123"
+        user1 = user_factory(
+            with_player=True, email="testuser3@example.com", password="testpassword123"
         )
-        user2 = self.UserModel.objects.create_user(
-            email="testuser4@example.com", password="testpassword123"
+        user2 = user_factory(
+            with_player=True, email="testuser4@example.com", password="testpassword123"
         )
 
         self.assertNotEqual(user1.player.name, user2.player.name)
@@ -100,10 +99,7 @@ class UserCreationTest(TestCase):
 
     def test_create_user_creates_activity_timer(self):
         """Test that a new user's player gets an ActivityTimer."""
-        user = self.UserModel.objects.create_user(
-            email="testuser5@example.com", password="testpassword123"
-        )
-        self.assertTrue(ActivityTimer.objects.filter(player=user.player).exists())
+        self.assertTrue(ActivityTimer.objects.filter(player=self.user.player).exists())
 
     def test_admin_created_user_gets_player_and_activity_timer(self):
         """UserAdmin.save_model() just does obj.save() - it doesn't go
@@ -111,26 +107,26 @@ class UserCreationTest(TestCase):
         explicitly run player setup for admin-created users."""
         from users.admin import CustomUserAdmin
         from django.contrib import admin as django_admin
+        from users.models import CustomUser
 
-        user = self.UserModel(email="testuser6@example.com")
-        user.set_password("testpassword123")
+        self.user.set_password("testpassword123")
 
-        model_admin = CustomUserAdmin(self.UserModel, django_admin.site)
-        model_admin.save_model(request=None, obj=user, form=None, change=False)
+        model_admin = CustomUserAdmin(CustomUser, django_admin.site)
+        model_admin.save_model(request=None, obj=self.user, form=None, change=False)
 
-        self.assertTrue(Player.objects.filter(user=user).exists())
-        self.assertTrue(
-            ActivityTimer.objects.filter(player__user=user).exists()
-        )
+        self.assertTrue(Player.objects.filter(user=self.user).exists())
+        self.assertTrue(ActivityTimer.objects.filter(player__user=self.user).exists())
 
 
 class PlayerNameValidationTest(TestCase):
-    def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="player-name@example.com",
-            password="testpassword123",
+    @classmethod
+    def setUpTestData(cls):
+        cls.character = Character.objects.create(
+            first_name="Jane", sex="Female", can_link=True
         )
+
+    def setUp(self):
+        self.user = user_factory(with_player=True)
 
     def test_player_serializer_accepts_trimmed_valid_name(self):
         serializer = PlayerSerializer(
@@ -252,10 +248,7 @@ class PlayerAchievementGoalsTest(TestCase):
 
     def test_player_serializer_includes_achievements(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        user = get_user_model().objects.create_user(
-            email="achievements@example.com",
-            password="testpassword123",
-        )
+        user = user_factory(with_player=True)
 
         data = PlayerSerializer(user.player).data
 
@@ -263,10 +256,7 @@ class PlayerAchievementGoalsTest(TestCase):
         self.assertEqual(len(data["achievements"]), 3)
 
     def test_player_serializer_reflects_trial_status(self):
-        user = get_user_model().objects.create_user(
-            email="trial-serializer@example.com",
-            password="testpassword123",
-        )
+        user = user_factory(with_player=True)
         plan = SubscriptionPlan.objects.create(
             name="Premium Monthly",
             description="",
@@ -289,10 +279,7 @@ class PlayerAchievementGoalsTest(TestCase):
         self.assertEqual(data["trial_end"], future.isoformat().replace("+00:00", "Z"))
 
     def test_player_serializer_not_trialing_without_subscription(self):
-        user = get_user_model().objects.create_user(
-            email="no-trial-serializer@example.com",
-            password="testpassword123",
-        )
+        user = user_factory(with_player=True)
 
         data = PlayerSerializer(user.player).data
 
@@ -302,10 +289,7 @@ class PlayerAchievementGoalsTest(TestCase):
 
 class OnboardingTest(TestCase):
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_user(
-            email="testuser@example.com", password="testpassword123"
-        )
+        self.user = user_factory(with_player=True)
         self.client.login(email="testuser@example.com", password="testpassword123")
         self.player = self.user.player
 
@@ -319,10 +303,7 @@ class PlayerMethodsTest(TestCase):
     def setUp(self):
         self.character = Character.objects.create(first_name="Jane", can_link=True)
         self.character2 = Character.objects.create(first_name="John", can_link=True)
-        User = get_user_model()
-        self.user = User.objects.create_user(
-            email="testuser1@example.com", password="testpassword123"
-        )
+        self.user = user_factory(with_player=True)
 
     def test_player_add_activity(self):
         """Test adding activity to a player."""
@@ -400,10 +381,7 @@ class PlayerMethodsTest(TestCase):
 class UserLoginModelTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="login-test@example.com",
-            password="testpassword123",
-        )
+        self.user = user_factory(with_player=True)
 
     def _create_login(self, days_ago):
         # bulk_create so no post_save signal fires: the login-reward signal
@@ -490,15 +468,14 @@ class UserLoginModelTest(TestCase):
 class JwtLoginTrackingTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="jwt-login@example.com",
-            password="testpassword123",
+        self.user = user_factory(
+            with_player=True, email="test@example.com", password="testpassword123"
         )
 
     def test_token_serializer_creates_user_login_record(self):
         serializer = CustomTokenObtainPairSerializer(
             data={
-                "email": "jwt-login@example.com",
+                "email": "test@example.com",
                 "password": "testpassword123",
             }
         )
@@ -510,10 +487,7 @@ class JwtLoginTrackingTest(TestCase):
 class DailyLoginRewardTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="daily-login@example.com",
-            password="testpassword123",
-        )
+        self.user = user_factory(with_player=True)
 
     def _login_via_jwt(self):
         serializer = CustomTokenObtainPairSerializer(
@@ -573,10 +547,7 @@ class DailyLoginRewardTest(TestCase):
 class UserTimezoneApiTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="timezone-api@example.com",
-            password="testpassword123",
-        )
+        self.user = user_factory(with_player=True)
         self.factory = APIRequestFactory()
 
     def test_me_settings_patch_updates_timezone(self):
@@ -598,10 +569,7 @@ class UserTimezoneApiTest(TestCase):
 class UserTimezoneMiddlewareTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="timezone-middleware@example.com",
-            password="testpassword123",
-        )
+        self.user = user_factory(with_player=True)
         self.user.timezone = "Europe/Paris"
         self.user.save(update_fields=["timezone"])
 
@@ -683,10 +651,7 @@ class EmailTaskTest(TestCase):
 
 class ReconcileStaleOnlinePlayersTest(TestCase):
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_user(
-            email="stale@example.com", password="testpassword123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     @patch("users.tasks.async_to_sync")
@@ -758,10 +723,7 @@ class ReconcileStaleOnlinePlayersTest(TestCase):
 
 class PerformAccountWipeTest(TestCase):
     def setUp(self):
-        User = get_user_model()
-        self.user = User.objects.create_user(
-            email="pending-delete@example.com", password="testpassword123"
-        )
+        self.user = user_factory(with_player=True)
         self.user.pending_delete = True
         self.user.delete_at = timezone.now() - timedelta(days=1)
         self.user.save(update_fields=["pending_delete", "delete_at"])
@@ -783,10 +745,7 @@ class PerformAccountWipeTest(TestCase):
 class CustomAccountAdapterTest(TestCase):
     def setUp(self):
         Character.objects.create(first_name="Jane", can_link=True)
-        self.user = get_user_model().objects.create_user(
-            email="adapter@example.com",
-            password="testpassword123",
-        )
+        self.user = user_factory(with_player=True)
 
     @patch("users.adapters.send_rendered_email_task.delay")
     def test_send_confirmation_mail_queues_email_task(self, mock_delay):
@@ -829,9 +788,7 @@ class AssignCharacterTest(TestCase):
         )
 
         # Create a user and player
-        self.user = CustomUser.objects.create_user(
-            email="testplayer@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     def test_assign_character_to_player_success(self):
@@ -875,10 +832,8 @@ class AssignCharacterTest(TestCase):
             death_date=date.today(),
         )
 
-        from users.models import CustomUser
-
-        user2 = CustomUser.objects.create_user(
-            email="user2@example.com", password="pass"
+        user2 = user_factory(
+            with_player=True, email="user2@example.com", password="pass"
         )
         PlayerCharacterLink.assign_character(player=user2.player, character=self.npc1)
 
@@ -896,10 +851,8 @@ class AssignCharacterTest(TestCase):
         """Test assignment when no NPCs are available"""
         from users.utils import assign_character_to_player
 
-        from users.models import CustomUser
-
-        user1 = CustomUser.objects.create_user(email="user1@test.com", password="pass")
-        user2 = CustomUser.objects.create_user(email="user2@test.com", password="pass")
+        user1 = user_factory(with_player=True, email="user1@test.com", password="pass")
+        user2 = user_factory(with_player=True, email="user2@test.com", password="pass")
         PlayerCharacterLink.assign_character(player=user1.player, character=self.npc1)
         PlayerCharacterLink.assign_character(player=user2.player, character=self.npc2)
 
@@ -985,9 +938,7 @@ class CustomUserAdminChangeViewQueryTest(TestCase):
         self.admin_user = get_user_model().objects.create_superuser(
             email="superadmin@example.com", password="testpassword123"
         )
-        self.target_user = get_user_model().objects.create_user(
-            email="change-view-user@example.com", password="testpassword123"
-        )
+        self.target_user = user_factory(with_player=True)
         for _ in range(5):
             UserLogin.objects.create(user=self.target_user)
 

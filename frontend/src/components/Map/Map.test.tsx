@@ -1,9 +1,178 @@
-import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
-import PopulationCentreMap from './Map';
-import { TooltipProvider } from '../Tooltip/Tooltip';
+import { fromLngLat, toLngLat } from './utils';
+
+// MapLibre needs a real WebGL context, which jsdom doesn't provide - these
+// fakes stand in for just enough of the maplibre-gl API surface for Map.tsx
+// to wire itself up, so its own logic (scatter placement, walker
+// interpolation, tooltip content, feature styling) can be exercised the
+// same way it would be against a real map. `load` fires synchronously on
+// registration (real MapLibre fires it async once its style/tiles are
+// ready) so tests don't need to flush extra microtasks/timers to see the
+// component's post-load state.
+class FakeGeoJSONSource {
+  data: unknown = { type: 'FeatureCollection', features: [] };
+  setData(data: unknown) {
+    this.data = data;
+  }
+}
+
+class FakeMap {
+  static instances: FakeMap[] = [];
+  container: HTMLElement;
+  sources = new Map<string, FakeGeoJSONSource>();
+  layers: { id: string }[] = [];
+  handlers = new Map<string, { layerId?: string; handler: (e?: unknown) => void }[]>();
+  fitBoundsCalls: unknown[] = [];
+
+  constructor(options: { container: HTMLElement }) {
+    this.container = options.container;
+    FakeMap.instances.push(this);
+  }
+
+  addControl() {
+    return this;
+  }
+
+  addSource(id: string) {
+    this.sources.set(id, new FakeGeoJSONSource());
+  }
+
+  getSource(id: string) {
+    return this.sources.get(id);
+  }
+
+  addLayer(layer: { id: string }) {
+    this.layers.push(layer);
+  }
+
+  on(event: string, a: string | ((e?: unknown) => void), b?: (e?: unknown) => void) {
+    const layerId = typeof a === 'string' ? a : undefined;
+    const handler = typeof a === 'string' ? (b as (e?: unknown) => void) : a;
+    const list = this.handlers.get(event) ?? [];
+    list.push({ layerId, handler });
+    this.handlers.set(event, list);
+    if (event === 'load') handler();
+  }
+
+  off() {
+    // Not exercised by these tests - move listeners are cleaned up per
+    // tooltip open/close, which no test currently asserts on directly.
+  }
+
+  // Layer-scoped triggers only fire handlers registered for that exact
+  // layer (mirroring `map.on(event, layerId, handler)`); a triggered event
+  // with no layerId only fires map-wide handlers (`map.on(event, handler)`).
+  // Real MapLibre would fire both for a click that hits a feature, using
+  // queryRenderedFeatures to decide - these tests only need the layer-scoped
+  // path, so the map-wide "click on empty space closes the tooltip" handler
+  // (registered via the layerId-less overload) is exercised separately, not
+  // implicitly by every layer click.
+  trigger(event: string, payload?: unknown, layerId?: string) {
+    for (const entry of this.handlers.get(event) ?? []) {
+      if (entry.layerId === layerId) entry.handler(payload);
+    }
+  }
+
+  fitBounds(bounds: unknown, options: unknown) {
+    this.fitBoundsCalls.push({ bounds, options });
+  }
+
+  maxBoundsCalls: unknown[] = [];
+  setMaxBounds(bounds: unknown) {
+    this.maxBoundsCalls.push(bounds);
+  }
+
+  getBounds() {
+    return { getWest: () => 0, getSouth: () => 0, getEast: () => 1, getNorth: () => 1 };
+  }
+
+  getCanvas() {
+    return { style: {} as CSSStyleDeclaration };
+  }
+
+  queryRenderedFeatures() {
+    return [];
+  }
+
+  project([lng, lat]: [number, number]) {
+    return { x: lng, y: lat };
+  }
+
+  remove() {
+    // no-op
+  }
+}
+
+class FakeMarker {
+  static instances: FakeMarker[] = [];
+  element: HTMLElement;
+  lngLat: [number, number] | null = null;
+  private map: FakeMap | null = null;
+
+  constructor(options: { element: HTMLElement }) {
+    this.element = options.element;
+    FakeMarker.instances.push(this);
+  }
+
+  setLngLat(lngLat: [number, number]) {
+    this.lngLat = lngLat;
+    return this;
+  }
+
+  addTo(map: FakeMap) {
+    this.map = map;
+    map.container.appendChild(this.element);
+    return this;
+  }
+
+  remove() {
+    this.map?.container.removeChild(this.element);
+    return this;
+  }
+
+  // Convenience for assertions: the marker's position back in raw GIS units.
+  get gisPosition(): [number, number] | null {
+    return this.lngLat ? fromLngLat(this.lngLat) : null;
+  }
+}
+
+class FakeNavigationControl {}
+class FakeLngLatBounds {
+  constructor(
+    public sw: [number, number],
+    public ne: [number, number]
+  ) {}
+}
+
+vi.mock('maplibre-gl', () => ({
+  Map: FakeMap,
+  Marker: FakeMarker,
+  NavigationControl: FakeNavigationControl,
+  LngLatBounds: FakeLngLatBounds,
+  setWorkerUrl: vi.fn(),
+}));
+
+// Imported after the mock so Map.tsx picks up the faked maplibre-gl module.
+const { default: PopulationCentreMap } = await import('./Map');
+const { TooltipProvider } = await import('../Tooltip/Tooltip');
+
+function currentMap(): FakeMap {
+  return FakeMap.instances[FakeMap.instances.length - 1];
+}
+
+function villageSourceFeatures(): { properties: Record<string, unknown> }[] {
+  const data = currentMap().getSource('village')?.data as
+    | { features?: { properties: Record<string, unknown> }[] }
+    | undefined;
+  return data?.features ?? [];
+}
+
+function characterMarkers(): FakeMarker[] {
+  return [...FakeMarker.instances];
+}
 
 function renderMap(props: ComponentProps<typeof PopulationCentreMap>) {
   return render(
@@ -12,6 +181,11 @@ function renderMap(props: ComponentProps<typeof PopulationCentreMap>) {
     </TooltipProvider>
   );
 }
+
+beforeEach(() => {
+  FakeMap.instances = [];
+  FakeMarker.instances = [];
+});
 
 const baseGeojson = {
   bbox: [0, 0, 100, 100] as [number, number, number, number],
@@ -33,39 +207,51 @@ const baseGeojson = {
 
 describe('PopulationCentreMap', () => {
   it('renders nothing when geojson is absent', () => {
-    const { container } = renderMap({ geojson: null });
-    expect(container.querySelectorAll('g')).toHaveLength(0);
+    renderMap({ geojson: null });
+    expect(characterMarkers()).toHaveLength(0);
   });
 
   it('renders one character marker per character feature', () => {
-    const { container } = renderMap({ geojson: baseGeojson });
-    const markers = container.querySelectorAll('g');
-    expect(markers).toHaveLength(2);
+    renderMap({ geojson: baseGeojson });
+    expect(characterMarkers()).toHaveLength(2);
+  });
+
+  it('applies worldBounds as the map maxBounds, converted to the map projection', () => {
+    renderMap({ geojson: baseGeojson, worldBounds: [-1000, -1000, 2000, 2000] });
+    const map = currentMap();
+    expect(map.maxBoundsCalls).toHaveLength(1);
+    const bounds = map.maxBoundsCalls[0] as { sw: [number, number]; ne: [number, number] };
+    expect(bounds.sw[0]).toBeCloseTo(toLngLat([-1000, -1000])[0]);
+    expect(bounds.sw[1]).toBeCloseTo(toLngLat([-1000, -1000])[1]);
+    expect(bounds.ne[0]).toBeCloseTo(toLngLat([2000, 2000])[0]);
+    expect(bounds.ne[1]).toBeCloseTo(toLngLat([2000, 2000])[1]);
   });
 
   it('gives the same character id the same colour across renders', () => {
-    const { container: first } = renderMap({ geojson: baseGeojson });
-    const { container: second } = renderMap({ geojson: baseGeojson });
-
-    const firstCircle = first.querySelectorAll('g circle')[0];
-    const secondCircle = second.querySelectorAll('g circle')[0];
-    expect(firstCircle.getAttribute('fill')).toBe(secondCircle.getAttribute('fill'));
+    renderMap({ geojson: baseGeojson });
+    const firstFill = characterMarkers()[0].element.querySelector('circle')?.getAttribute('fill');
+    FakeMap.instances = [];
+    FakeMarker.instances = [];
+    renderMap({ geojson: baseGeojson });
+    const secondFill = characterMarkers()[0].element.querySelector('circle')?.getAttribute('fill');
+    expect(firstFill).toBe(secondFill);
   });
 
   it('gives different character ids different colours (for the placeholder palette)', () => {
-    const { container } = renderMap({ geojson: baseGeojson });
-    const circles = container.querySelectorAll('g circle');
-    expect(circles[0].getAttribute('fill')).not.toBe(circles[1].getAttribute('fill'));
+    renderMap({ geojson: baseGeojson });
+    const [a, b] = characterMarkers();
+    expect(a.element.querySelector('circle')?.getAttribute('fill')).not.toBe(
+      b.element.querySelector('circle')?.getAttribute('fill')
+    );
   });
 
-  it('positions each marker via the SVG transform attribute in user-space units (not CSS px), so it scales with the viewBox under zoom', () => {
-    const { container } = renderMap({ geojson: baseGeojson });
-    const markers = container.querySelectorAll('g');
-    markers.forEach((marker) => {
-      const transform = marker.getAttribute('transform') || '';
-      expect(transform).toMatch(/translate\(/);
-      expect(transform).not.toMatch(/px/);
-    });
+  it('positions each marker at its GIS coordinates converted to the map projection', () => {
+    renderMap({ geojson: baseGeojson });
+    const [alice, bob] = characterMarkers();
+    expect(alice.gisPosition?.[0]).toBeCloseTo(10);
+    expect(alice.gisPosition?.[1]).toBeCloseTo(10);
+    expect(bob.gisPosition?.[0]).toBeCloseTo(20);
+    expect(bob.gisPosition?.[1]).toBeCloseTo(20);
   });
 
   it('places characters at random points inside their building footprint, not clustered at its centre', () => {
@@ -90,15 +276,9 @@ describe('PopulationCentreMap', () => {
       ],
     };
 
-    const { container } = renderMap({ geojson: geojsonWithHousehold });
-    const markers = container.querySelectorAll('g');
-    expect(markers).toHaveLength(5);
-
-    const points = Array.from(markers).map((marker) => {
-      const transform = marker.getAttribute('transform') || '';
-      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
-      return [Number(match?.[1]), Number(match?.[2])];
-    });
+    renderMap({ geojson: geojsonWithHousehold });
+    const points = characterMarkers().map((m) => m.gisPosition as [number, number]);
+    expect(points).toHaveLength(5);
 
     // Every character should land inside the 0-20 footprint (inset from the
     // walls a little), not stacked at the shared (10, 10) entrance point.
@@ -112,13 +292,11 @@ describe('PopulationCentreMap', () => {
     const exactlyAtSharedPoint = points.filter(([x, y]) => x === 10 && y === 10);
     expect(exactlyAtSharedPoint.length).toBeLessThan(points.length);
 
-    const uniquePoints = new Set(points.map(([x, y]) => `${x},${y}`));
+    const uniquePoints = new Set(points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`));
     expect(uniquePoints.size).toBe(5);
   });
 
   it('keeps a minimum distance between housemates scattered in the same building', () => {
-    // A small 10x10 footprint with 5 residents - tight enough to make the
-    // minimum-distance constraint actually bind, not just happen to pass.
     const geojsonWithCrowdedHousehold = {
       bbox: [0, 0, 10, 10] as [number, number, number, number],
       features: [
@@ -140,18 +318,10 @@ describe('PopulationCentreMap', () => {
       ],
     };
 
-    const { container } = renderMap({ geojson: geojsonWithCrowdedHousehold });
-    const points = Array.from(container.querySelectorAll('g')).map((marker) => {
-      const transform = marker.getAttribute('transform') || '';
-      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
-      return [Number(match?.[1]), Number(match?.[2])] as [number, number];
-    });
+    renderMap({ geojson: geojsonWithCrowdedHousehold });
+    const points = characterMarkers().map((m) => m.gisPosition as [number, number]);
     expect(points).toHaveLength(5);
 
-    // The footprint is tight relative to the minimum spacing, so the exact
-    // 3.5-unit floor may not be reachable for every pair - but positions
-    // should still land noticeably apart rather than nearly on top of each
-    // other (which the earlier ring-radius approach could produce).
     for (let i = 0; i < points.length; i++) {
       for (let j = i + 1; j < points.length; j++) {
         const dx = points[i][0] - points[j][0];
@@ -163,10 +333,6 @@ describe('PopulationCentreMap', () => {
   });
 
   it('places characters at a shared point on the footprint boundary (e.g. the entrance node) inside the house, not clustered at the door', () => {
-    // The entrance node sits on the midpoint of a wall - exactly on the
-    // polygon's edge, not safely inside it. This regresses if the
-    // footprint-matching lookup uses a strict point-in-polygon test, which
-    // is unreliable exactly on a boundary.
     const geojsonWithResidentsAtEntrance = {
       bbox: [0, 0, 20, 20] as [number, number, number, number],
       features: [
@@ -188,12 +354,8 @@ describe('PopulationCentreMap', () => {
       ],
     };
 
-    const { container } = renderMap({ geojson: geojsonWithResidentsAtEntrance });
-    const points = Array.from(container.querySelectorAll('g')).map((marker) => {
-      const transform = marker.getAttribute('transform') || '';
-      const match = transform.match(/translate\(([-\d.]+), ([-\d.]+)\)/);
-      return [Number(match?.[1]), Number(match?.[2])];
-    });
+    renderMap({ geojson: geojsonWithResidentsAtEntrance });
+    const points = characterMarkers().map((m) => m.gisPosition as [number, number]);
     expect(points).toHaveLength(5);
 
     points.forEach(([x, y]) => {
@@ -207,7 +369,7 @@ describe('PopulationCentreMap', () => {
     expect(exactlyAtDoor.length).toBe(0);
   });
 
-  it('renders a ready-to-harvest crops subzone in gold, distinct from the default grey building fill', () => {
+  it('assigns a ready-to-harvest crops subzone a gold fill, distinct from the default grey building fill', () => {
     const geojsonWithCropSubzone = {
       ...baseGeojson,
       features: [
@@ -232,15 +394,14 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const { container } = renderMap({ geojson: geojsonWithCropSubzone });
-    const polygons = container.querySelectorAll('polygon');
-    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+    renderMap({ geojson: geojsonWithCropSubzone });
+    const fills = villageSourceFeatures().map((f) => f.properties.fillColor);
 
     expect(fills).toContain('#E4C158');
     expect(fills).toContain('#ddd');
   });
 
-  it('renders a fallow or not-yet-planted crops subzone as bare soil, distinct from ready gold', () => {
+  it('assigns a fallow or not-yet-planted crops subzone a bare-soil fill, distinct from ready gold', () => {
     const geojsonFallow = {
       ...baseGeojson,
       features: [
@@ -257,15 +418,14 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const { container } = renderMap({ geojson: geojsonFallow });
-    const polygons = container.querySelectorAll('polygon');
-    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+    renderMap({ geojson: geojsonFallow });
+    const fills = villageSourceFeatures().map((f) => f.properties.fillColor);
 
     expect(fills).toContain('#c2a878');
     expect(fills).not.toContain('#E4C158');
   });
 
-  it('renders a growing crops subzone with a green that darkens as growth progress increases', () => {
+  it('assigns a growing crops subzone a green fill that darkens as growth progress increases', () => {
     const cropFeature = (progress: number) => ({
       geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 40], [40, 40], [40, 5], [5, 5]]] },
       properties: {
@@ -277,22 +437,22 @@ describe('PopulationCentreMap', () => {
       },
     });
 
-    const { container: early } = renderMap({
-      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.1)] },
-    });
-    const { container: late } = renderMap({
-      geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.9)] },
-    });
+    renderMap({ geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.1)] } });
+    const earlyFill = villageSourceFeatures().find((f) => f.properties.feature_type === 'subzone')
+      ?.properties.fillColor;
 
-    const earlyFill = early.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
-    const lateFill = late.querySelector('polygon[points^="5,5"]')?.getAttribute('fill');
+    FakeMap.instances = [];
+    FakeMarker.instances = [];
+    renderMap({ geojson: { ...baseGeojson, features: [...baseGeojson.features, cropFeature(0.9)] } });
+    const lateFill = villageSourceFeatures().find((f) => f.properties.feature_type === 'subzone')
+      ?.properties.fillColor;
 
     expect(earlyFill).toMatch(/^hsl\(/);
     expect(lateFill).toMatch(/^hsl\(/);
     expect(earlyFill).not.toBe(lateFill);
   });
 
-  it('renders field_shelter buildings in the default grey, not gold', () => {
+  it('assigns field_shelter buildings the default grey fill, not gold', () => {
     const geojsonWithShelter = {
       ...baseGeojson,
       features: [
@@ -307,9 +467,8 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const { container } = renderMap({ geojson: geojsonWithShelter });
-    const polygons = container.querySelectorAll('polygon');
-    const fills = Array.from(polygons).map((p) => p.getAttribute('fill'));
+    renderMap({ geojson: geojsonWithShelter });
+    const fills = villageSourceFeatures().map((f) => f.properties.fillColor);
 
     expect(fills).not.toContain('#E4C158');
     expect(fills).toContain('#ddd');
@@ -330,15 +489,12 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const user = userEvent.setup();
-    render(
-      <TooltipProvider>
-        <PopulationCentreMap geojson={geojsonWithBuilding} />
-      </TooltipProvider>
-    );
+    renderMap({ geojson: geojsonWithBuilding });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
 
-    const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.click(building);
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'buildings-fill');
+    });
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('House');
@@ -366,15 +522,12 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const user = userEvent.setup();
-    render(
-      <TooltipProvider>
-        <PopulationCentreMap geojson={geojsonWithBuilding} />
-      </TooltipProvider>
-    );
+    renderMap({ geojson: geojsonWithBuilding });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
 
-    const building = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.click(building);
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'buildings-fill');
+    });
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Workers: 2');
@@ -399,15 +552,12 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const user = userEvent.setup();
-    render(
-      <TooltipProvider>
-        <PopulationCentreMap geojson={geojsonWithHouse} />
-      </TooltipProvider>
-    );
+    renderMap({ geojson: geojsonWithHouse });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
 
-    const house = document.querySelector('polygon[fill="#ddd"]') as SVGPolygonElement;
-    await user.click(house);
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'buildings-fill');
+    });
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Residents: 3');
@@ -432,13 +582,9 @@ describe('PopulationCentreMap', () => {
       ],
     };
     const user = userEvent.setup();
-    render(
-      <TooltipProvider>
-        <PopulationCentreMap geojson={geojsonWithCharacter} />
-      </TooltipProvider>
-    );
+    renderMap({ geojson: geojsonWithCharacter });
 
-    await user.click(document.querySelector('g') as SVGGElement);
+    await user.click(characterMarkers()[0].element.querySelector('svg') as SVGSVGElement);
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
@@ -464,15 +610,12 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const user = userEvent.setup();
-    render(
-      <TooltipProvider>
-        <PopulationCentreMap geojson={geojsonWithReadyField} />
-      </TooltipProvider>
-    );
+    renderMap({ geojson: geojsonWithReadyField });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'subzone');
 
-    const field = document.querySelector('polygon[fill="#E4C158"]') as SVGPolygonElement;
-    await user.click(field);
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'subzones-fill');
+    });
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Ready to harvest');
@@ -497,57 +640,16 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const { container } = renderMap({ geojson: geojsonWithSharedHouse });
-    const markers = container.querySelectorAll('g');
-    expect(markers).toHaveLength(5);
+    renderMap({ geojson: geojsonWithSharedHouse });
+    const points = characterMarkers()
+      .slice(2)
+      .map((m) => m.gisPosition as [number, number]);
 
-    const houseMarkerTransforms = Array.from(markers)
-      .slice(2) // Carol, Dave, Eve - all originally at (50, 50)
-      .map((marker) => marker.getAttribute('transform'));
-
-    expect(new Set(houseMarkerTransforms).size).toBe(3);
+    const uniquePoints = new Set(points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`));
+    expect(uniquePoints.size).toBe(3);
   });
 
-  it('paints characters lower on screen after (on top of) ones higher up, in DOM/render order', () => {
-    const geojsonOutOfOrder = {
-      ...baseGeojson,
-      features: [
-        ...baseGeojson.features,
-        {
-          // Listed first in the feature list but should paint last (highest
-          // y = lowest on screen, since the viewBox y axis isn't flipped).
-          geometry: { type: 'Point', coordinates: [30, 90] },
-          properties: { feature_type: 'character', id: 3, name: 'LowestOnScreen' },
-        },
-        {
-          geometry: { type: 'Point', coordinates: [30, 5] },
-          properties: { feature_type: 'character', id: 4, name: 'HighestOnScreen' },
-        },
-      ],
-    };
-    const { container } = renderMap({ geojson: geojsonOutOfOrder });
-    const markerNames = Array.from(container.querySelectorAll('g')).map((marker) =>
-      marker.getAttribute('transform')
-    );
-
-    // Alice (y=10), Bob (y=20), HighestOnScreen (y=5), LowestOnScreen (y=90)
-    // -> expected paint order ascending by y: HighestOnScreen, Alice, Bob, LowestOnScreen
-    expect(markerNames).toEqual([
-      'translate(30, 5)',
-      'translate(10, 10)',
-      'translate(20, 20)',
-      'translate(30, 90)',
-    ]);
-  });
-
-  it('keeps a single character at its exact point (no unnecessary offset)', () => {
-    const { container } = renderMap({ geojson: baseGeojson });
-    const markers = container.querySelectorAll('g');
-    expect(markers[0].getAttribute('transform')).toBe('translate(10, 10)');
-    expect(markers[1].getAttribute('transform')).toBe('translate(20, 20)');
-  });
-
-  it('renders path lines invisibly (opacity 0)', () => {
+  it('renders path lines invisibly (line-opacity 0)', () => {
     const geojsonWithPath = {
       ...baseGeojson,
       features: [
@@ -558,9 +660,176 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    const { container } = renderMap({ geojson: geojsonWithPath });
-    const path = container.querySelector('polyline');
-    expect(path).not.toBeNull();
-    expect(path?.getAttribute('opacity')).toBe('0');
+    renderMap({ geojson: geojsonWithPath });
+    const pathsLayer = currentMap().layers.find((l) => l.id === 'paths-line') as
+      | { paint?: { 'line-opacity'?: number } }
+      | undefined;
+    expect(pathsLayer?.paint?.['line-opacity']).toBe(0);
+
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'path');
+    expect(feature).toBeDefined();
+  });
+});
+
+describe('PopulationCentreMap path-aware interpolation (#615)', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const walkingGeojson = {
+    bbox: [0, 0, 100, 100] as [number, number, number, number],
+    features: [
+      {
+        geometry: { type: 'Point', coordinates: [0, 0] },
+        properties: {
+          feature_type: 'character',
+          id: 1,
+          name: 'Walker',
+          path: [
+            [10, 0],
+            [10, 10],
+          ] as [number, number][],
+          effective_speed: 5,
+        },
+      },
+    ],
+  };
+
+  it('walks a moving character along its path over time instead of staying put', () => {
+    renderMap({ geojson: walkingGeojson });
+    const marker = characterMarkers()[0];
+    expect(marker.gisPosition?.[0]).toBeCloseTo(0);
+    expect(marker.gisPosition?.[1]).toBeCloseTo(0);
+
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+
+    const [x, y] = marker.gisPosition as [number, number];
+    expect(x).toBeGreaterThan(0);
+    expect(x).toBeLessThanOrEqual(10);
+    expect(y).toBeCloseTo(0);
+  });
+
+  it('continues onto the next path segment after reaching a waypoint, without stalling', () => {
+    renderMap({ geojson: walkingGeojson });
+    const marker = characterMarkers()[0];
+
+    act(() => {
+      vi.advanceTimersByTime(3000);
+    });
+
+    const [x, y] = marker.gisPosition as [number, number];
+    expect(x).toBeCloseTo(10);
+    expect(y).toBeGreaterThan(0);
+    expect(y).toBeLessThan(10);
+  });
+
+  it('holds position at the end of its known path instead of extrapolating past it', () => {
+    renderMap({ geojson: walkingGeojson });
+    const marker = characterMarkers()[0];
+
+    act(() => {
+      vi.advanceTimersByTime(10000);
+    });
+
+    expect(marker.gisPosition?.[0]).toBeCloseTo(10);
+    expect(marker.gisPosition?.[1]).toBeCloseTo(10);
+  });
+
+  it('does not animate an idle character (no active journey)', () => {
+    const idleGeojson = {
+      ...walkingGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: { feature_type: 'character', id: 2, name: 'Idle', path: null },
+        },
+      ],
+    };
+    renderMap({ geojson: idleGeojson });
+    const marker = characterMarkers()[0];
+    expect(marker.gisPosition?.[0]).toBeCloseTo(50);
+    expect(marker.gisPosition?.[1]).toBeCloseTo(50);
+
+    act(() => {
+      vi.advanceTimersByTime(5000);
+    });
+
+    expect(marker.gisPosition?.[0]).toBeCloseTo(50);
+    expect(marker.gisPosition?.[1]).toBeCloseTo(50);
+  });
+
+  it('adopts a fresh poll as the new authoritative checkpoint rather than extrapolating from the previous one (#615 follow-up)', () => {
+    const { rerender } = renderMap({ geojson: walkingGeojson });
+    const marker = characterMarkers()[0];
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const midX = marker.gisPosition?.[0] as number;
+    expect(midX).toBeGreaterThan(0);
+    expect(midX).toBeLessThan(10);
+
+    const correctedGeojson = {
+      bbox: [0, 0, 100, 100] as [number, number, number, number],
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [50, 50] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Walker',
+            path: [[60, 50]] as [number, number][],
+            effective_speed: 5,
+          },
+        },
+      ],
+    };
+    rerender(
+      <TooltipProvider>
+        <PopulationCentreMap geojson={correctedGeojson} />
+      </TooltipProvider>
+    );
+
+    act(() => {
+      vi.advanceTimersByTime(16);
+    });
+    const justAfter = marker.gisPosition as [number, number];
+    expect(Math.hypot(justAfter[0] - 50, justAfter[1] - 50)).toBeLessThan(0.5);
+
+    act(() => {
+      vi.advanceTimersByTime(500);
+    });
+    const later = marker.gisPosition as [number, number];
+    expect(later[0]).toBeGreaterThan(justAfter[0]);
+    expect(later[1]).toBeCloseTo(50, 5);
+  });
+
+  it('recomputes position fresh each frame instead of accumulating step-to-step error (#615 follow-up)', () => {
+    renderMap({ geojson: walkingGeojson });
+    const singleStepMarker = characterMarkers()[0];
+    act(() => {
+      vi.advanceTimersByTime(1000);
+    });
+    const singleStepPos = singleStepMarker.gisPosition as [number, number];
+
+    FakeMap.instances = [];
+    FakeMarker.instances = [];
+    renderMap({ geojson: walkingGeojson });
+    const manyStepsMarker = characterMarkers()[0];
+    act(() => {
+      for (let i = 0; i < 50; i++) {
+        vi.advanceTimersByTime(20);
+      }
+    });
+    const manyStepsPos = manyStepsMarker.gisPosition as [number, number];
+
+    expect(manyStepsPos[0]).toBeCloseTo(singleStepPos[0], 1);
+    expect(manyStepsPos[1]).toBeCloseTo(singleStepPos[1], 1);
   });
 });

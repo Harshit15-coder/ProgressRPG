@@ -15,6 +15,7 @@ from users.models import InviteCode, Waitlist
 from users.services import waitlist_service
 
 User = get_user_model()
+from users.tests import user_factory
 
 
 class RegistrationStatusAPITest(APITestCase):
@@ -30,9 +31,7 @@ class RegistrationStatusAPITest(APITestCase):
         self.assertTrue(res.json()["registration_open"])
 
     def test_registration_closed_at_cap(self):
-        user = User.objects.create_user(
-            email="a@example.com", password="testpassword123"
-        )
+        user = user_factory()
         user.is_confirmed = True
         user.save(update_fields=["is_confirmed"])
         self.settings.registration_cap = User.objects.count()
@@ -42,7 +41,7 @@ class RegistrationStatusAPITest(APITestCase):
         self.assertFalse(res.json()["registration_open"])
 
     def test_registration_open_ignores_unconfirmed_users_at_cap(self):
-        User.objects.create_user(email="a@example.com", password="testpassword123")
+        user = user_factory()
         self.settings.registration_cap = User.objects.count()
         self.settings.save()
         res = self.client.get("/api/v1/registration_status/")
@@ -95,7 +94,9 @@ class RegistrationStatusAPITest(APITestCase):
         self.assertEqual(res.json()["waitlist_signup_provider"], "mailchimp")
 
     def test_waitlist_signup_provider_reports_internal_when_set(self):
-        self.settings.waitlist_signup_provider = GameSettings.WaitlistSignupProvider.INTERNAL
+        self.settings.waitlist_signup_provider = (
+            GameSettings.WaitlistSignupProvider.INTERNAL
+        )
         self.settings.save()
         res = self.client.get("/api/v1/registration_status/")
         self.assertEqual(res.status_code, status.HTTP_200_OK)
@@ -252,9 +253,7 @@ class SignupIgnoresCapTest(APITestCase):
 
         GameSettings.objects.all().delete()
         settings_obj = GameSettings.current()
-        User.objects.create_user(
-            email="existing@example.com", password="testpassword123"
-        )
+        user = user_factory()
         settings_obj.registration_cap = 0
         settings_obj.save()
         InviteCode.objects.create(code="TESTCODE")
@@ -893,9 +892,7 @@ class SelfServeRegistrationTest(APITestCase):
 
     def test_self_serve_respects_registration_cap(self):
         self._enable_self_serve()
-        existing = User.objects.create_user(
-            email="a@example.com", password="testpassword123"
-        )
+        existing = user_factory()
         existing.is_confirmed = True
         existing.save(update_fields=["is_confirmed"])
         self.settings.registration_cap = User.objects.count()
@@ -906,7 +903,7 @@ class SelfServeRegistrationTest(APITestCase):
 
     def test_self_serve_ignores_unconfirmed_users_for_cap(self):
         self._enable_self_serve()
-        User.objects.create_user(email="a@example.com", password="testpassword123")
+        user_factory()
         self.settings.registration_cap = User.objects.count()
         self.settings.save()
         res = self._post_register(self._register_payload("solo@example.com"))
@@ -915,7 +912,7 @@ class SelfServeRegistrationTest(APITestCase):
 
     def test_invite_token_still_bypasses_cap_when_self_serve_enabled(self):
         self._enable_self_serve()
-        User.objects.create_user(email="a@example.com", password="testpassword123")
+        user_factory()
         self.settings.registration_cap = User.objects.count()
         self.settings.save()
         Waitlist.objects.create(

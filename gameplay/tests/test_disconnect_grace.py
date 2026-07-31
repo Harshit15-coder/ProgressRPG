@@ -10,7 +10,6 @@ never comes back the task calls ActivityTimer.complete(), awarding XP.
 from asgiref.sync import async_to_sync
 from unittest.mock import AsyncMock, MagicMock, patch
 
-from django.contrib.auth import get_user_model
 from django.core.cache import cache
 from django.test import TransactionTestCase
 from django.utils import timezone
@@ -23,6 +22,7 @@ from gameplay.consumers import (
 from gameplay.models import ActivityTimer
 from gameplay.tasks import auto_complete_timer_on_disconnect
 
+from users.tests import user_factory
 
 # ── shared test infrastructure ─────────────────────────────────────────────────
 
@@ -75,10 +75,7 @@ class AutoCompleteTimerTaskTests(TransactionTestCase):
     TASK_ID = "test-task-abc123"
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="disconnect-grace@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         self.timer = self.player.activity_timer
         cache.clear()
@@ -188,10 +185,7 @@ class AutoCompleteTimerTaskTests(TransactionTestCase):
 class TimerConsumerDisconnectGraceTests(TransactionTestCase):
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="disconnect-consumer@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         cache.clear()
 
@@ -303,10 +297,7 @@ class TimerConsumerDisconnectGraceTests(TransactionTestCase):
 class TimerConsumerReconnectTests(TransactionTestCase):
 
     def setUp(self):
-        self.user = get_user_model().objects.create_user(
-            email="reconnect-grace@example.com",
-            password="test-pass-123",
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         cache.clear()
 

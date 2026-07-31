@@ -2,7 +2,7 @@ from collections import defaultdict
 from typing import TYPE_CHECKING
 
 from django.contrib.gis.db import models as gis_models
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import LineString, Point
 from django.contrib.gis.db.models.functions import Distance
 from django.db import models, transaction
 from django.db.models import Q
@@ -208,6 +208,9 @@ class Path(models.Model):
         related_name="paths",
     )
     length = models.FloatField(blank=True, null=True)
+    geom = gis_models.LineStringField(
+        srid=3857, null=True, blank=True, spatial_index=True
+    )
 
     class Meta:
         constraints = [
@@ -223,6 +226,9 @@ class Path(models.Model):
         if self.from_node_id and self.to_node_id:
             try:
                 self.length = self.from_node.location.distance(self.to_node.location)
+                self.geom = LineString(
+                    self.from_node.location, self.to_node.location, srid=3857
+                )
             except Exception:
                 pass
         super().save(*args, **kwargs)
@@ -306,6 +312,23 @@ class Journey(models.Model):
         if self.path_nodes and self.current_index + 1 < len(self.path_nodes):
             return Node.objects.get(pk=self.path_nodes[self.current_index + 1])
         return None
+
+    def remaining_path_nodes(self, limit=None):
+        """
+        Nodes still ahead of the character (excluding their current node),
+        in path order. Optionally capped to the first `limit` of them -
+        used to bound response size when previewing a journey to clients
+        rather than sending the full remaining route every time.
+        """
+        if not self.path_nodes:
+            return []
+
+        remaining_ids = self.path_nodes[self.current_index + 1 :]
+        if limit is not None:
+            remaining_ids = remaining_ids[:limit]
+
+        nodes = Node.objects.in_bulk(remaining_ids)
+        return [nodes[node_id] for node_id in remaining_ids if node_id in nodes]
 
     def cancel(self):
         """

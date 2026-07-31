@@ -1,5 +1,4 @@
 @use '../../styles/utilities/mixins' as m;
-@use '../../styles/base/variables' as v;
 @use '../../styles/semantic/typography' as t;
 @use '../../styles/semantic/colors' as c;
 @use '../../styles/semantic/spacing' as sp;
@@ -17,7 +16,7 @@ $row-control-height: 44px;
 }
 
 .limitWarning {
-  margin: v.$spacing-sm 0 0;
+  margin: sp.$spacing-sm 0 0;
   text-align: left;
   color: c.$color-text-body;
 }
@@ -27,7 +26,7 @@ $row-control-height: 44px;
   z-index: 1;
   display: flex;
   justify-content: center;
-  padding-top: v.$spacing-md;
+  padding-top: sp.$spacing-md;
 }
 
 .supportModeButton {
@@ -42,8 +41,8 @@ $row-control-height: 44px;
   z-index: 2;
 
   border: 1px solid rgba(c.$color-border-primary, 0.15);
-  border-radius: v.$border-radius;
-  padding: v.$padding-base;
+  border-radius: sp.$border-radius;
+  padding: sp.$padding-base;
   background: rgba(c.$color-player, 0.14);
   width: min(100%, 720px);
 }
@@ -79,8 +78,8 @@ $row-control-height: 44px;
   display: flex;
   align-items: center;
   @include m.border(rgba(c.$color-border-primary, 0.3));
-  border-radius: v.$border-radius;
-  padding: v.$padding-base;
+  border-radius: sp.$border-radius;
+  padding: sp.$padding-base;
   line-height: 1;
   white-space: nowrap;
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -96,11 +95,11 @@ $row-control-height: 44px;
   line-height: 1.2;
   height: 100%;
   min-height: 100%;
-  padding: v.$padding-sm;
+  padding: sp.$padding-sm;
   box-sizing: border-box;
 
   border: none;
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   background: transparent;
   box-shadow: none;
   width: 100%;
@@ -229,11 +228,11 @@ $row-control-height: 44px;
     font-size: 1rem;
     line-height: 1.1;
     min-height: 1.2em;
-    padding: v.$spacing-xs;
+    padding: sp.$spacing-xs;
   }
 
   .timerPill {
-    padding: v.$spacing-sm;
+    padding: sp.$spacing-sm;
     font-size: 1rem;
   }
 
@@ -258,7 +257,7 @@ $row-control-height: 44px;
   }
 
   .timerPill {
-    padding: v.$spacing-xs v.$spacing-sm;
+    padding: sp.$spacing-xs sp.$spacing-sm;
     font-size: 0.95rem;
   }
 }

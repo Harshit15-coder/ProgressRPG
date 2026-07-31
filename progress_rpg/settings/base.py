@@ -44,7 +44,11 @@ if SENTRY_DSN:
         dsn=SENTRY_DSN,
         environment=CURRENT_ENV,
         send_default_pii=CURRENT_ENV != "production",
-        traces_sample_rate=1.0,
+        traces_sample_rate={
+            "production": 0.1,
+            "staging": 0.5,
+            "local": 0.0,
+        }.get(CURRENT_ENV, 0.0),
     )
 
 APP_VERSION = "0.6.0-alpha"

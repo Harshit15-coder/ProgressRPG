@@ -6,6 +6,12 @@
       "runtimeExecutable": "wsl",
       "runtimeArgs": ["-e", "bash", "-lc", "cd /home/gaidheal/repos/progressrpg/frontend && npm run dev -- --host --port 5183 --strictPort"],
       "port": 5183
+    },
+    {
+      "name": "storybook",
+      "runtimeExecutable": "wsl",
+      "runtimeArgs": ["-e", "bash", "-lc", "cd /home/gaidheal/repos/progressrpg/frontend && npx storybook dev -p 6006 --host 0.0.0.0"],
+      "port": 6006
     }
   ]
 }

@@ -9,7 +9,7 @@
   position: fixed;
   bottom: 1rem;
   right: 1rem;
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
 
   .feedbackButton {
     padding: map.get(sp.$gap, sm) map.get(sp.$gap, md);
@@ -21,10 +21,10 @@
   max-width: 320px;
   background-color: c.$color-bg;
   @include m.border(c.$color-border-primary);
-  border-radius: v.$border-radius;
+  border-radius: sp.$border-radius;
   @include m.box-shadow(md);
   padding: map.get(sp.$gap, md);
-  z-index: v.$z-indexdropdown;
+  z-index: v.$z-index-dropdown;
   position: relative;
   @include m.slide-up(0.2s);
 
@@ -40,8 +40,8 @@
     gap: 0.5rem;
 
     .modalButton {
-      padding: v.$padding-base;
-      border-radius: v.$border-radius;
+      padding: sp.$padding-base;
+      border-radius: sp.$border-radius;
       text-align: center;
       text-decoration: none;
       font-weight: 500;

@@ -1,14 +1,49 @@
 import type React from "react";
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createRoot, type Root } from "react-dom/client";
+import {
+  Map as MapLibreMap,
+  Marker,
+  NavigationControl,
+  LngLatBounds,
+  setWorkerUrl,
+  type GeoJSONSource,
+  type MapGeoJSONFeature,
+  type MapMouseEvent,
+} from "maplibre-gl";
+import "maplibre-gl/dist/maplibre-gl.css";
 import Tooltip, { TooltipProvider } from "../Tooltip/Tooltip";
-import { computeBaseRect, fieldFillFor, ViewBoxRect } from "./utils";
+import { coordsToLngLat, fieldFillFor, fromLngLat, quantizeBbox, toLngLat } from "./utils";
 import { BuildingTooltipContent, CharacterTooltipContent } from "./MapTooltips";
 import styles from "./Map.module.scss";
+
+// maplibre-gl loads its own tile-processing worker via a runtime
+// `new URL('./${name}.mjs', import.meta.url)` where `name` is a variable,
+// not a string literal - Vite/Rollup's static asset analysis only bundles
+// (and emits) worker URLs it can resolve at build time, so this pattern
+// silently produces no build output for the production build (dev mode
+// isn't affected - see the optimizeDeps.exclude comment in vite.config.ts,
+// which addresses a different, dev-only version of this same underlying
+// problem). Without this fix, the worker request 404s (silently, since the
+// static host's SPA fallback serves index.html instead of a real 404) and
+// every vector layer (fills/lines - anything that isn't a DOM-positioned
+// Marker) renders nothing, with no error surfaced anywhere (issue #624
+// investigation, 2026-07-31). vite.config.ts's viteStaticCopy plugin copies
+// the worker file and its own sibling import (maplibre-gl-shared.mjs) to a
+// fixed, unhashed path verbatim - the exact relative filename the worker's
+// own `import "./maplibre-gl-shared.mjs"` expects - and setWorkerUrl is
+// maplibre-gl's own public override for exactly this bundler scenario.
+setWorkerUrl("/maplibre-gl/maplibre-gl-worker.mjs");
 
 interface GeoJSONFeatureProperties {
   feature_type?: string;
   name?: string;
   id?: number;
+  // Remaining waypoints (capped server-side, see JOURNEY_PATH_PREVIEW_LIMIT
+  // in locations/serializers.py) for a character with an active journey;
+  // null/absent for an idle character.
+  path?: [number, number][] | null;
+  effective_speed?: number;
   [key: string]: unknown;
 }
 
@@ -27,6 +62,16 @@ interface GeoJSON {
 
 interface PopulationCentreMapProps {
   geojson?: GeoJSON | null;
+  // Called (debounced) whenever the camera settles on a new viewport, with a
+  // quantized "minx,miny,maxx,maxy" bbox in raw 3857 metres - lets the owner
+  // (MapPage) drive a bbox-scoped data fetch. Omit for a display-only map
+  // (e.g. in tests).
+  onViewportChange?: (bbox: string) => void;
+  // Padded [minX, minY, maxX, maxY] in raw 3857 metres covering every seeded
+  // population centre (MapWorldBoundsView) - limits how far the camera can
+  // pan. Arrives asynchronously (a separate one-shot fetch), so it's applied
+  // in its own effect below rather than at map construction time.
+  worldBounds?: [number, number, number, number] | null;
 }
 
 // Placeholder palette until real character sprites/art exist. Colour is
@@ -203,6 +248,59 @@ interface PositionedCharacter {
   feature: GeoJSONFeature;
   cx: number;
   cy: number;
+  isWalking?: boolean;
+}
+
+// A walker's position is never stepped incrementally frame-to-frame (that
+// approach let small per-poll speed mismatches between client and server
+// silently accumulate over the whole journey, surfacing as a character
+// lagging further and further behind, then snapping/rushing to catch up).
+// Instead each poll records a fresh checkpoint - the authoritative position
+// the server reported, the remaining path from there, and the client
+// timestamp it was received - and every frame recomputes position from
+// scratch as a pure function of that checkpoint and elapsed real time.
+// Whatever drift builds up within a single poll interval (small, since it's
+// only ever one interval's worth) is wiped out by the next poll's fresh
+// checkpoint rather than compounding across the journey.
+interface WalkerState {
+  checkpointPos: [number, number];
+  path: [number, number][];
+  speed: number;
+  receivedAt: number;
+}
+
+// Walks `distance` units from `start` along `path`, consuming as many
+// waypoints as it reaches rather than stopping at the first one short of the
+// full distance - the same carry-over-leftover-budget approach as the
+// backend's step_toward (locations/services/movement.py), so a character
+// crossing several short segments doesn't visibly slow down at each one.
+// Holds at the final point rather than extrapolating past it if `distance`
+// exceeds the path's total length (e.g. the client's clock has run ahead of
+// the server's capped path preview - the next poll will supply more path).
+function positionAlongPath(
+  start: [number, number],
+  path: [number, number][],
+  distance: number
+): [number, number] {
+  let pos = start;
+  let remaining = distance;
+
+  for (const [nx, ny] of path) {
+    const dx = nx - pos[0];
+    const dy = ny - pos[1];
+    const segmentDistance = Math.hypot(dx, dy);
+
+    if (segmentDistance <= remaining) {
+      pos = [nx, ny];
+      remaining -= segmentDistance;
+    } else {
+      const factor = segmentDistance === 0 ? 0 : remaining / segmentDistance;
+      pos = [pos[0] + dx * factor, pos[1] + dy * factor];
+      break;
+    }
+  }
+
+  return pos;
 }
 
 function buildingFootprintRings(features: GeoJSONFeature[]): Ring[] {
@@ -265,11 +363,6 @@ function scatterCharacters(
     });
   }
 
-  // SVG paints later elements on top of earlier ones, and this viewBox's y
-  // axis runs top-to-bottom same as screen space (no flip applied) - so
-  // sorting ascending by cy means characters lower on screen paint last and
-  // sit above the ones "behind" them, like a simple painter's algorithm.
-  positioned.sort((a, b) => a.cy - b.cy);
   return positioned;
 }
 
@@ -284,49 +377,6 @@ const BUILDING_TYPE_LABELS: Record<string, string> = {
   communal: "Communal",
   field_shelter: "Field Shelter",
 };
-
-// Pan/zoom scale is relative to the base (fully-zoomed-out) rect: 1 shows
-// the whole padded bbox, smaller values zoom in. Clamped rather than
-// unbounded so the map can't be zoomed out past its own content or zoomed
-// in so far the view loses all context.
-const MIN_ZOOM_SCALE = 0.08;
-const MAX_ZOOM_SCALE = 1;
-const WHEEL_ZOOM_FACTOR = 1.2;
-const ZOOM_BUTTON_FACTOR = 1.4;
-
-// A plain click (no movement) shouldn't be treated as the start of a pan -
-// capturing the pointer immediately on every pointerdown meant even a
-// stationary click briefly entered "dragging" state. Panning only kicks in
-// once the pointer has actually moved past this threshold.
-const DRAG_START_THRESHOLD_PX = 4;
-
-interface PanZoomState {
-  scale: number;
-  // Centre of the current view, in the same coordinate space as feature
-  // geometry (GIS units), not screen pixels.
-  cx: number;
-  cy: number;
-}
-
-function clamp(value: number, min: number, max: number): number {
-  return Math.min(max, Math.max(min, value));
-}
-
-function panZoomToRect(base: ViewBoxRect, view: PanZoomState): ViewBoxRect {
-  const w = base.w * view.scale;
-  const h = base.h * view.scale;
-  return { x: view.cx - w / 2, y: view.cy - h / 2, w, h };
-}
-
-// Panning is clamped to the base content bounds themselves (which already
-// include everything - village, fields, paths - via the bbox), so a user
-// can't drag the view off into empty space with nothing rendered.
-function clampCentre(base: ViewBoxRect, cx: number, cy: number): [number, number] {
-  return [
-    clamp(cx, base.x, base.x + base.w),
-    clamp(cy, base.y, base.y + base.h),
-  ];
-}
 
 function polygonTooltipContent(
   properties: GeoJSONFeatureProperties | null | undefined
@@ -359,365 +409,511 @@ function polygonTooltipContent(
   return properties?.name;
 }
 
+// A camera move fires many intermediate events per drag/zoom gesture -
+// debouncing means onViewportChange (and the network fetch it triggers)
+// only fires once the camera has actually settled.
+const VIEWPORT_DEBOUNCE_MS = 400;
+
+const BOUNDARY_FILL_LAYER = "boundary-fill";
+const BOUNDARY_LINE_LAYER = "boundary-line";
+const BUILDINGS_FILL_LAYER = "buildings-fill";
+const SUBZONES_FILL_LAYER = "subzones-fill";
+const PATHS_LINE_LAYER = "paths-line";
+const CLICKABLE_LAYERS = [BOUNDARY_FILL_LAYER, BUILDINGS_FILL_LAYER, SUBZONES_FILL_LAYER];
+
+// Precomputes per-feature presentation properties (fill/stroke) so map
+// styling can stay simple `["get", ...]` paint expressions instead of
+// duplicating fieldFillFor's stage/progress logic as a style expression.
+function styledPolygonFeatures(features: GeoJSONFeature[]) {
+  return features
+    .filter((f) => f.geometry.type === "Polygon")
+    .map((f) => {
+      const isBoundary = f.properties?.feature_type === "boundary";
+      const isCropSubzone =
+        f.properties?.feature_type === "subzone" && f.properties?.usage === "crops";
+      const fillColor = isBoundary
+        ? "transparent"
+        : isCropSubzone
+        ? fieldFillFor(
+            f.properties?.crop_stage as string | null | undefined,
+            f.properties?.crop_progress as number | null | undefined
+          )
+        : "#ddd";
+      return {
+        type: "Feature" as const,
+        geometry: {
+          type: f.geometry.type,
+          coordinates: coordsToLngLat(f.geometry.coordinates as never),
+        },
+        properties: { ...f.properties, fillColor },
+      };
+    });
+}
+
+function styledLineFeatures(features: GeoJSONFeature[]) {
+  return features
+    .filter((f) => f.geometry.type === "LineString")
+    .map((f) => ({
+      type: "Feature" as const,
+      geometry: {
+        type: f.geometry.type,
+        coordinates: coordsToLngLat(f.geometry.coordinates as never),
+      },
+      properties: f.properties,
+    }));
+}
+
+interface TooltipOverlayState {
+  key: string;
+  content: React.ReactNode;
+  lngLat: [number, number];
+}
+
 export default function PopulationCentreMap({
   geojson,
+  onViewportChange,
+  worldBounds,
 }: PopulationCentreMapProps) {
   const features: GeoJSONFeature[] = useMemo(
     () => geojson?.features || [],
     [geojson]
   );
 
-  // Feature coordinates are plotted at their raw GIS values, inside a
-  // viewBox derived straight from the bbox. Letting the SVG's own viewBox
-  // scaling do the work (rather than pre-computing a pixel transform)
-  // means the map always fills its container and scales/zooms correctly,
-  // instead of floating at a fixed size inside a mismatched canvas.
-  const baseRect = useMemo<ViewBoxRect>(() => {
-    if (geojson?.bbox) {
-      return computeBaseRect(geojson.bbox);
-    }
-    return { x: 0, y: 0, w: 100, h: 100 };
-  }, [geojson]);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const [mapReady, setMapReady] = useState(false);
+  const initialFitDoneRef = useRef(false);
 
-  // Fields can sit far outside the village itself, so the base (fully
-  // zoomed-out) view that fits everything renders the village tiny. Pan/zoom
-  // lets the user zoom into the village (or the field) instead of forcing
-  // one fixed view to fit both. Kept as separate state from baseRect so
-  // panning/zooming persists across polls (baseRect is only reset when the
-  // underlying bbox itself actually changes, e.g. switching villages).
-  const [view, setView] = useState<PanZoomState>({
-    scale: 1,
-    cx: baseRect.x + baseRect.w / 2,
-    cy: baseRect.y + baseRect.h / 2,
-  });
-  const lastBaseKeyRef = useRef<string | null>(null);
+  const [tooltip, setTooltip] = useState<TooltipOverlayState | null>(null);
+  const tooltipRootRef = useRef<Root | null>(null);
+  const tooltipHostRef = useRef<HTMLDivElement | null>(null);
+
+  // Creates the map once. onViewportChange is read via a ref inside the
+  // handler below rather than as an effect dep, so the camera event
+  // listener isn't torn down and re-attached on every poll.
+  const onViewportChangeRef = useRef(onViewportChange);
   useEffect(() => {
-    const key = `${baseRect.x},${baseRect.y},${baseRect.w},${baseRect.h}`;
-    if (lastBaseKeyRef.current === key) return;
-    lastBaseKeyRef.current = key;
-    setView({
-      scale: 1,
-      cx: baseRect.x + baseRect.w / 2,
-      cy: baseRect.y + baseRect.h / 2,
-    });
-  }, [baseRect]);
-
-  const currentRect = useMemo(() => panZoomToRect(baseRect, view), [baseRect, view]);
-  const viewBox = `${currentRect.x} ${currentRect.y} ${currentRect.w} ${currentRect.h}`;
-
-  const svgRef = useRef<SVGSVGElement>(null);
-  const dragStateRef = useRef<{
-    pointerId: number;
-    startClientX: number;
-    startClientY: number;
-    startCx: number;
-    startCy: number;
-    captured: boolean;
-  } | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
-
-  const zoomAt = (
-    clientX: number,
-    clientY: number,
-    factor: number
-  ) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    setView((prev) => {
-      const prevViewRect = panZoomToRect(baseRect, prev);
-      // Point under the cursor, in GIS coordinates, before zooming.
-      const focusX = prevViewRect.x + ((clientX - rect.left) / rect.width) * prevViewRect.w;
-      const focusY = prevViewRect.y + ((clientY - rect.top) / rect.height) * prevViewRect.h;
-
-      const nextScale = clamp(prev.scale / factor, MIN_ZOOM_SCALE, MAX_ZOOM_SCALE);
-      const nextW = baseRect.w * nextScale;
-      const nextH = baseRect.h * nextScale;
-
-      // Keep the same GIS point under the cursor after the zoom, not the
-      // view centre - otherwise zooming in always drifts toward the middle
-      // of the map instead of toward whatever the user pointed at.
-      const nextX = focusX - ((clientX - rect.left) / rect.width) * nextW;
-      const nextY = focusY - ((clientY - rect.top) / rect.height) * nextH;
-      const [cx, cy] = clampCentre(baseRect, nextX + nextW / 2, nextY + nextH / 2);
-
-      return { scale: nextScale, cx, cy };
-    });
-  };
+    onViewportChangeRef.current = onViewportChange;
+  }, [onViewportChange]);
 
   useEffect(() => {
-    const svg = svgRef.current;
-    if (!svg) return;
+    const container = containerRef.current;
+    if (!container) return;
 
-    // Wheel must be a non-passive native listener to preventDefault (stop
-    // the page itself from scrolling while zooming the map) - React's
-    // synthetic onWheel is attached passively and can't reliably do this.
-    const handleWheel = (e: WheelEvent) => {
-      e.preventDefault();
-      const factor = e.deltaY > 0 ? 1 / WHEEL_ZOOM_FACTOR : WHEEL_ZOOM_FACTOR;
-      zoomAt(e.clientX, e.clientY, factor);
-    };
-
-    svg.addEventListener("wheel", handleWheel, { passive: false });
-    return () => svg.removeEventListener("wheel", handleWheel);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [baseRect]);
-
-  const handlePointerDown = (e: React.PointerEvent<SVGSVGElement>) => {
-    // Only the primary button/touch starts a drag - avoids hijacking
-    // right-click and other pointer interactions.
-    if (e.button !== 0) return;
-    dragStateRef.current = {
-      pointerId: e.pointerId,
-      startClientX: e.clientX,
-      startClientY: e.clientY,
-      startCx: view.cx,
-      startCy: view.cy,
-      captured: false,
-    };
-  };
-
-  const handlePointerMove = (e: React.PointerEvent<SVGSVGElement>) => {
-    const drag = dragStateRef.current;
-    const svg = svgRef.current;
-    if (!drag || !svg || drag.pointerId !== e.pointerId) return;
-
-    if (!drag.captured) {
-      const movedX = Math.abs(e.clientX - drag.startClientX);
-      const movedY = Math.abs(e.clientY - drag.startClientY);
-      if (Math.hypot(movedX, movedY) < DRAG_START_THRESHOLD_PX) return;
-      drag.captured = true;
-      setIsDragging(true);
-      svg.setPointerCapture(e.pointerId);
-    }
-
-    const rect = svg.getBoundingClientRect();
-    if (!rect.width || !rect.height) return;
-
-    const viewRect = panZoomToRect(baseRect, view);
-    const dxSvg = -((e.clientX - drag.startClientX) / rect.width) * viewRect.w;
-    const dySvg = -((e.clientY - drag.startClientY) / rect.height) * viewRect.h;
-    const [cx, cy] = clampCentre(baseRect, drag.startCx + dxSvg, drag.startCy + dySvg);
-    setView((prev) => ({ ...prev, cx, cy }));
-  };
-
-  const endDrag = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (dragStateRef.current?.pointerId !== e.pointerId) return;
-    dragStateRef.current = null;
-    setIsDragging(false);
-  };
-
-  const handleZoomButton = (factor: number) => {
-    const svg = svgRef.current;
-    if (!svg) return;
-    const rect = svg.getBoundingClientRect();
-    zoomAt(rect.left + rect.width / 2, rect.top + rect.height / 2, factor);
-  };
-
-  const handleResetView = () => {
-    setView({
-      scale: 1,
-      cx: baseRect.x + baseRect.w / 2,
-      cy: baseRect.y + baseRect.h / 2,
+    const map = new MapLibreMap({
+      container,
+      style: { version: 8, sources: {}, layers: [] },
+      center: [0, 0],
+      zoom: 2,
     });
-  };
+    mapRef.current = map;
+    map.addControl(new NavigationControl({ showCompass: false }), "top-right");
+
+    let debounceTimer: ReturnType<typeof setTimeout>;
+    const handleMoveEnd = () => {
+      clearTimeout(debounceTimer);
+      debounceTimer = setTimeout(() => {
+        const onChange = onViewportChangeRef.current;
+        if (!onChange) return;
+        const bounds = map.getBounds();
+        const sw = fromLngLat([bounds.getWest(), bounds.getSouth()]);
+        const ne = fromLngLat([bounds.getEast(), bounds.getNorth()]);
+        onChange(quantizeBbox([sw[0], sw[1], ne[0], ne[1]]));
+      }, VIEWPORT_DEBOUNCE_MS);
+    };
+
+    const closeTooltip = () => setTooltip(null);
+
+    map.on("load", () => {
+      map.addSource("village", {
+        type: "geojson",
+        data: { type: "FeatureCollection", features: [] },
+      });
+      map.addLayer({
+        id: BOUNDARY_FILL_LAYER,
+        type: "fill",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "boundary"],
+        paint: { "fill-color": "transparent" },
+      });
+      map.addLayer({
+        id: BOUNDARY_LINE_LAYER,
+        type: "line",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "boundary"],
+        paint: { "line-color": "#888", "line-width": 2 },
+      });
+      map.addLayer({
+        id: SUBZONES_FILL_LAYER,
+        type: "fill",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "subzone"],
+        paint: { "fill-color": ["get", "fillColor"], "fill-outline-color": "#333" },
+      });
+      map.addLayer({
+        id: BUILDINGS_FILL_LAYER,
+        type: "fill",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "building"],
+        paint: { "fill-color": ["get", "fillColor"], "fill-outline-color": "#333" },
+      });
+      map.addLayer({
+        id: PATHS_LINE_LAYER,
+        type: "line",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "path"],
+        // Paths (roads) are rendered invisible - kept as a real layer so
+        // they're available if visible styling is wanted later, but with no
+        // interactivity registered (see CLICKABLE_LAYERS) since an invisible
+        // line has nothing worth hovering.
+        paint: { "line-color": "#8b5a2b", "line-width": 2.5, "line-opacity": 0 },
+      });
+
+      for (const layerId of CLICKABLE_LAYERS) {
+        map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          const content = polygonTooltipContent(
+            feature.properties as GeoJSONFeatureProperties
+          );
+          if (!content) return;
+          setTooltip({
+            key: `${layerId}-${feature.id ?? JSON.stringify(feature.properties)}`,
+            content,
+            lngLat: [e.lngLat.lng, e.lngLat.lat],
+          });
+        });
+        map.on("mouseenter", layerId, () => {
+          map.getCanvas().style.cursor = "pointer";
+        });
+        map.on("mouseleave", layerId, () => {
+          map.getCanvas().style.cursor = "";
+        });
+      }
+
+      map.on("click", (e: MapMouseEvent) => {
+        // A click that hit one of the clickable layers is handled by the
+        // per-layer listeners above and stops here; a click on empty map
+        // area closes whatever tooltip is open.
+        const hits = map.queryRenderedFeatures(e.point, { layers: CLICKABLE_LAYERS });
+        if (hits.length === 0) closeTooltip();
+      });
+
+      map.on("moveend", handleMoveEnd);
+      map.on("moveend", () => container.classList.remove(styles.cameraMoving));
+      map.on("movestart", closeTooltip);
+      // Idle characters glide between polls via a CSS transition (see
+      // .characterMarker), but MapLibre also updates each Marker's transform
+      // on every camera move to keep it pixel-anchored while panning/
+      // zooming - without this, that recalculation gets caught by the same
+      // transition and characters visibly lag behind the map instead of
+      // moving with it instantly.
+      map.on("movestart", () => container.classList.add(styles.cameraMoving));
+
+      setMapReady(true);
+    });
+
+    return () => {
+      clearTimeout(debounceTimer);
+      map.remove();
+      mapRef.current = null;
+      setMapReady(false);
+      initialFitDoneRef.current = false;
+    };
+  }, []);
+
+  // Keeps the tooltip overlay anchored to its map-space point while panning,
+  // and reprojects the initial position once opened.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !tooltip) return;
+    const updatePosition = () => {
+      const point = map.project(tooltip.lngLat);
+      const host = tooltipHostRef.current;
+      if (host) {
+        host.style.transform = `translate(${point.x}px, ${point.y}px)`;
+      }
+    };
+    updatePosition();
+    map.on("move", updatePosition);
+    return () => {
+      map.off("move", updatePosition);
+    };
+  }, [tooltip]);
+
+  // Mounts/unmounts a React root into the tooltip host div imperatively,
+  // since the host itself lives outside React's tree (positioned by the
+  // MapLibre `move` handler above, not by React re-render).
+  useEffect(() => {
+    const host = tooltipHostRef.current;
+    if (!host) return;
+    if (!tooltip) {
+      tooltipRootRef.current?.unmount();
+      tooltipRootRef.current = null;
+      return;
+    }
+    if (!tooltipRootRef.current) {
+      tooltipRootRef.current = createRoot(host);
+    }
+    tooltipRootRef.current.render(
+      <div role="tooltip" className={styles.floatingTooltip}>
+        {tooltip.content}
+      </div>
+    );
+  }, [tooltip]);
+
+  // Feeds the current geojson (buildings/subzones/boundary/paths) into the
+  // map's GeoJSON source whenever it changes.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const source = map.getSource("village") as GeoJSONSource | undefined;
+    if (!source) return;
+
+    source.setData({
+      type: "FeatureCollection",
+      features: [...styledPolygonFeatures(features), ...styledLineFeatures(features)],
+    } as Parameters<GeoJSONSource["setData"]>[0]);
+  }, [features, mapReady]);
+
+  // Fits the camera to the first bbox this map ever receives, then leaves
+  // the camera alone - later polls update content, not the view, so the
+  // user's own pan/zoom is never fought.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || initialFitDoneRef.current || !geojson?.bbox) return;
+    const [minX, minY, maxX, maxY] = geojson.bbox;
+    const sw = toLngLat([minX, minY]);
+    const ne = toLngLat([maxX, maxY]);
+    map.fitBounds(new LngLatBounds(sw, ne), { padding: 40, animate: false });
+    initialFitDoneRef.current = true;
+  }, [geojson, mapReady]);
+
+  // Limits panning to a generous area around the seeded world, rather than
+  // being fully unbounded (which would strand users in empty space with no
+  // way back) - see design decision #6 in the map-viewport plan.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady || !worldBounds) return;
+    const [minX, minY, maxX, maxY] = worldBounds;
+    map.setMaxBounds(new LngLatBounds(toLngLat([minX, minY]), toLngLat([maxX, maxY])));
+  }, [worldBounds, mapReady]);
 
   const buildingFootprints = useMemo(
     () => buildingFootprintRings(features),
     [features]
   );
 
-  const positionedCharacters = useMemo(
-    () =>
-      scatterCharacters(
-        features.filter((f) => f.properties?.feature_type === "character"),
-        buildingFootprints
-      ),
-    [features, buildingFootprints]
+  const characterFeatures = useMemo(
+    () => features.filter((f) => f.properties?.feature_type === "character"),
+    [features]
   );
 
-  // Browser page zoom fires a burst of resize events while the SVG's
-  // rendered size is being recalculated; some browsers momentarily
-  // mis-paint elements mid-resize, which - combined with the wander
-  // transition below - reads as characters vanishing and then sliding in
-  // from outside the boundary. Suppressing the transition for the
-  // duration of any resize (zoom included) avoids that, without affecting
-  // the normal slow-drift animation between polls.
-  const [suppressTransition, setSuppressTransition] = useState(false);
+  // Characters with an active journey (a non-empty `path` from the backend,
+  // see CharacterPointFeatureSerializer) are animated by the walker loop
+  // below instead of the idle scatter-inside-building placement, which only
+  // makes sense for characters standing still.
+  const walkingFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
+    [characterFeatures]
+  );
+  const idleFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
+    [characterFeatures]
+  );
 
+  const positionedCharacters = useMemo(
+    () => scatterCharacters(idleFeatures, buildingFootprints),
+    [idleFeatures, buildingFootprints]
+  );
+
+  // Per-character walker state (current interpolated position, remaining
+  // path, speed), keyed by character id. Lives in a ref rather than state -
+  // it's updated up to 60x/sec by the animation loop below, and driving that
+  // through setState would re-render the map every frame.
+  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
+  // Live marker instances, keyed by character id - reused across renders so
+  // idle wandering keeps its CSS transition and walking motion isn't
+  // recreated (and thus reset) every poll.
+  const markersRef = useRef<
+    Map<string, { marker: Marker; root: Root; element: HTMLDivElement }>
+  >(new Map());
+
+  // Resets each walking character's checkpoint to the latest poll whenever
+  // the underlying geojson changes: the authoritative position, its
+  // remaining path, its speed, and the moment this checkpoint was taken.
+  // Unconditional - there's no drift to weigh here, since the animation loop
+  // below never accumulates state across polls; it only ever measures time
+  // elapsed since this checkpoint.
   useEffect(() => {
-    let timeoutId: ReturnType<typeof setTimeout>;
+    const activeIds = new Set<string>();
+    const receivedAt = performance.now();
 
-    const handleResize = () => {
-      setSuppressTransition(true);
-      clearTimeout(timeoutId);
-      timeoutId = setTimeout(() => setSuppressTransition(false), 200);
+    for (const feature of walkingFeatures) {
+      const id = String(feature.properties?.id);
+      activeIds.add(id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const path = feature.properties?.path ?? [];
+      const speed = Number(feature.properties?.effective_speed) || 0;
+
+      walkersRef.current.set(id, { checkpointPos: [x, y], path, speed, receivedAt });
+    }
+
+    // Characters no longer walking (arrived, or gone from the map) fall back
+    // to idle placement next render - drop their stale walker state so a
+    // later journey starts clean instead of resuming from wherever this one
+    // left off.
+    for (const id of walkersRef.current.keys()) {
+      if (!activeIds.has(id)) walkersRef.current.delete(id);
+    }
+  }, [walkingFeatures]);
+
+  // Creates/updates/removes one Marker per character feature. Idle
+  // characters get their scattered position set directly (the .noTransition
+  // class is toggled off so CSS handles the drift-between-polls glide, same
+  // MAP_POLL_INTERVAL_MS timing as before). Walking characters are
+  // positioned every frame by the rAF loop below instead, via the same
+  // marker instance, with transitions suppressed so per-frame updates don't
+  // fight a CSS glide.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+
+    const seenIds = new Set<string>();
+
+    const upsertMarker = (
+      id: string,
+      feature: GeoJSONFeature,
+      lngLat: [number, number],
+      isWalking: boolean
+    ) => {
+      seenIds.add(id);
+      let entry = markersRef.current.get(id);
+      if (!entry) {
+        const element = document.createElement("div");
+        const marker = new Marker({ element, anchor: "center" }).setLngLat(lngLat).addTo(map);
+        const root = createRoot(element);
+        entry = { marker, root, element };
+        markersRef.current.set(id, entry);
+      } else {
+        entry.marker.setLngLat(lngLat);
+      }
+
+      // Marker's own constructor adds classes to this element (notably
+      // "maplibregl-marker", which supplies the `position: absolute` that
+      // makes its lngLat-driven transform positioning work at all) -
+      // overwriting `className` wholesale would silently strip those and
+      // leave the element in normal document flow instead of anchored to
+      // the map, so toggle just our own class instead.
+      entry.element.classList.add(styles.characterMarker);
+      entry.element.classList.toggle(styles.noTransition, isWalking);
+
+      const colour = colourForCharacter(feature.properties?.id);
+      // Each marker's element is its own React root (see upsertMarker below)
+      // - a separate tree from the one wrapped in the outer <TooltipProvider>
+      // in this component's own render, so Radix's context doesn't cross
+      // that boundary even though the DOM nodes end up nested. Each marker
+      // root needs its own provider instance.
+      entry.root.render(
+        <TooltipProvider>
+          <Tooltip
+            content={
+              <CharacterTooltipContent
+                name={feature.properties?.name as string | undefined}
+                home={feature.properties?.home as string | null | undefined}
+                work={feature.properties?.work as string | null | undefined}
+                hungerLabel={feature.properties?.hunger_label as string | null | undefined}
+              />
+            }
+            disabled={!feature.properties?.name}
+          >
+            <svg
+              width="20"
+              height="20"
+              viewBox="-4 -6 8 10"
+              tabIndex={0}
+              role="img"
+              aria-label={(feature.properties?.name as string | undefined) || "Character"}
+            >
+              <ellipse cx={0} cy={2.2} rx={2.2} ry={1.4} fill="rgba(0,0,0,0.15)" />
+              <rect x={-1.8} y={-1.8} width={3.6} height={4} rx={1.2} fill={colour} stroke="#000" strokeWidth={0.5} />
+              <circle cx={0} cy={-3.2} r={1.8} fill={colour} stroke="#000" strokeWidth={0.5} />
+            </svg>
+          </Tooltip>
+        </TooltipProvider>
+      );
     };
 
-    window.addEventListener("resize", handleResize);
+    for (const { feature, cx, cy } of positionedCharacters) {
+      const id = String(feature.properties?.id);
+      upsertMarker(id, feature, toLngLat([cx, cy]), false);
+    }
+    for (const feature of walkingFeatures) {
+      const id = String(feature.properties?.id);
+      const [x, y] = feature.geometry.coordinates as [number, number];
+      const pos = walkersRef.current.get(id)?.checkpointPos ?? [x, y];
+      upsertMarker(id, feature, toLngLat(pos), true);
+    }
+
+    for (const [id, entry] of markersRef.current) {
+      if (!seenIds.has(id)) {
+        entry.marker.remove();
+        entry.root.unmount();
+        markersRef.current.delete(id);
+      }
+    }
+  }, [positionedCharacters, walkingFeatures, mapReady]);
+
+  // Drives smooth per-frame movement for walking characters between polls.
+  // Each frame recomputes position from scratch - the checkpoint plus how
+  // much time has passed since it was taken - rather than stepping forward
+  // from wherever the previous frame left off, so nothing compounds across
+  // frames or across polls (see the WalkerState comment above).
+  useEffect(() => {
+    let frameId: number;
+
+    const step = () => {
+      const now = performance.now();
+      walkersRef.current.forEach((walker, id) => {
+        const elapsedSeconds = (now - walker.receivedAt) / 1000;
+        const pos = positionAlongPath(
+          walker.checkpointPos,
+          walker.path,
+          walker.speed * elapsedSeconds
+        );
+        markersRef.current.get(id)?.marker.setLngLat(toLngLat(pos));
+      });
+      frameId = requestAnimationFrame(step);
+    };
+
+    frameId = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frameId);
+  }, []);
+
+  // Unmount cleanup for any remaining markers/tooltip root when the whole
+  // component goes away (not just the map instance effect above, which
+  // already tears down the map itself).
+  useEffect(() => {
+    const markers = markersRef.current;
     return () => {
-      window.removeEventListener("resize", handleResize);
-      clearTimeout(timeoutId);
+      for (const entry of markers.values()) {
+        entry.marker.remove();
+        entry.root.unmount();
+      }
+      markers.clear();
+      tooltipRootRef.current?.unmount();
+      tooltipRootRef.current = null;
     };
   }, []);
 
   return (
     <TooltipProvider>
-    <div className={styles.mapWrapper}>
-      <svg
-        ref={svgRef}
-        className={isDragging ? `${styles.mapSvg} ${styles.dragging}` : styles.mapSvg}
-        viewBox={viewBox}
-        preserveAspectRatio="xMidYMid meet"
-        onPointerDown={handlePointerDown}
-        onPointerMove={handlePointerMove}
-        onPointerUp={endDrag}
-        onPointerCancel={endDrag}
-      >
-      {/* Polygons */}
-      {features
-        .filter((f) => f.geometry.type === "Polygon")
-        .map((f, i) => {
-          const coords = (f.geometry.coordinates as number[][][])[0];
-          if (!coords?.length) return null;
-
-        const points = coords
-          .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
-          .map(([x, y]) => `${x},${y}`)
-          .join(" ");
-
-        const isBoundary = f.properties?.feature_type === "boundary";
-        const isCropSubzone =
-          f.properties?.feature_type === "subzone" && f.properties?.usage === "crops";
-        const tooltipContent = polygonTooltipContent(f.properties);
-
-        return (
-          <Tooltip key={i} content={tooltipContent} disabled={!tooltipContent}>
-            <polygon
-              tabIndex={0}
-              className={styles.focusableShape}
-              points={points}
-              fill={
-                isBoundary
-                  ? "none"
-                  : isCropSubzone
-                  ? fieldFillFor(
-                      f.properties?.crop_stage as string | null | undefined,
-                      f.properties?.crop_progress as number | null | undefined
-                    )
-                  : "#ddd"
-              }
-              stroke={isBoundary ? "#888" : "#333"}
-              strokeWidth={isBoundary ? 2 : 1}
-              vectorEffect="non-scaling-stroke"
-              strokeLinejoin="round"
-              strokeLinecap="round"
-            />
-          </Tooltip>
-        );
-      })}
-
-      {/* Lines */}
-        {features
-          .filter((f) => f.geometry.type === "LineString")
-          .map((f, i) => {
-            const coords = f.geometry.coordinates as number[][];
-            if (!coords?.length) return null;
-
-            const points = coords
-              .filter(([x, y]) => Number.isFinite(x) && Number.isFinite(y))
-              .map(([x, y]) => `${x},${y}`)
-              .join(" ");
-
-            const isPath = f.properties?.feature_type === "path";
-
-            return (
-              <Tooltip key={`line-${i}`} content={f.properties?.name} disabled={!f.properties?.name}>
-                <polyline
-                  // Paths (roads) are rendered invisible (opacity 0, no
-                  // tooltip content) but were still hit-testable, sitting on
-                  // top of buildings/subzones wherever a road runs near them
-                  // - a mouse jittering by a couple of pixels would flip the
-                  // topmost hit target between the road and the shape
-                  // beneath it, flickering that shape's tooltip open/closed.
-                  // Since an invisible line has nothing worth hovering,
-                  // taking it out of hit-testing entirely fixes that.
-                  tabIndex={isPath ? undefined : 0}
-                  className={isPath ? undefined : styles.focusableShape}
-                  style={isPath ? { pointerEvents: "none" } : undefined}
-                  points={points}
-                  fill="none"
-                  stroke={isPath ? "#8b5a2b" : "#666"}
-                  strokeWidth={isPath ? 2.5 : 1.5}
-                  vectorEffect="non-scaling-stroke"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeDasharray={isPath ? "4 3" : undefined}
-                  opacity={isPath ? 0 : 1}
-                />
-              </Tooltip>
-            );
-          })}
-
-      {/* Characters */}
-      {positionedCharacters.map(({ feature: f, cx, cy }) => {
-          const colour = colourForCharacter(f.properties?.id);
-          return (
-            <Tooltip
-              key={`char-${f.properties?.id}`}
-              content={
-                <CharacterTooltipContent
-                  name={f.properties?.name as string | undefined}
-                  home={f.properties?.home as string | null | undefined}
-                  work={f.properties?.work as string | null | undefined}
-                  hungerLabel={f.properties?.hunger_label as string | null | undefined}
-                />
-              }
-              disabled={!f.properties?.name}
-            >
-              <g
-                tabIndex={0}
-                className={
-                  suppressTransition
-                    ? `${styles.characterMarker} ${styles.noTransition}`
-                    : styles.characterMarker
-                }
-                transform={`translate(${cx}, ${cy})`}
-              >
-                {/* Placeholder person glyph: head + body, coloured per character.
-                    Sized relative to a village ~100-200 GIS units wide, not
-                    an arbitrary pixel canvas, so it stays a sensible size
-                    (easy to spot and hover) regardless of village scale. */}
-                <ellipse cx={0} cy={2.2} rx={2.2} ry={1.4} fill="rgba(0,0,0,0.15)" />
-                <rect x={-1.8} y={-1.8} width={3.6} height={4} rx={1.2} fill={colour} stroke="#000" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-                <circle cx={0} cy={-3.2} r={1.8} fill={colour} stroke="#000" strokeWidth={0.5} vectorEffect="non-scaling-stroke" />
-              </g>
-            </Tooltip>
-          );
-        })}
-      </svg>
-      <div className={styles.zoomControls}>
-        <button
-          type="button"
-          aria-label="Zoom in"
-          onClick={() => handleZoomButton(ZOOM_BUTTON_FACTOR)}
-        >
-          +
-        </button>
-        <button
-          type="button"
-          aria-label="Zoom out"
-          onClick={() => handleZoomButton(1 / ZOOM_BUTTON_FACTOR)}
-        >
-          −
-        </button>
-        <button type="button" aria-label="Reset view" onClick={handleResetView}>
-          reset
-        </button>
+      <div className={styles.mapWrapper}>
+        <div ref={containerRef} className={styles.mapContainer} />
+        {tooltip && (
+          <div ref={tooltipHostRef} className={styles.tooltipHost} />
+        )}
       </div>
-    </div>
     </TooltipProvider>
   );
 }
