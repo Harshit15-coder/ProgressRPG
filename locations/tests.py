@@ -1,8 +1,10 @@
 import random
+import time
 from datetime import datetime
 
 from django.contrib.auth import get_user_model
 from django.contrib.gis.geos import Point, Polygon
+from django.core.cache import cache
 from django.core.management import call_command
 from django.db import connection
 from django.test import TestCase
@@ -215,6 +217,43 @@ class LocationsModelsTestCase(TestCase):
 
         journey = Journey.objects.filter(character=char).first()
         self.assertEqual(journey.status, "complete")
+
+    def test_move_characters_tick_uses_real_elapsed_time_when_not_given(self):
+        """Regression test for issue #624: a tick left to infer its own
+        time_delta must move characters by how much real time actually
+        passed since the previous tick, not a hardcoded assumption -
+        otherwise the server's simulated position drifts away from what the
+        frontend (which extrapolates using the real clock) expects, causing
+        a visible correction every poll."""
+        from locations.tasks import _LAST_TICK_CACHE_KEY
+
+        char = Character.objects.create(
+            first_name="Drifter",
+            location=Point(0, 0, srid=3857),
+            current_node=self.node_a,
+            movement_speed=1.0,
+        )
+        char.set_destination(node=self.node_c)  # far enough not to arrive early
+
+        # Cache is a real (Redis) backend shared across tests, not reset per
+        # test - clear it first so this test doesn't inherit a near-"now"
+        # timestamp left behind by another test's tick.
+        cache.delete(_LAST_TICK_CACHE_KEY)
+        self.addCleanup(cache.delete, _LAST_TICK_CACHE_KEY)
+        with patch("locations.tasks.move_characters_tick.apply_async"):
+            # First tick with no prior recorded run: falls back to the
+            # nominal 1s cadence, moving the character 1 unit (speed 1.0).
+            move_characters_tick()
+            char.refresh_from_db()
+            self.assertAlmostEqual(char.location.x, 1.0, places=6)
+
+            # Second tick, 3 real seconds later (simulating a delayed
+            # worker/broker): should move the character by 3 units, not 1.
+            first_tick_at = cache.get(_LAST_TICK_CACHE_KEY)
+            with patch("locations.tasks.time.time", return_value=first_tick_at + 3.0):
+                move_characters_tick()
+            char.refresh_from_db()
+            self.assertAlmostEqual(char.location.x, 4.0, places=6)
 
 
 class CharacterPointFeatureSerializerJourneyTest(TestCase):
