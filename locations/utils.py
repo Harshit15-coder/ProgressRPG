@@ -1,5 +1,53 @@
 import math
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, Polygon
+
+
+class InvalidBBoxError(ValueError):
+    """Raised when a `?bbox=` query param is missing, malformed, or too large."""
+
+
+# Villages are seeded 1000-2000 units (metres, srid 3857) apart from each
+# other (see min_centre_distance/max_centre_distance in spawn_villages.py).
+# 10km per side comfortably covers many villages in one viewport while still
+# rejecting a request for "the entire world" in one query, since every
+# feature in the bbox gets fully serialized (no vector-tile-style paging).
+MAX_BBOX_AREA_SQ_M = 10_000 * 10_000
+
+# Padding added around the world's outermost population-centre geometry when
+# computing the map's pan bounds (MapWorldBoundsView) - keeps a village from
+# sitting flush against the edge of where the camera can pan, rather than
+# clamping panning exactly at its boundary/location extent.
+WORLD_BOUNDS_PADDING_M = 500
+
+
+def parse_bbox_param(raw_bbox: str | None) -> Polygon:
+    """
+    Parse a `?bbox=minx,miny,maxx,maxy` query param (same units as stored
+    geometry, i.e. srid 3857 metres) into a GEOS Polygon usable for spatial
+    lookups. Raises InvalidBBoxError on anything missing/malformed/oversized.
+    """
+    if not raw_bbox:
+        raise InvalidBBoxError("bbox query parameter is required")
+
+    parts = raw_bbox.split(",")
+    if len(parts) != 4:
+        raise InvalidBBoxError("bbox must have exactly 4 comma-separated values")
+
+    try:
+        minx, miny, maxx, maxy = (float(p) for p in parts)
+    except ValueError:
+        raise InvalidBBoxError("bbox values must be numbers")
+
+    if minx >= maxx or miny >= maxy:
+        raise InvalidBBoxError("bbox min values must be less than max values")
+
+    area = (maxx - minx) * (maxy - miny)
+    if area > MAX_BBOX_AREA_SQ_M:
+        raise InvalidBBoxError("bbox area exceeds the maximum allowed - zoom in")
+
+    bbox = Polygon.from_bbox((minx, miny, maxx, maxy))
+    bbox.srid = 3857
+    return bbox
 
 
 def compass_direction(angle_deg):

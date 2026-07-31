@@ -13,6 +13,15 @@ export default defineConfig(() => {
   return {
     plugins: [react()],
     base: '/',
+    // maplibre-gl loads its own worker via a dynamically-constructed URL;
+    // Vite's dependency pre-bundler rewrites that URL to a path
+    // (maplibre-gl-worker.mjs) it never actually emits, breaking the map at
+    // runtime ("The file does not exist ... in the optimize deps
+    // directory"). Excluding it from pre-bundling avoids the rewrite - this
+    // is MapLibre's own documented workaround for Vite.
+    optimizeDeps: {
+      exclude: ['maplibre-gl'],
+    },
     server: {
       open: true,
       host: true,
