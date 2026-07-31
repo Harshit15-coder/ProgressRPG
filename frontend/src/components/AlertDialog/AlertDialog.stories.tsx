@@ -12,6 +12,14 @@ const meta: Meta<typeof AlertDialog> = {
   title: 'Shared/AlertDialog',
   component: AlertDialog,
   tags: ['autodocs'],
+  // AlertDialog renders via a Radix Portal into document.body. With inline
+  // docs rendering that portal escapes the story canvas and covers the whole
+  // docs page, so render each story in its own iframe instead.
+  parameters: {
+    docs: {
+      story: { inline: false, iframeHeight: 260 },
+    },
+  },
   args: {
     open: true,
     title: 'Delete this activity?',
