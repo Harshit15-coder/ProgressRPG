@@ -36,7 +36,7 @@ from progression.views import (
 from server_management.views import maintenance_status
 from users.views import PlayerViewSet
 
-from locations.views import PopulationCentreMapView, MapViewportView
+from locations.views import PopulationCentreMapView, MapViewportView, MapWorldBoundsView
 
 
 class KeyConverter:
@@ -118,5 +118,10 @@ urlpatterns = [
         "map/viewport/",
         MapViewportView.as_view(),
         name="map-viewport",
+    ),
+    path(
+        "map/world-bounds/",
+        MapWorldBoundsView.as_view(),
+        name="map-world-bounds",
     ),
 ]

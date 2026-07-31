@@ -13,6 +13,12 @@ class InvalidBBoxError(ValueError):
 # feature in the bbox gets fully serialized (no vector-tile-style paging).
 MAX_BBOX_AREA_SQ_M = 10_000 * 10_000
 
+# Padding added around the world's outermost population-centre geometry when
+# computing the map's pan bounds (MapWorldBoundsView) - keeps a village from
+# sitting flush against the edge of where the camera can pan, rather than
+# clamping panning exactly at its boundary/location extent.
+WORLD_BOUNDS_PADDING_M = 500
+
 
 def parse_bbox_param(raw_bbox: str | None) -> Polygon:
     """

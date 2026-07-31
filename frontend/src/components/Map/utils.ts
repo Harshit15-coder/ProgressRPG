@@ -1,52 +1,5 @@
 
 /**
- * Build an SVG viewBox string directly from a GeoJSON bbox, with a little
- * breathing room around the edges. Plotting features at their raw
- * coordinates inside this viewBox (rather than pre-scaling to a fixed pixel
- * canvas) lets the browser's native viewBox scaling handle resizing/zoom
- * correctly, and keeps the map filling its container instead of floating
- * small inside a much bigger, mismatched canvas.
- */
-export interface ViewBoxRect {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-}
-
-/**
- * Same padded box as computeViewBox, as a rect rather than a string - used
- * as the base/fully-zoomed-out extent for pan/zoom clamping.
- */
-export function computeBaseRect(
-  bbox: [number, number, number, number],
-  paddingRatio = 0.08
-): ViewBoxRect {
-  const [minX, minY, maxX, maxY] = bbox;
-
-  const geomWidth = maxX - minX || 1;
-  const geomHeight = maxY - minY || 1;
-
-  const padX = geomWidth * paddingRatio;
-  const padY = geomHeight * paddingRatio;
-
-  return {
-    x: minX - padX,
-    y: minY - padY,
-    w: geomWidth + padX * 2,
-    h: geomHeight + padY * 2,
-  };
-}
-
-export function computeViewBox(
-  bbox: [number, number, number, number],
-  paddingRatio = 0.08
-): string {
-  const { x, y, w, h } = computeBaseRect(bbox, paddingRatio);
-  return `${x} ${y} ${w} ${h}`;
-}
-
-/**
  * MapLibre's rendering pipeline is Mercator-projection-based: it expects
  * source coordinates as [lng, lat] and internally clamps/wraps latitude to
  * roughly +-85 degrees (the standard Web Mercator-valid range - much
@@ -96,6 +49,20 @@ export function coordsToLngLat(coords: CoordTree): CoordTree {
 /** Converts a whole GeoJSON `coordinates` tree from synthetic lng/lat back to 3857 metres. */
 export function coordsFromLngLat(coords: CoordTree): CoordTree {
   return mapCoordTree(coords, fromLngLat);
+}
+
+// Rounds a camera-derived bbox (raw 3857 metres) to the nearest `step` so
+// that sub-pixel camera jitter during a drag/zoom doesn't mint a new
+// TanStack Query key - and therefore a new network request - on every
+// frame. 50m is small next to a village's extent (a building footprint is
+// tens of metres wide) but coarse enough that a settled camera reuses the
+// same key.
+export function quantizeBbox(
+  [minx, miny, maxx, maxy]: [number, number, number, number],
+  step = 50
+): string {
+  const q = (v: number) => Math.round(v / step) * step;
+  return `${q(minx)},${q(miny)},${q(maxx)},${q(maxy)}`;
 }
 
 // Bare soil - a crop subzone with no field planted yet, or fallow.

@@ -1,3 +1,4 @@
+from django.contrib.gis.db.models import Extent
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
 from rest_framework import viewsets
@@ -15,7 +16,7 @@ from locations.models import (
     Path,
     Journey,
 )
-from locations.utils import InvalidBBoxError, parse_bbox_param
+from locations.utils import InvalidBBoxError, WORLD_BOUNDS_PADDING_M, parse_bbox_param
 
 from .serializers import (
     InteriorSpaceSerializer,
@@ -183,6 +184,36 @@ class MapViewportView(APIView):
                 features, bbox=list(bbox.extent), meta=meta
             ).data
         )
+
+
+class MapWorldBoundsView(APIView):
+    """
+    Returns a padded bounding box covering every PopulationCentre's location
+    and (where present) boundary polygon - used by the frontend to derive
+    MapLibre's `maxBounds`, so panning is limited to a generous area around
+    the seeded world rather than being either unbounded or clamped to a
+    single village.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request):
+        location_extent = PopulationCentre.objects.aggregate(Extent("location"))[
+            "location__extent"
+        ]
+        boundary_extent = PopulationCentre.objects.filter(
+            boundary__isnull=False
+        ).aggregate(Extent("boundary"))["boundary__extent"]
+
+        extents = [e for e in (location_extent, boundary_extent) if e]
+        if not extents:
+            return Response({"bbox": None})
+
+        min_x = min(e[0] for e in extents) - WORLD_BOUNDS_PADDING_M
+        min_y = min(e[1] for e in extents) - WORLD_BOUNDS_PADDING_M
+        max_x = max(e[2] for e in extents) + WORLD_BOUNDS_PADDING_M
+        max_y = max(e[3] for e in extents) + WORLD_BOUNDS_PADDING_M
+        return Response({"bbox": [min_x, min_y, max_x, max_y]})
 
 
 class JourneyViewSet(viewsets.ViewSet):
