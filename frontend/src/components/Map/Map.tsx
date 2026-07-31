@@ -6,6 +6,7 @@ import {
   Marker,
   NavigationControl,
   LngLatBounds,
+  setWorkerUrl,
   type GeoJSONSource,
   type MapGeoJSONFeature,
   type MapMouseEvent,
@@ -15,6 +16,24 @@ import Tooltip, { TooltipProvider } from "../Tooltip/Tooltip";
 import { coordsToLngLat, fieldFillFor, fromLngLat, quantizeBbox, toLngLat } from "./utils";
 import { BuildingTooltipContent, CharacterTooltipContent } from "./MapTooltips";
 import styles from "./Map.module.scss";
+
+// maplibre-gl loads its own tile-processing worker via a runtime
+// `new URL('./${name}.mjs', import.meta.url)` where `name` is a variable,
+// not a string literal - Vite/Rollup's static asset analysis only bundles
+// (and emits) worker URLs it can resolve at build time, so this pattern
+// silently produces no build output for the production build (dev mode
+// isn't affected - see the optimizeDeps.exclude comment in vite.config.ts,
+// which addresses a different, dev-only version of this same underlying
+// problem). Without this fix, the worker request 404s (silently, since the
+// static host's SPA fallback serves index.html instead of a real 404) and
+// every vector layer (fills/lines - anything that isn't a DOM-positioned
+// Marker) renders nothing, with no error surfaced anywhere (issue #624
+// investigation, 2026-07-31). vite.config.ts's viteStaticCopy plugin copies
+// the worker file and its own sibling import (maplibre-gl-shared.mjs) to a
+// fixed, unhashed path verbatim - the exact relative filename the worker's
+// own `import "./maplibre-gl-shared.mjs"` expects - and setWorkerUrl is
+// maplibre-gl's own public override for exactly this bundler scenario.
+setWorkerUrl("/maplibre-gl/maplibre-gl-worker.mjs");
 
 interface GeoJSONFeatureProperties {
   feature_type?: string;
