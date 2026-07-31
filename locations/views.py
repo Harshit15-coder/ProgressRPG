@@ -133,8 +133,8 @@ class MapViewportView(APIView):
     def get(self, request):
         try:
             bbox = parse_bbox_param(request.query_params.get("bbox"))
-        except InvalidBBoxError as exc:
-            return Response({"error": str(exc)}, status=400)
+        except InvalidBBoxError:
+            return Response({"error": "Invalid bbox parameter."}, status=400)
 
         population_centres = list(
             PopulationCentre.objects.filter(
