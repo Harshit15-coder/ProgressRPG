@@ -6,13 +6,12 @@ from rest_framework.test import APITestCase
 from progression.models import Task
 
 User = get_user_model()
+from users.tests import user_factory
 
 
 class LabelActivityViewTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="label-activity@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         self.client.force_authenticate(user=self.user)
         self.url = reverse("activitytimer-label-activity")
@@ -64,8 +63,8 @@ class LabelActivityViewTests(APITestCase):
         self.assertEqual(timer.activity.task_id, task.id)
 
     def test_rejects_task_owned_by_another_player(self):
-        other_user = User.objects.create_user(
-            email="other-player@example.com", password="testpass123"
+        other_user = user_factory(
+            with_player=True, email="otheruser@example.com", password="testpassword123"
         )
         other_task = Task.objects.create(player=other_user.player, name="Not yours")
         self.start_timer()

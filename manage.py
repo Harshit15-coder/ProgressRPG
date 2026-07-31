@@ -6,10 +6,14 @@ import sys
 
 def main():
     """Run administrative tasks."""
-    os.environ.setdefault(
-        "DJANGO_SETTINGS_MODULE",
-        os.getenv("DJANGO_SETTINGS_MODULE", "progress_rpg.settings.dev"),
-    )
+    if "test" in sys.argv:
+        os.environ["DJANGO_SETTINGS_MODULE"] = "progress_rpg.settings.test"
+
+    else:
+        os.environ.setdefault(
+            "DJANGO_SETTINGS_MODULE",
+            os.getenv("DJANGO_SETTINGS_MODULE", "progress_rpg.settings.dev"),
+        )
     try:
         from django.core.management import execute_from_command_line
     except ImportError as exc:

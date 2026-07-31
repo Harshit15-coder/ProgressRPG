@@ -21,6 +21,8 @@ from .tasks import commute_tick, move_characters_tick, wander_tick
 from character.models import Character, CharacterLocation, PlayerCharacterLink
 from economy.models import FieldCrop
 
+from users.tests import user_factory
+
 
 class LocationsModelsTestCase(TestCase):
     def setUp(self):
@@ -325,9 +327,7 @@ class PopulationCentreMapViewJourneyTest(TestCase):
             )
             self.moving_characters.append(character)
 
-        user = get_user_model().objects.create_user(
-            email="map-viewer@example.com", password="testpassword123"
-        )
+        user = user_factory()
         self.client = APIClient()
         self.client.force_authenticate(user=user)
 
@@ -383,9 +383,7 @@ class PopulationCentreVillagePointsTest(TestCase):
             for i in range(4)
         ]
 
-        user = get_user_model().objects.create_user(
-            email="linked-resident@example.com", password="testpassword123"
-        )
+        user = user_factory(with_player=True)
         PlayerCharacterLink.objects.create(
             player=user.player, character=self.residents[0], is_active=True
         )
@@ -516,9 +514,7 @@ class WanderTickTaskTest(TestCase):
             population_centre=self.centre,
             is_moving=False,
         )
-        user = get_user_model().objects.create_user(
-            email="linked-wanderer@example.com", password="testpassword123"
-        )
+        user = user_factory(with_player=True)
         PlayerCharacterLink.objects.create(
             player=user.player, character=self.linked_character, is_active=True
         )

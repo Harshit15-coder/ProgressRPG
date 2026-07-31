@@ -18,6 +18,8 @@ from users.services.login_services import (
 
 User = get_user_model()
 
+from users.tests import user_factory
+
 
 class GameSettingsSingletonTest(TestCase):
     def setUp(self):
@@ -184,7 +186,7 @@ class PremiumXpMultiplierFromSettingsTest(TestCase):
     def setUp(self):
         GameSettings.objects.all().delete()
         self.settings = GameSettings.current()
-        self.user = User.objects.create_user(email="test@example.com", password="pass")
+        self.user = user_factory(with_player=True)
 
     def test_free_player_gets_1x(self):
         with patch.object(
@@ -214,7 +216,7 @@ class GameSettingsAPITest(APITestCase):
     def setUp(self):
         GameSettings.objects.all().delete()
         GameSettings.current()
-        self.user = User.objects.create_user(email="api@example.com", password="pass")
+        self.user = user_factory()
         self.client.force_authenticate(user=self.user)
 
     def test_game_settings_endpoint_returns_all_fields(self):
