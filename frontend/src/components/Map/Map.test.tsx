@@ -152,6 +152,7 @@ vi.mock('maplibre-gl', () => ({
   Marker: FakeMarker,
   NavigationControl: FakeNavigationControl,
   LngLatBounds: FakeLngLatBounds,
+  setWorkerUrl: vi.fn(),
 }));
 
 // Imported after the mock so Map.tsx picks up the faked maplibre-gl module.
