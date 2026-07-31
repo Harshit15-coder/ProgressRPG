@@ -1,14 +1,45 @@
 import random
+import time
 
 from celery import shared_task
+from django.core.cache import cache
 from django.core.management import call_command
+
+# Nominal real-world cadence the self-rescheduling tick loop aims for.
+# Celery's `countdown` is only a lower bound on the delay before a task is
+# *eligible* to run, not a guarantee of when it actually runs - broker/worker
+# load can push the real gap between ticks past this. move_characters_tick
+# measures that real gap itself (see time_delta below) rather than assuming
+# it's always exactly this value, so simulated movement stays in step with
+# real elapsed time - which is what the frontend's between-poll walker
+# animation assumes (see issue #624: server/client disagreeing about how far
+# a character should have moved surfaced as a visible correction, in sync
+# across every moving character, roughly every poll).
+MOVE_TICK_NOMINAL_SECONDS = 1.0
+# Ceiling on how much elapsed real time a single tick will credit as
+# movement, so a long stall (worker restart, deploy, broker backlog) doesn't
+# let characters teleport once ticking resumes - they just take a few more,
+# still real-time-accurate, ticks to catch up.
+MOVE_TICK_MAX_SECONDS = 5.0
+
+_LAST_TICK_CACHE_KEY = "locations:move_characters_tick:last_run_at"
 
 
 @shared_task
-def move_characters_tick(time_delta=1.0):
+def move_characters_tick(time_delta=None):
     """Process character movement in batches. Avoid loading all movers into memory."""
     from character.models import Character
     from .models import Journey
+
+    now = time.time()
+    if time_delta is None:
+        last_run_at = cache.get(_LAST_TICK_CACHE_KEY)
+        time_delta = (
+            min(now - last_run_at, MOVE_TICK_MAX_SECONDS)
+            if last_run_at is not None
+            else MOVE_TICK_NOMINAL_SECONDS
+        )
+    cache.set(_LAST_TICK_CACHE_KEY, now, timeout=None)
 
     batch_size = 100
     movers_to_update = []
@@ -60,9 +91,11 @@ def move_characters_tick(time_delta=1.0):
             ),
         )
 
-    # Check if there are still moving characters
+    # Check if there are still moving characters. Reschedule at the nominal
+    # cadence, not `time_delta` - `time_delta` is how much time this tick
+    # measured as *having already elapsed*, not how long to wait next.
     if Character.objects.filter(is_moving=True).exists():
-        move_characters_tick.apply_async(countdown=time_delta)
+        move_characters_tick.apply_async(countdown=MOVE_TICK_NOMINAL_SECONDS)
 
 
 @shared_task
