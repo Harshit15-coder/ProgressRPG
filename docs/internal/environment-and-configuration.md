@@ -26,7 +26,7 @@ Typical variables:
 
 ## Cache / broker / async execution
 
-Project dependencies indicate Redis + Celery + Channels usage.
+Project dependencies indicate Redis + Celery + Channels usage. See [architectural-decisions.md #2](architectural-decisions.md) (sync request handling vs. Celery for background work) and [#3](architectural-decisions.md) (Channels/Redis for realtime, isolated from core domain logic) for why this split exists.
 
 Typical variables:
 
@@ -39,10 +39,8 @@ Typical variables:
 
 ## Authentication / API integrations
 
-Based on installed packages, backend deploys may require:
-
-- Email/service provider credentials (see Transactional email below)
-- Payment provider credentials (Stripe secret/public settings where applicable)
+- **Stripe**: `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY`, `STRIPE_WEBHOOK_SECRET` — used by `payments/` for checkout and webhook verification. Local webhook testing: `make stripelistener`.
+- Email/service provider credentials — see Transactional email below
 - Error/telemetry DSN (Sentry)
 - Turnstile/site verification keys if anti-bot flows are enabled
 

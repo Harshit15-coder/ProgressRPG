@@ -14,6 +14,7 @@ theme:
 nav:
   - Home: index.md
   - Backend Structure: internal/backend-structure.md
+  - Repo Structure: internal/repo-structure.md
   - Environment & Configuration: internal/environment-and-configuration.md
   - Deployment Runbook: internal/deployment-runbook.md
   - Architectural Decisions: internal/architectural-decisions.md
