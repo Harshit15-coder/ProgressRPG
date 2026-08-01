@@ -40,6 +40,9 @@ class Command(BaseCommand):
 
         for subzone in crop_subzones:
             centre = subzone.land_area.population_centre
+            # Guaranteed non-null: crop_subzones is filtered to
+            # land_area__population_centre__isnull=False above.
+            assert centre is not None
 
             if FieldCrop.objects.filter(subzone=subzone).exists():
                 self.stdout.write(

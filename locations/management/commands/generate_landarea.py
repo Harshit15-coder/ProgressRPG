@@ -73,6 +73,11 @@ class Command(BaseCommand):
         Returns True if placed, False if no valid spot was found.
         """
         centre = landarea.population_centre
+        # Guaranteed non-null: handle() skips any PopulationCentre with no
+        # boundary/location before creating a LandArea for it.
+        assert centre is not None
+        assert centre.boundary is not None
+        assert centre.location is not None
         # Convert hectares to rough meters (1 ha = 100 m x 100 m = 10,000 m^2)
         half_side = (landarea.size * 10000) ** 0.5 / 2
 

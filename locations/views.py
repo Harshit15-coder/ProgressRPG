@@ -169,7 +169,7 @@ class MapViewportView(APIView):
             )
         )
 
-        features = []
+        features: list[dict] = []
         features.extend(BoundaryFeatureSerializer(population_centres, many=True).data)
         features.extend(CharacterPointFeatureSerializer(characters, many=True).data)
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
