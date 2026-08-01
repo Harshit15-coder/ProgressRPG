@@ -304,14 +304,24 @@ class Journey(models.Model):
 
     def current_node(self):
         if self.path_nodes:
-            node_id = self.path_nodes[self.current_index]
-            return Node.objects.get(pk=node_id)
+            return self._get_node(self.path_nodes[self.current_index])
         return None
 
     def next_node(self):
         if self.path_nodes and self.current_index + 1 < len(self.path_nodes):
-            return Node.objects.get(pk=self.path_nodes[self.current_index + 1])
+            return self._get_node(self.path_nodes[self.current_index + 1])
         return None
+
+    def _get_node(self, node_id):
+        """
+        Look up a node by id, preferring a pre-fetched cache (set by callers
+        batching this across many journeys, e.g. move_characters_tick) over
+        a per-call query.
+        """
+        node_cache = getattr(self, "_node_cache", None)
+        if node_cache is not None and node_id in node_cache:
+            return node_cache[node_id]
+        return Node.objects.get(pk=node_id)
 
     def remaining_path_nodes(self, limit=None):
         """

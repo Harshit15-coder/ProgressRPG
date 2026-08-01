@@ -1,57 +1,59 @@
+import itertools
 import random
 
 from celery import shared_task
 from django.core.management import call_command
 
 
+def _chunked(iterable, size):
+    it = iter(iterable)
+    while chunk := list(itertools.islice(it, size)):
+        yield chunk
+
+
 @shared_task
 def move_characters_tick(time_delta=1.0):
     """Process character movement in batches. Avoid loading all movers into memory."""
     from character.models import Character
-    from .models import Journey
+    from .models import Journey, Node
 
     batch_size = 100
-    movers_to_update = []
-    has_more_movers = False
 
-    # Process movers in batches to avoid memory overload
-    for char in (
+    movers_qs = (
         Character.objects.filter(is_moving=True)
-        .select_related(
-            "current_node",
-            "target_node",
-        )
+        .select_related("current_node", "target_node")
         .iterator(chunk_size=batch_size)
-    ):
-        # Check if there's an active journey for this character
-        journey = Journey.objects.filter(character_id=char.id, status="active").first()
+    )
 
-        if not journey:
-            char.is_moving = False
-            char.target_node = None
-        else:
-            char._journey = journey
-            char.step_toward(time_delta)
+    for chars in _chunked(movers_qs, batch_size):
+        journeys_by_character = {
+            journey.character_id: journey
+            for journey in Journey.objects.filter(
+                character_id__in=[char.id for char in chars], status="active"
+            ).select_related("destination_node")
+        }
 
-        movers_to_update.append(char)
+        node_ids = {
+            node_id
+            for journey in journeys_by_character.values()
+            if journey.path_nodes
+            for node_id in journey.path_nodes
+        }
+        node_cache = Node.objects.in_bulk(node_ids)
 
-        # Bulk update in batches to avoid memory accumulation
-        if len(movers_to_update) >= batch_size:
-            Character.objects.bulk_update(
-                movers_to_update,
-                (
-                    "location",
-                    "current_node",
-                    "target_node",
-                    "is_moving",
-                ),
-            )
-            movers_to_update = []
+        for char in chars:
+            journey = journeys_by_character.get(char.id)
 
-    # Update any remaining movers
-    if movers_to_update:
+            if not journey:
+                char.is_moving = False
+                char.target_node = None
+            else:
+                journey._node_cache = node_cache
+                char._journey = journey
+                char.step_toward(time_delta)
+
         Character.objects.bulk_update(
-            movers_to_update,
+            chars,
             (
                 "location",
                 "current_node",
