@@ -103,15 +103,52 @@ def commute_tick():
     existing Journey/set_destination movement stack. Replaces wander_tick
     as the scheduled beat task - see locations.services.schedule.
     """
-    from character.models import Character
-    from .services.schedule import sync_character_location
+    from character.models import Character, CharacterLocation
+    from .models import Node
+    from .services.schedule import sync_character_location, target_role_for
 
-    for character in (
-        Character.objects.filter(is_moving=False, population_centre__isnull=False)
-        .select_related("current_node", "target_node")
-        .iterator(chunk_size=100)
-    ):
-        sync_character_location(character)
+    characters = list(
+        Character.objects.filter(
+            is_moving=False, population_centre__isnull=False
+        ).select_related("current_node", "target_node")
+    )
+    if not characters:
+        return
+
+    target_roles = {
+        character.id: target_role_for(character) for character in characters
+    }
+
+    target_locations = {
+        char_location.character_id: char_location
+        for char_location in CharacterLocation.objects.filter(
+            character_id__in=target_roles, is_primary=True
+        ).select_related("location")
+        if char_location.role == target_roles[char_location.character_id]
+    }
+
+    entrance_nodes_by_building = {
+        node.building_id: node
+        for node in Node.objects.filter(
+            building_id__in={
+                char_location.location_id for char_location in target_locations.values()
+            },
+            kind=Node.Kind.BUILDING_ENTRANCE,
+        )
+    }
+
+    for character in characters:
+        target_location = target_locations.get(character.id)
+        entrance_node = (
+            entrance_nodes_by_building.get(target_location.location_id)
+            if target_location is not None
+            else None
+        )
+        sync_character_location(
+            character,
+            target_location=target_location,
+            entrance_node=entrance_node,
+        )
 
 
 @shared_task
