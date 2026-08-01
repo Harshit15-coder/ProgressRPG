@@ -1,57 +1,59 @@
+import itertools
 import random
 
 from celery import shared_task
 from django.core.management import call_command
 
 
+def _chunked(iterable, size):
+    it = iter(iterable)
+    while chunk := list(itertools.islice(it, size)):
+        yield chunk
+
+
 @shared_task
 def move_characters_tick(time_delta=1.0):
     """Process character movement in batches. Avoid loading all movers into memory."""
     from character.models import Character
-    from .models import Journey
+    from .models import Journey, Node
 
     batch_size = 100
-    movers_to_update = []
-    has_more_movers = False
 
-    # Process movers in batches to avoid memory overload
-    for char in (
+    movers_qs = (
         Character.objects.filter(is_moving=True)
-        .select_related(
-            "current_node",
-            "target_node",
-        )
+        .select_related("current_node", "target_node")
         .iterator(chunk_size=batch_size)
-    ):
-        # Check if there's an active journey for this character
-        journey = Journey.objects.filter(character_id=char.id, status="active").first()
+    )
 
-        if not journey:
-            char.is_moving = False
-            char.target_node = None
-        else:
-            char._journey = journey
-            char.step_toward(time_delta)
+    for chars in _chunked(movers_qs, batch_size):
+        journeys_by_character = {
+            journey.character_id: journey
+            for journey in Journey.objects.filter(
+                character_id__in=[char.id for char in chars], status="active"
+            ).select_related("destination_node")
+        }
 
-        movers_to_update.append(char)
+        node_ids = {
+            node_id
+            for journey in journeys_by_character.values()
+            if journey.path_nodes
+            for node_id in journey.path_nodes
+        }
+        node_cache = Node.objects.in_bulk(node_ids)
 
-        # Bulk update in batches to avoid memory accumulation
-        if len(movers_to_update) >= batch_size:
-            Character.objects.bulk_update(
-                movers_to_update,
-                (
-                    "location",
-                    "current_node",
-                    "target_node",
-                    "is_moving",
-                ),
-            )
-            movers_to_update = []
+        for char in chars:
+            journey = journeys_by_character.get(char.id)
 
-    # Update any remaining movers
-    if movers_to_update:
+            if not journey:
+                char.is_moving = False
+                char.target_node = None
+            else:
+                journey._node_cache = node_cache
+                char._journey = journey
+                char.step_toward(time_delta)
+
         Character.objects.bulk_update(
-            movers_to_update,
+            chars,
             (
                 "location",
                 "current_node",
@@ -103,15 +105,52 @@ def commute_tick():
     existing Journey/set_destination movement stack. Replaces wander_tick
     as the scheduled beat task - see locations.services.schedule.
     """
-    from character.models import Character
-    from .services.schedule import sync_character_location
+    from character.models import Character, CharacterLocation
+    from .models import Node
+    from .services.schedule import sync_character_location, target_role_for
 
-    for character in (
-        Character.objects.filter(is_moving=False, population_centre__isnull=False)
-        .select_related("current_node", "target_node")
-        .iterator(chunk_size=100)
-    ):
-        sync_character_location(character)
+    characters = list(
+        Character.objects.filter(
+            is_moving=False, population_centre__isnull=False
+        ).select_related("current_node", "target_node")
+    )
+    if not characters:
+        return
+
+    target_roles = {
+        character.id: target_role_for(character) for character in characters
+    }
+
+    target_locations = {
+        char_location.character_id: char_location
+        for char_location in CharacterLocation.objects.filter(
+            character_id__in=target_roles, is_primary=True
+        ).select_related("location")
+        if char_location.role == target_roles[char_location.character_id]
+    }
+
+    entrance_nodes_by_building = {
+        node.building_id: node
+        for node in Node.objects.filter(
+            building_id__in={
+                char_location.location_id for char_location in target_locations.values()
+            },
+            kind=Node.Kind.BUILDING_ENTRANCE,
+        )
+    }
+
+    for character in characters:
+        target_location = target_locations.get(character.id)
+        entrance_node = (
+            entrance_nodes_by_building.get(target_location.location_id)
+            if target_location is not None
+            else None
+        )
+        sync_character_location(
+            character,
+            target_location=target_location,
+            entrance_node=entrance_node,
+        )
 
 
 @shared_task

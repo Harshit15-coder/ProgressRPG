@@ -24,14 +24,16 @@ def create_timer(sender, instance, created, **kwargs):
 
 @receiver(post_save, sender=Character)
 def create_behaviour(sender, instance, created, **kwargs):
-    """Ensure every Character has a behaviour instance."""
-    Behaviour.objects.get_or_create(character=instance)
+    """Ensure every new Character has a behaviour instance."""
+    if created:
+        Behaviour.objects.get_or_create(character=instance)
 
 
 @receiver(post_save, sender=Character)
 def create_needs(sender, instance, created, **kwargs):
-    """Ensure every Character has a needs instance."""
-    CharacterNeeds.objects.get_or_create(character=instance)
+    """Ensure every new Character has a needs instance."""
+    if created:
+        CharacterNeeds.objects.get_or_create(character=instance)
 
 
 @receiver(pre_delete, sender=PlayerCharacterLink)
@@ -58,7 +60,6 @@ def recompute_character_flags(character_id: int) -> None:
     Character.objects.filter(id=character_id).update(
         can_link=can_link,
     )
-    
 
 
 @receiver(pre_save, sender=PlayerCharacterLink)
