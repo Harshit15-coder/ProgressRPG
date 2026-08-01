@@ -26,7 +26,7 @@ Typical variables:
 
 ## Cache / broker / async execution
 
-Project dependencies indicate Redis + Celery + Channels usage. See [architectural-decisions.md #2](architectural-decisions.md) (sync request handling vs. Celery for background work) and [#3](architectural-decisions.md) (Channels/Redis for realtime, isolated from core domain logic) for why this split exists.
+Project dependencies indicate Redis + Celery + Channels usage. See [architectural-decisions.md #2](../architecture/architectural-decisions.md#2-backend-uses-both-synchronous-request-handling-and-asynchronous-workers) (sync request handling vs. Celery for background work) and [#3](../architecture/architectural-decisions.md#3-realtimeevent-driven-behavior-relies-on-channelsredis-stack) (Channels/Redis for realtime, isolated from core domain logic) for why this split exists.
 
 Typical variables:
 

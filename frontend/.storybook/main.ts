@@ -8,6 +8,10 @@ const config: StorybookConfig = {
     '@storybook/addon-vitest'
   ],
   framework: '@storybook/react-vite',
+  viteFinal: async (config) => {
+      config.base = '/ProgressRPG/storybook/';
+    return config;
+  }
 };
 
 export default config;
