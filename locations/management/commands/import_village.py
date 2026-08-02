@@ -38,6 +38,7 @@ class Command(BaseCommand):
             default=10000,
             help="Half-width (metres) of the square region to search for a free spot",
         )
+
     def handle(self, *args, **options):
         with open(options["file"]) as fh:
             data = json.load(fh)
