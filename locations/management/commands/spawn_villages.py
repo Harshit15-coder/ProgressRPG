@@ -1,7 +1,9 @@
+import math
 import random
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import Point, Polygon, MultiPolygon
 from locations.models import PopulationCentre, Building, InteriorSpace, Node, Path
+from locations.utils import perturb_quad_corners, rotate_point
 from math import sqrt
 
 
@@ -9,6 +11,33 @@ SPECIAL_BUILDINGS = ["granary", "inn", "mill", "bakery", "communal"]
 RESIDENTIAL_PER_VILLAGE = 5
 IRREGULARITY = 0
 BUILDING_BUFFER = 2
+
+# Two fixed neighbourhoods per village: "social" buildings (housing, inn,
+# communal) cluster on one side, "craft"/work buildings on the other, so a
+# village reads as distinct areas rather than a uniform scatter. Fixed at
+# two rather than one-per-building-type to keep the placement bias simple -
+# see .claude/plans/656-village-layout-generator-v2.md.
+BUILDING_ZONES = {
+    "residential": "social",
+    "inn": "social",
+    "communal": "social",
+    "granary": "craft",
+    "mill": "craft",
+    "bakery": "craft",
+}
+# Distance of each zone's anchor point from the village centre. Must clear
+# ZONE_BUILDING_SPREAD by a wide enough margin that the two zones' building
+# clouds don't overlap - otherwise the clustering bias is too weak to be
+# statistically detectable (see SpawnVillagesZoneGroupingTest).
+ZONE_ANCHOR_DISTANCE = 60
+# Random offset range (in each axis) for a building around its zone anchor.
+ZONE_BUILDING_SPREAD = 20
+# Wider fallback offset range (around the village centre, not a zone anchor)
+# used only if a building can't be placed near its zone anchor after
+# PLACEMENT_ATTEMPTS tries - keeps the original best-effort behaviour so a
+# crowded zone doesn't cause the whole building to be skipped.
+FALLBACK_BUILDING_SPREAD = 50
+PLACEMENT_ATTEMPTS = 100
 
 
 VILLAGE_NAMES = [
@@ -43,7 +72,7 @@ def distance(p1: Point, p2: Point):
 
 
 def create_building_footprint(
-    centre: Point, min_size=5, max_size=20, irregularity=IRREGULARITY
+    centre: Point, min_size=5, max_size=20, irregularity=IRREGULARITY, rotation=0.0
 ):
     """Return a polygon around the building location with variation."""
     if not centre:
@@ -63,13 +92,10 @@ def create_building_footprint(
         (x + hw, y - hh),
     ]
 
-    if irregularity > 0:
-        max_dx = width * irregularity
-        max_dy = height * irregularity
-        corners = [
-            (cx + random.uniform(-max_dx, max_dx), cy + random.uniform(-max_dy, max_dy))
-            for cx, cy in corners
-        ]
+    corners = perturb_quad_corners(corners, width, height, irregularity)
+
+    if rotation:
+        corners = [rotate_point(cx, cy, x, y, rotation) for cx, cy in corners]
 
     corners.append(corners[0])
 
@@ -118,6 +144,15 @@ class Command(BaseCommand):
         parser.add_argument("--num-centres", type=int, default=2)
         parser.add_argument("--grid-size", type=int, default=5000)
         parser.add_argument("--min-distance", type=int, default=3)
+        parser.add_argument(
+            "--clear-all",
+            action="store_true",
+            help=(
+                "Delete all existing PopulationCentres and start from "
+                "scratch. Default behaviour keeps each existing centre's "
+                "point and name, only regenerating its buildings/nodes/paths."
+            ),
+        )
 
     def attempt_place_centre(
         self,
@@ -141,116 +176,199 @@ class Command(BaseCommand):
 
         return new_point
 
+    def compute_zone_anchors(self, centre_point: Point) -> dict[str, Point]:
+        """
+        Pick a "social" and a "craft" anchor point on opposite sides of the
+        village centre, so buildings biased toward each anchor read as two
+        distinct neighbourhoods rather than a uniform scatter.
+        """
+        angle = random.uniform(0, 2 * math.pi)
+        social = Point(
+            centre_point.x + ZONE_ANCHOR_DISTANCE * math.cos(angle),
+            centre_point.y + ZONE_ANCHOR_DISTANCE * math.sin(angle),
+        )
+        craft = Point(
+            centre_point.x + ZONE_ANCHOR_DISTANCE * math.cos(angle + math.pi),
+            centre_point.y + ZONE_ANCHOR_DISTANCE * math.sin(angle + math.pi),
+        )
+        return {"social": social, "craft": craft}
+
     def attempt_place_building(
-        self, centre_point: Point, placed_buildings, min_distance
+        self, anchor_point: Point, placed_buildings, min_distance, spread
     ):
-        offset_x = random.randint(-50, 50)
-        offset_y = random.randint(-50, 50)
-        candidate = Point(centre_point.x + offset_x, centre_point.y + offset_y)
+        offset_x = random.randint(-spread, spread)
+        offset_y = random.randint(-spread, spread)
+        candidate = Point(anchor_point.x + offset_x, anchor_point.y + offset_y)
 
         if all(distance(candidate, bp) >= min_distance for bp in placed_buildings):
             return candidate
 
         return None
 
-    def handle(self, *args, **options):
-        PopulationCentre.objects.all().delete()
-        Building.objects.all().delete()
-        InteriorSpace.objects.all().delete()
-        Node.objects.all().delete()
-        Path.objects.all().delete()
-        self.stdout.write("Deleted all existing game world locations")
+    def place_building_footprint(
+        self,
+        anchor_point: Point,
+        spread: int,
+        placed_building_points,
+        placed_footprints,
+        min_distance,
+    ):
+        """
+        Try up to PLACEMENT_ATTEMPTS times to find a non-overlapping spot for
+        a building near anchor_point. Returns (point, footprint) or
+        (None, None) if no spot was found.
+        """
+        for _ in range(PLACEMENT_ATTEMPTS):
+            building_point = self.attempt_place_building(
+                anchor_point, placed_building_points, min_distance, spread
+            )
+            if building_point is None:
+                continue
 
+            footprint = create_building_footprint(
+                building_point,
+                min_size=10,
+                max_size=25,
+                irregularity=0,
+                rotation=random.uniform(0, 360),
+            )
+            buffered_footprint = footprint.buffer(BUILDING_BUFFER)
+            if all(
+                not buffered_footprint.intersects(existing_fp.buffer(BUILDING_BUFFER))
+                for existing_fp in placed_footprints
+            ):
+                return building_point, footprint
+
+        return None, None
+
+    def handle(self, *args, **options):
         num_centres = options["num_centres"]
         grid_size = options["grid_size"]
         min_distance = options["min_distance"]
+        clear_all = options["clear_all"]
 
-        centres_positions: list[Point] = []
+        if clear_all:
+            PopulationCentre.objects.all().delete()
+            Building.objects.all().delete()
+            InteriorSpace.objects.all().delete()
+            Node.objects.all().delete()
+            Path.objects.all().delete()
+            self.stdout.write("Deleted all existing game world locations")
+            existing_centres: list[PopulationCentre] = []
+        else:
+            # Reuse each existing centre's point/name rather than randomising
+            # a new one every run - only the centres we're about to
+            # regenerate (up to num_centres) get their contents cleared;
+            # any existing centres beyond that are left untouched entirely.
+            existing_centres = list(PopulationCentre.objects.all()[:num_centres])
+            if existing_centres:
+                Building.objects.filter(population_centre__in=existing_centres).delete()
+                # Building.delete() cascades its own Nodes/InteriorSpaces;
+                # this catches the centre-level CENTRE/OUTSIDE/POI nodes.
+                Node.objects.filter(population_centre__in=existing_centres).delete()
+                Path.objects.filter(population_centre__in=existing_centres).delete()
+                self.stdout.write(
+                    f"Keeping {len(existing_centres)} existing centre(s); "
+                    "regenerating their buildings/nodes/paths"
+                )
+
+        centres_positions: list[Point] = [c.location for c in existing_centres]
         # Place centres
         for i in range(num_centres):
-            for attempt in range(100):
-                result = self.attempt_place_centre(
-                    centres_positions,
-                    grid_size=5000,
-                    min_centre_distance=1000,
-                    max_centre_distance=2000,
-                )
-                if result:
-                    new_point = result
-                    break
+            existing_centre = existing_centres[i] if i < len(existing_centres) else None
+            if existing_centre:
+                new_point = existing_centre.location
+                centre_name = existing_centre.name
             else:
-                self.stdout.write(
-                    self.style.WARNING(
-                        f"Could not place centre {i+1} after 100 attempts"
+                for attempt in range(100):
+                    result = self.attempt_place_centre(
+                        centres_positions,
+                        grid_size=5000,
+                        min_centre_distance=1000,
+                        max_centre_distance=2000,
                     )
-                )
-                continue
-            centre_name = f"{random.choice(VILLAGE_NAMES)} village"
+                    if result:
+                        new_point = result
+                        break
+                else:
+                    self.stdout.write(
+                        self.style.WARNING(
+                            f"Could not place centre {i+1} after 100 attempts"
+                        )
+                    )
+                    continue
+                centre_name = f"{random.choice(VILLAGE_NAMES)} village"
 
             # Place buildings around this centre
             residential_buildings = [
                 f"residential-{i+1}" for i in range(RESIDENTIAL_PER_VILLAGE)
             ]
             all_buildings_to_place = SPECIAL_BUILDINGS + residential_buildings
+            zone_anchors = self.compute_zone_anchors(new_point)
 
             placed_building_points: list[Point] = []
             placed_footprints: list[Polygon] = []
             created_buildings = []
             for btype_or_name in all_buildings_to_place:
-                for attempt in range(100):
-                    building_point = self.attempt_place_building(
-                        new_point, placed_building_points, min_distance
-                    )
-
-                    if building_point is None:
-                        continue
-
-                    footprint = create_building_footprint(
-                        building_point, min_size=10, max_size=25, irregularity=0
-                    )
-                    buffered_footprint = footprint.buffer(BUILDING_BUFFER)
-                    if all(
-                        not buffered_footprint.intersects(
-                            existing_fp.buffer(BUILDING_BUFFER)
-                        )
-                        for existing_fp in placed_footprints
-                    ):
-                        if btype_or_name in SPECIAL_BUILDINGS:
-                            building_name = f"{btype_or_name.capitalize()}"
-                            building_type = btype_or_name
-                        else:
-                            building_name = f"House {btype_or_name.split('-')[1]}"
-                            building_type = "residential"
-
-                        placed_footprints.append(footprint)
-                        building = Building.objects.create(
-                            name=building_name,
-                            building_type=building_type,
-                            location=building_point,
-                            footprint=footprint,
-                            population_centre=None,
-                        )
-
-                        placed_building_points.append(building_point)
-                        created_buildings.append(building)
-                        self.stdout.write(
-                            f"  Placed {building_name} at {building_point}"
-                        )
-                        break
-
+                if btype_or_name in SPECIAL_BUILDINGS:
+                    building_name = f"{btype_or_name.capitalize()}"
+                    building_type = btype_or_name
                 else:
+                    building_name = f"House {btype_or_name.split('-')[1]}"
+                    building_type = "residential"
+
+                zone_anchor = zone_anchors[BUILDING_ZONES.get(building_type, "social")]
+
+                building_point, footprint = self.place_building_footprint(
+                    zone_anchor,
+                    ZONE_BUILDING_SPREAD,
+                    placed_building_points,
+                    placed_footprints,
+                    min_distance,
+                )
+                if building_point is None:
+                    # Zone anchor is too crowded - fall back to the original
+                    # wider search around the village centre before skipping.
+                    building_point, footprint = self.place_building_footprint(
+                        new_point,
+                        FALLBACK_BUILDING_SPREAD,
+                        placed_building_points,
+                        placed_footprints,
+                        min_distance,
+                    )
+
+                if building_point is None:
                     self.stdout.write(
                         self.style.WARNING(
-                            f"Could not place building {btype_or_name} in {centre_name} after 100 attempts"
+                            f"Could not place building {btype_or_name} in {centre_name} after "
+                            f"{PLACEMENT_ATTEMPTS} attempts"
                         )
                     )
                     continue
 
+                placed_footprints.append(footprint)
+                building = Building.objects.create(
+                    name=building_name,
+                    building_type=building_type,
+                    location=building_point,
+                    footprint=footprint,
+                    population_centre=None,
+                )
+
+                placed_building_points.append(building_point)
+                created_buildings.append(building)
+                self.stdout.write(f"  Placed {building_name} at {building_point}")
+
             boundary = create_centre_boundary(placed_footprints)
 
-            centre = PopulationCentre.objects.create(
-                name=centre_name, location=new_point, boundary=boundary
-            )
+            if existing_centre:
+                existing_centre.boundary = boundary
+                existing_centre.save(update_fields=["boundary"])
+                centre = existing_centre
+            else:
+                centre = PopulationCentre.objects.create(
+                    name=centre_name, location=new_point, boundary=boundary
+                )
 
             Node.objects.get_or_create(
                 name=f"Central node of settlement {centre.name}",
@@ -286,8 +404,10 @@ class Command(BaseCommand):
                     },
                 )
 
-            centres_positions.append(new_point)
-            self.stdout.write(f"Created PopulationCentre: {centre_name} at {new_point}")
+            if not existing_centre:
+                centres_positions.append(new_point)
+            verb = "Updated" if existing_centre else "Created"
+            self.stdout.write(f"{verb} PopulationCentre: {centre_name} at {new_point}")
 
         self.stdout.write(
             self.style.SUCCESS("Finished spawning population centres with buildings")

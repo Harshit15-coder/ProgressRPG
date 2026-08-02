@@ -11,11 +11,24 @@ from economy.constants import (
     YIELD_PER_AREA,
 )
 from locations.models import Building, LandArea, Subzone, PopulationCentre
+from locations.utils import perturb_quad_corners
 
 PLACEMENT_ATTEMPTS = 100
 LANDAREA_BUFFER = 5
 MIN_MARGIN_BEYOND_BOUNDARY = 10
 MAX_MARGIN_BEYOND_BOUNDARY = 40
+
+# Same jitter magnitude used for building footprints (spawn_villages.py's
+# create_building_footprint irregularity param) - reused as-is for v1 rather
+# than tuning a separate constant, per issue #656.
+FIELD_IRREGULARITY = 0.15
+
+# A farm's crops allocation is split into a handful of separate plots
+# (rather than one big rectangle) so a single farm can visually read as
+# multiple fields - fixed small range for current village sizes, not scaled
+# by population/area.
+CROPS_PLOTS_MIN = 2
+CROPS_PLOTS_MAX = 3
 
 DAYS_PER_YEAR = 365
 
@@ -136,14 +149,24 @@ class Command(BaseCommand):
 
     def subdivide_landarea(self, landarea: LandArea):
         """
-        Split a LandArea into Subzones proportionally.
+        Split a LandArea into Subzones proportionally. The "crops" share is
+        further split into a handful of separate plots (a farm can own
+        multiple field polygons - issue #656) instead of one single Subzone.
         """
+        num_crop_plots = random.randint(CROPS_PLOTS_MIN, CROPS_PLOTS_MAX)
+        crop_plot_fraction = CROPS_SUBZONE_FRACTION / num_crop_plots
+        for i in range(num_crop_plots):
+            Subzone.objects.create(
+                name=f"{landarea.name} - Crops {i + 1}",
+                land_area=landarea,
+                usage="crops",
+                size=landarea.size * crop_plot_fraction,
+            )
+
         breakdown = {
-            "crops": CROPS_SUBZONE_FRACTION,
             "grazing": 0.20,
             "mixed_crops": 0.20,
         }
-
         for usage, fraction in breakdown.items():
             Subzone.objects.create(
                 name=f"{landarea.name} - {usage.capitalize()}",
@@ -181,16 +204,16 @@ class Command(BaseCommand):
             fraction = subzone.size / landarea.size
             x0 = x_cursor
             x1 = x0 + total_width * fraction
-            subzone.boundary = Polygon(
-                (
-                    (x0, min_y),
-                    (x0, max_y),
-                    (x1, max_y),
-                    (x1, min_y),
-                    (x0, min_y),
-                ),
-                srid=3857,
-            )
+
+            corners = [
+                (x0, min_y),
+                (x0, max_y),
+                (x1, max_y),
+                (x1, min_y),
+            ]
+            corners = perturb_quad_corners(corners, x1 - x0, height, FIELD_IRREGULARITY)
+            corners.append(corners[0])
+            subzone.boundary = Polygon(corners, srid=3857)
             # center as location
             subzone.location = Point((x0 + x1) / 2, (min_y + max_y) / 2, srid=3857)
             subzone.save(update_fields=["boundary", "location"])
