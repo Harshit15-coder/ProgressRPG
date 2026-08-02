@@ -137,11 +137,7 @@ class Command(BaseCommand):
             irregularity=0,
         )
         shelter = Building.objects.create(
-            # Building.name is globally unique, so this must be qualified
-            # per centre - a bare "Field Shelter" would collide as soon as a
-            # second farm's shelter is created (pre-existing bug fixed
-            # alongside the multi-plot farm support in issue #656).
-            name=f"Field Shelter ({centre.name})",
+            name="Field Shelter",
             building_type="field_shelter",
             location=shelter_point,
             footprint=shelter_footprint,

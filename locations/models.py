@@ -382,7 +382,7 @@ class Building(models.Model):
         ("field_shelter", "Field Shelter"),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     building_type = models.CharField(
         max_length=50, choices=BUILDING_TYPES, default="residential"
     )
@@ -407,18 +407,6 @@ class Building(models.Model):
 
     def __str__(self):
         return f"{self.name}"
-
-    @property
-    def display_name(self):
-        """
-        Player-facing name, stripped of the "of (Village Name)" qualifier
-        that generation commands (e.g. spawn_villages) bake into `name` for
-        backend bookkeeping/uniqueness - e.g. "Bakery of (Driftmoor
-        village)" -> "Bakery", "House 3 of (Driftmoor village)" -> "House 3".
-        Falls back to the full name unchanged when it doesn't match that
-        pattern (e.g. hand-created buildings in tests/admin).
-        """
-        return self.name.split(" of (")[0]
 
     class Meta:
         indexes = [

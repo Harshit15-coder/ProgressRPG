@@ -81,7 +81,7 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def _primary_location_name(self, obj, role):
         for location in obj.locations.all():
             if location.role == role and location.is_primary:
-                return location.location.display_name
+                return location.location.name
         return None
 
     def _active_journey(self, obj):
