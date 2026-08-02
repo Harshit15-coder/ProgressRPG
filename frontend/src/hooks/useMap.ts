@@ -5,6 +5,7 @@ import {
   fetchMapViewport,
   fetchMapWorldBounds,
   fetchPopulationCentreMap,
+  fetchPopulationCentres,
 } from "../api/map";
 
 // Close to move_characters_tick's 1s cadence (locations/tasks.py) so the map
@@ -19,7 +20,8 @@ export function usePopulationCentreId() {
   return useQuery({
     queryKey: ["population-centres", "first-id"],
     queryFn: fetchFirstPopulationCentreId,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -33,7 +35,8 @@ export function useInitialMapCentre(pcId: number | null | undefined) {
     queryKey: ["map", "population-centre", "initial-centre", pcId],
     queryFn: () => fetchPopulationCentreMap(pcId as number),
     enabled: pcId != null,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -48,6 +51,8 @@ export function useMapViewport(bbox: string | null) {
     queryFn: () => fetchMapViewport(bbox as string),
     enabled: bbox != null,
     refetchInterval: MAP_POLL_INTERVAL_MS,
+    staleTime: 5 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: (previousData: unknown) => previousData,
   });
 }
@@ -60,6 +65,20 @@ export function useMapWorldBounds() {
   return useQuery({
     queryKey: ["map", "world-bounds"],
     queryFn: fetchMapWorldBounds,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+}
+
+// id/name/location for every seeded PopulationCentre - lets MapPage's "find
+// village" button cycle the camera through all of them. One-shot like
+// useMapWorldBounds: which villages exist changes far more slowly than
+// anything the map polls for.
+export function usePopulationCentres() {
+  return useQuery({
+    queryKey: ["population-centres", "all"],
+    queryFn: fetchPopulationCentres,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }

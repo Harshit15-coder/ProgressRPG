@@ -11,6 +11,7 @@ from locations.models import (
     Subzone,
     Node,
     Path,
+    Road,
     Journey,
 )
 
@@ -62,6 +63,16 @@ class PointFeatureSerializer(GeoJSONFeatureSerializer):
         }
 
 
+class PopulationCentreLabelFeatureSerializer(PointFeatureSerializer):
+    feature_type = "population_centre_label"
+
+    def get_properties(self, obj):
+        return {
+            "name": obj.name,
+            "population_centre_id": obj.id,
+        }
+
+
 # Cap on how many upcoming path nodes a moving character's map feature
 # carries per poll, rather than its full remaining route. Keeps response
 # size bounded independent of how many villages a future multi-village map
@@ -81,7 +92,7 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def _primary_location_name(self, obj, role):
         for location in obj.locations.all():
             if location.role == role and location.is_primary:
-                return location.location.display_name
+                return location.location.name
         return None
 
     def _active_journey(self, obj):
@@ -135,10 +146,45 @@ class LineStringFeatureSerializer(GeoJSONFeatureSerializer):
 class PathFeatureSerializer(LineStringFeatureSerializer):
     feature_type = "path"
 
+    def get_geometry(self, obj):
+        # Use the stored geom (which may include a waypoint inserted by
+        # generate_paths to route around a building - issue #656) rather
+        # than always drawing a straight line between the two endpoints.
+        if obj.geom is not None:
+            return {
+                "type": "LineString",
+                "coordinates": [[float(x), float(y)] for x, y in obj.geom.coords],
+            }
+        return super().get_geometry(obj)
+
     def get_properties(self, obj):
         return {
             "id": obj.id,
             "name": getattr(obj, "name", ""),
+        }
+
+
+class RoadFeatureSerializer(GeoJSONFeatureSerializer):
+    """
+    Renders a Road's own `geom` LineString directly - unlike
+    PathFeatureSerializer, which draws a straight line between two Node
+    locations, a Road's geometry is the actual (possibly multi-vertex)
+    imported polyline.
+    """
+
+    feature_type = "road"
+
+    def get_geometry(self, obj):
+        return {
+            "type": "LineString",
+            "coordinates": [[float(x), float(y)] for x, y in obj.geom.coords],
+        }
+
+    def get_properties(self, obj):
+        return {
+            "id": obj.id,
+            "name": obj.name,
+            "width": obj.width,
         }
 
 
@@ -196,7 +242,7 @@ class BoundaryFeatureSerializer(PolygonFeatureSerializer):
     polygon_attr = "boundary"
 
     def get_properties(self, obj):
-        return {"feature_type": "boundary"}
+        return {"feature_type": "boundary", "name": obj.name}
 
 
 class SubzoneFeatureSerializer(PolygonFeatureSerializer):
@@ -274,6 +320,7 @@ class PopulationCentreSerializer(serializers.ModelSerializer):
     village_points = serializers.IntegerField(read_only=True)
     progress = serializers.IntegerField(read_only=True)
     state = serializers.CharField(read_only=True)
+    location = serializers.SerializerMethodField()
 
     residents = CharacterSerializer(many=True, read_only=True)
     buildings = BuildingSerializer(many=True, read_only=True)
@@ -284,12 +331,16 @@ class PopulationCentreSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "location",
             "village_points",
             "progress",
             "state",
             "residents",
             "buildings",
         ]
+
+    def get_location(self, obj):
+        return [obj.location.x, obj.location.y]
 
 
 class LandAreaSerializer(serializers.ModelSerializer):
@@ -313,6 +364,12 @@ class NodeSerializer(serializers.ModelSerializer):
 class PathSerializer(serializers.ModelSerializer):
     class Meta:
         model = Path
+        fields = "__all__"
+
+
+class RoadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Road
         fields = "__all__"
 
 

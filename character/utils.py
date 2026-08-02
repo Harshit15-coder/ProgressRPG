@@ -129,7 +129,7 @@ def work_activities_for(character):
         .first()
     )
 
-    building_type = work_location.location.building_type if work_location else None
+    building_type = work_location.location.building_type if work_location else "default"
     return WORK_ACTIVITIES_BY_BUILDING_TYPE.get(
         building_type, WORK_ACTIVITIES_BY_BUILDING_TYPE["default"]
     )

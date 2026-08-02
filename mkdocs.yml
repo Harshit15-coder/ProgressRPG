@@ -1,5 +1,5 @@
-site_name: Progress RPG Backend Docs
-site_description: Internal documentation for the Django backend
+site_name: Progress RPG Documentation
+site_description: Documentation and guides for Progress RPG
 repo_url: https://github.com/progressrpg/ProgressRPG
 repo_name: progressrpg/ProgressRPG
 edit_uri: ""
@@ -13,12 +13,33 @@ theme:
 
 nav:
   - Home: index.md
-  - Backend Structure: internal/backend-structure.md
-  - Environment & Configuration: internal/environment-and-configuration.md
-  - Deployment Runbook: internal/deployment-runbook.md
-  - Architectural Decisions: internal/architectural-decisions.md
+
+  - Architecture:
+      - Overview: architecture/index.md
+      - Backend Structure: architecture/backend-structure.md
+      - Repository Structure: architecture/repo-structure.md
+      - Architectural Decisions: architecture/architectural-decisions.md
+
+  - Operations:
+      - Overview: operations/index.md
+      - Environment & Configuration: operations/environment-and-configuration.md
+      - Deployment Runbook: operations/deployment-runbook.md
+
+  - Development:
+      - Contributing: development/CONTRIBUTING.md
+      - Type Checking: development/TYPE_CHECKING.md
+
+  - Design Notes:
+      - Overview: design-notes/index.md
+      - Quest System Ideas: design-notes/quest-system-ideas.md
+
+  - Legal:
+      - Privacy Policy: legal/privacy-policy.md
+      - Terms of Service: legal/terms-of-service.md
+
 
 markdown_extensions:
   - admonition
+  - attr_list
   - toc:
       permalink: true

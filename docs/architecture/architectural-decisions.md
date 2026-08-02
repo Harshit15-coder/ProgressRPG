@@ -29,6 +29,11 @@ This page captures non-obvious decisions and constraints for backend maintainers
 
 ---
 
+## 6) Files are stored as raw data in the database (StoredFile), not object storage
+
+- **Decision**: File uploads live in Postgres via StoredFile/DatabaseFileStorage, not S3-equivalent object storage.
+- **Why**: Avoided setting up static object storage at implementation time. Known to need revisiting — not a permanent choice.
+
 ## How to add a new decision record
 
 When adding non-obvious architectural behavior:
