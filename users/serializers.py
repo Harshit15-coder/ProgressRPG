@@ -8,8 +8,8 @@ from .validators import clean_player_name
 
 
 class AchievementGoalSerializer(serializers.Serializer):
-    type = serializers.CharField()
-    label = serializers.CharField()
+    type = serializers.CharField()  # type: ignore[assignment]
+    label = serializers.CharField()  # type: ignore[assignment]
     symbol = serializers.CharField()
     tier = serializers.IntegerField()
     complete = serializers.BooleanField()

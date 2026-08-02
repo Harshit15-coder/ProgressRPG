@@ -41,6 +41,9 @@ class Command(BaseCommand):
         for building in buildings:
             if building.population_centre_id != (current_centre and current_centre.id):
                 current_centre = building.population_centre
+                # Guaranteed non-null: buildings are filtered to
+                # population_centre__in=centres above.
+                assert current_centre is not None
                 self.stdout.write(
                     self.style.MIGRATE_HEADING(f"\n{current_centre.name}")
                 )

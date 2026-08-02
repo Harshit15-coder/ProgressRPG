@@ -1,4 +1,4 @@
-Please read the [Code of Conduct](CODE_OF_CONDUCT.md) before you start.
+Please read the [Code of Conduct](https://github.com/progressrpg/ProgressRPG/blob/main/CODE_OF_CONDUCT.md){target=_blank} before you start.
 
 ## Bug reports
 

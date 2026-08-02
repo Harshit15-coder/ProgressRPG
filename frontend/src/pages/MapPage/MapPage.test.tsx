@@ -9,6 +9,7 @@ const mockFetchFirstPopulationCentreId = vi.fn();
 const mockFetchPopulationCentreMap = vi.fn();
 const mockFetchMapViewport = vi.fn();
 const mockFetchMapWorldBounds = vi.fn();
+const mockFetchPopulationCentres = vi.fn();
 
 vi.mock('../../api/map', () => ({
   fetchFirstPopulationCentreId: (...args: unknown[]) =>
@@ -16,6 +17,7 @@ vi.mock('../../api/map', () => ({
   fetchPopulationCentreMap: (...args: unknown[]) => mockFetchPopulationCentreMap(...args),
   fetchMapViewport: (...args: unknown[]) => mockFetchMapViewport(...args),
   fetchMapWorldBounds: (...args: unknown[]) => mockFetchMapWorldBounds(...args),
+  fetchPopulationCentres: (...args: unknown[]) => mockFetchPopulationCentres(...args),
 }));
 
 // Map.tsx owns a real MapLibre instance, which needs a WebGL context jsdom
@@ -62,9 +64,13 @@ describe('MapPage', () => {
     mockFetchPopulationCentreMap.mockReset();
     mockFetchMapViewport.mockReset();
     mockFetchMapWorldBounds.mockReset();
+    mockFetchPopulationCentres.mockReset();
     mockFetchFirstPopulationCentreId.mockResolvedValue(1);
     mockFetchMapViewport.mockResolvedValue({ meta: { population_centre_name: 'Driftmoor' } });
     mockFetchMapWorldBounds.mockResolvedValue({ bbox: [-1000, -1000, 1000, 1000] });
+    mockFetchPopulationCentres.mockResolvedValue([
+      { id: 1, name: 'Driftmoor village', location: [0, 0] },
+    ]);
   });
 
   afterEach(() => {

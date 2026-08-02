@@ -1,7 +1,7 @@
 import logging
 from datetime import datetime, time, timedelta
 
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_date
@@ -79,11 +79,12 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        start = (
-            parse_date(options["start_date"])
-            if options["start_date"]
-            else timezone.localdate()
-        )
+        if options["start_date"]:
+            start = parse_date(options["start_date"])
+            if start is None:
+                raise CommandError(f"Invalid --start-date: {options['start_date']!r}")
+        else:
+            start = timezone.localdate()
         days = options["days"]
         interval = options["interval"]
         seed_wheat = options["seed_wheat"]
@@ -395,6 +396,7 @@ class Command(BaseCommand):
         total_field_area = sum(
             crop.subzone.boundary.area
             for crop in FieldCrop.objects.select_related("subzone")
+            if crop.subzone.boundary is not None
         )
         population = CharacterLocation.objects.filter(
             role=CharacterLocation.Role.HOME, is_primary=True
