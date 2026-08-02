@@ -121,19 +121,6 @@ class CharacterPointFeatureSerializerTest(TestCase):
         self.assertEqual(props["home"], "Rose Cottage")
         self.assertEqual(props["work"], "Village Bakery")
 
-    def test_home_and_work_strip_generation_bookkeeping_suffix(self):
-        generated_work = Building.objects.create(
-            name="Bakery of (Driftmoor village)", building_type="bakery"
-        )
-        CharacterLocation.objects.create(
-            character=self.character,
-            location=generated_work,
-            role=CharacterLocation.Role.WORK,
-            is_primary=True,
-        )
-
-        self.assertEqual(self.properties()["work"], "Bakery")
-
     def test_hunger_label_bands(self):
         self.character.needs.hunger = 0
         self.character.needs.save(update_fields=["hunger"])

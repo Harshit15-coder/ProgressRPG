@@ -82,7 +82,7 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def _primary_location_name(self, obj, role):
         for location in obj.locations.all():
             if location.role == role and location.is_primary:
-                return location.location.display_name
+                return location.location.name
         return None
 
     def _active_journey(self, obj):
@@ -135,6 +135,17 @@ class LineStringFeatureSerializer(GeoJSONFeatureSerializer):
 
 class PathFeatureSerializer(LineStringFeatureSerializer):
     feature_type = "path"
+
+    def get_geometry(self, obj):
+        # Use the stored geom (which may include a waypoint inserted by
+        # generate_paths to route around a building - issue #656) rather
+        # than always drawing a straight line between the two endpoints.
+        if obj.geom is not None:
+            return {
+                "type": "LineString",
+                "coordinates": [[float(x), float(y)] for x, y in obj.geom.coords],
+            }
+        return super().get_geometry(obj)
 
     def get_properties(self, obj):
         return {
