@@ -42,6 +42,16 @@
 // use the app's shared Tooltip/Radix component on a real DOM node) this is
 // a small custom overlay instead - positioned via `transform` in Map.tsx's
 // `move` handler so it tracks the map while panning.
+// Floating slot for owner-supplied map controls (see PopulationCentreMapProps
+// children) - top-left, clear of MapLibre's own NavigationControl which sits
+// top-right.
+.controlsOverlay {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 1;
+}
+
 .tooltipHost {
   position: absolute;
   top: 0;

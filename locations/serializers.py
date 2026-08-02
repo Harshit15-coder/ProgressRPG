@@ -11,6 +11,7 @@ from locations.models import (
     Subzone,
     Node,
     Path,
+    Road,
     Journey,
 )
 
@@ -139,6 +140,30 @@ class PathFeatureSerializer(LineStringFeatureSerializer):
         return {
             "id": obj.id,
             "name": getattr(obj, "name", ""),
+        }
+
+
+class RoadFeatureSerializer(GeoJSONFeatureSerializer):
+    """
+    Renders a Road's own `geom` LineString directly - unlike
+    PathFeatureSerializer, which draws a straight line between two Node
+    locations, a Road's geometry is the actual (possibly multi-vertex)
+    imported polyline.
+    """
+
+    feature_type = "road"
+
+    def get_geometry(self, obj):
+        return {
+            "type": "LineString",
+            "coordinates": [[float(x), float(y)] for x, y in obj.geom.coords],
+        }
+
+    def get_properties(self, obj):
+        return {
+            "id": obj.id,
+            "name": obj.name,
+            "width": obj.width,
         }
 
 
@@ -274,6 +299,7 @@ class PopulationCentreSerializer(serializers.ModelSerializer):
     village_points = serializers.IntegerField(read_only=True)
     progress = serializers.IntegerField(read_only=True)
     state = serializers.CharField(read_only=True)
+    location = serializers.SerializerMethodField()
 
     residents = CharacterSerializer(many=True, read_only=True)
     buildings = BuildingSerializer(many=True, read_only=True)
@@ -284,12 +310,16 @@ class PopulationCentreSerializer(serializers.ModelSerializer):
             "id",
             "name",
             "description",
+            "location",
             "village_points",
             "progress",
             "state",
             "residents",
             "buildings",
         ]
+
+    def get_location(self, obj):
+        return [obj.location.x, obj.location.y]
 
 
 class LandAreaSerializer(serializers.ModelSerializer):
@@ -313,6 +343,12 @@ class NodeSerializer(serializers.ModelSerializer):
 class PathSerializer(serializers.ModelSerializer):
     class Meta:
         model = Path
+        fields = "__all__"
+
+
+class RoadSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Road
         fields = "__all__"
 
 

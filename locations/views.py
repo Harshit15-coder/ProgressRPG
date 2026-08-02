@@ -14,6 +14,7 @@ from locations.models import (
     LandArea,
     Subzone,
     Path,
+    Road,
     Journey,
 )
 from locations.utils import InvalidBBoxError, WORLD_BOUNDS_PADDING_M, parse_bbox_param
@@ -27,6 +28,7 @@ from .serializers import (
     JourneySerializer,
     LineStringFeatureSerializer,
     PathFeatureSerializer,
+    RoadFeatureSerializer,
     PolygonFeatureSerializer,
     PointFeatureSerializer,
     BoundaryFeatureSerializer,
@@ -67,6 +69,7 @@ class PopulationCentreMapView(APIView):
                 "to_node__location",
             )
         )
+        roads = population_centre.roads.all()
         characters = population_centre.residents.select_related(
             "needs"
         ).prefetch_related(
@@ -85,6 +88,7 @@ class PopulationCentreMapView(APIView):
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
         features.extend(SubzoneFeatureSerializer(crop_subzones, many=True).data)
         features.extend(PathFeatureSerializer(paths, many=True).data)
+        features.extend(RoadFeatureSerializer(roads, many=True).data)
 
         bbox = (
             list(population_centre.boundary.extent)
@@ -94,6 +98,7 @@ class PopulationCentreMapView(APIView):
         for polygon_obj, polygon_attr in [
             *((b, "footprint") for b in buildings),
             *((s, "boundary") for s in crop_subzones),
+            *((r, "geom") for r in roads),
         ]:
             geom = getattr(polygon_obj, polygon_attr)
             if geom is None:
@@ -156,6 +161,7 @@ class MapViewportView(APIView):
             .select_related("from_node", "to_node")
             .only("id", "from_node__location", "to_node__location")
         )
+        roads = Road.objects.filter(geom__bboverlaps=bbox)
         characters = (
             Character.objects.filter(location__contained=bbox)
             .select_related("needs")
@@ -175,6 +181,7 @@ class MapViewportView(APIView):
         features.extend(BuildingFeatureSerializer(buildings, many=True).data)
         features.extend(SubzoneFeatureSerializer(crop_subzones, many=True).data)
         features.extend(PathFeatureSerializer(paths, many=True).data)
+        features.extend(RoadFeatureSerializer(roads, many=True).data)
 
         meta = {
             "population_centre_count": len(population_centres),

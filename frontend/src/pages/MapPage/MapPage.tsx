@@ -1,14 +1,40 @@
 // src/pages/MapPage.tsx
-import React, { useState } from "react";
-import PopulationCentreMap from "../../components/Map/Map";
+import React, { useRef, useState } from "react";
+import Button from "../../components/Button/Button";
+import PopulationCentreMap, {
+  type PopulationCentreMapHandle,
+} from "../../components/Map/Map";
 import {
   useInitialMapCentre,
   useMapViewport,
   useMapWorldBounds,
   usePopulationCentreId,
+  usePopulationCentres,
 } from "../../hooks/useMap";
 
 import styles from "./MapPage.module.scss";
+
+// Inline rather than pulling in an icon library for one glyph. Purely
+// decorative - the button's accessible name comes from Button's ariaLabel.
+function HomeIcon(): React.ReactElement {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M3 9.5 12 3l9 6.5" />
+      <path d="M5 9.5V21h14V9.5" />
+      <path d="M9 21v-6h6v6" />
+    </svg>
+  );
+}
 
 export default function MapPage(): React.ReactElement {
   const { data: pcId } = usePopulationCentreId();
@@ -28,6 +54,23 @@ export default function MapPage(): React.ReactElement {
   // screen; until then, fall back to the one-time initial fetch.
   const geojson = viewportGeojson ?? initialCentre;
 
+  const mapRef = useRef<PopulationCentreMapHandle>(null);
+  const { data: populationCentres } = usePopulationCentres();
+  // Index of the village the "find village" button will jump to *next* -
+  // advances (and wraps) on each click, cycling through every seeded
+  // PopulationCentre one at a time rather than needing the user to know
+  // where any of them are.
+  const [cycleIndex, setCycleIndex] = useState(0);
+  const nextVillage = populationCentres?.length
+    ? populationCentres[cycleIndex % populationCentres.length]
+    : null;
+
+  const handleFindVillage = () => {
+    if (!nextVillage) return;
+    mapRef.current?.flyToPoint(nextVillage.location);
+    setCycleIndex((index) => index + 1);
+  };
+
   return (
     <div className={styles.page}>
       {/* Visually hidden but still present - the page needs a heading for
@@ -37,10 +80,23 @@ export default function MapPage(): React.ReactElement {
       <div className={styles.content}>
         {initialCentre ? (
           <PopulationCentreMap
+            ref={mapRef}
             geojson={geojson}
             onViewportChange={setBbox}
             worldBounds={worldBounds?.bbox}
-          />
+          >
+            {nextVillage && (
+              <Button
+                type="button"
+                variant="secondary"
+                className={styles.findVillageButton}
+                ariaLabel={`Find ${nextVillage.name}`}
+                onClick={handleFindVillage}
+              >
+                <HomeIcon />
+              </Button>
+            )}
+          </PopulationCentreMap>
         ) : (
           "Loading..."
         )}
