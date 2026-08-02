@@ -16,3 +16,11 @@
   width: 100%;
   align-items: center;
 }
+
+// Icon-only, sized to read as a map control rather than a page-level button
+// (Button's default padding assumes text content alongside its icon).
+.findVillageButton {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+}

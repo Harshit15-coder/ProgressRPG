@@ -5,6 +5,7 @@ import {
   fetchMapViewport,
   fetchMapWorldBounds,
   fetchPopulationCentreMap,
+  fetchPopulationCentres,
 } from "../api/map";
 
 // Close to move_characters_tick's 1s cadence (locations/tasks.py) so the map
@@ -60,6 +61,18 @@ export function useMapWorldBounds() {
   return useQuery({
     queryKey: ["map", "world-bounds"],
     queryFn: fetchMapWorldBounds,
+    staleTime: Infinity,
+  });
+}
+
+// id/name/location for every seeded PopulationCentre - lets MapPage's "find
+// village" button cycle the camera through all of them. One-shot like
+// useMapWorldBounds: which villages exist changes far more slowly than
+// anything the map polls for.
+export function usePopulationCentres() {
+  return useQuery({
+    queryKey: ["population-centres", "all"],
+    queryFn: fetchPopulationCentres,
     staleTime: Infinity,
   });
 }

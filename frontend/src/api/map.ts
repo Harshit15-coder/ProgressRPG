@@ -15,6 +15,35 @@ export async function fetchFirstPopulationCentreId(): Promise<number | null> {
   return list.length > 0 ? list[0].id : null;
 }
 
+export interface PopulationCentreSummary {
+  id: number;
+  name: string;
+  location: [number, number];
+}
+
+type PopulationCentreSummaryResponse =
+  | { results?: PopulationCentreSummary[] }
+  | PopulationCentreSummary[];
+
+// id/name/location for every seeded PopulationCentre - used to let the map
+// jump the camera to any village on demand (see MapPage's "find village"
+// button), not the heavier per-village payload PopulationCentreSerializer
+// also nests (residents/buildings), which this endpoint returns too but
+// callers here don't need.
+export async function fetchPopulationCentres(): Promise<PopulationCentreSummary[]> {
+  const data = await apiFetch<PopulationCentreSummaryResponse>("/population-centres/");
+  const list = Array.isArray(data) ? data : (data?.results ?? []);
+  // Guards against a stale/mismatched API response (e.g. an old serializer
+  // still running, or a centre with no location for some other reason)
+  // rather than handing MapPage a village it can't fly the camera to.
+  return list.filter(
+    (centre) =>
+      Array.isArray(centre.location) &&
+      centre.location.length === 2 &&
+      centre.location.every((n) => typeof n === "number" && Number.isFinite(n))
+  );
+}
+
 // GeoJSON shape varies by feature type; typed loosely until Map is typed.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function fetchPopulationCentreMap(pcId: number): Promise<any> {

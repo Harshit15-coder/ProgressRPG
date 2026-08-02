@@ -244,6 +244,36 @@ class Path(models.Model):
         return f"{self.from_node} → {self.to_node}"
 
 
+class Road(models.Model):
+    """
+    A drawable street segment, decoupled from the Node/Path pathfinding
+    graph. Path is a straight edge between exactly two Nodes and drives
+    where characters can walk; Road holds arbitrary imported polyline
+    geometry (e.g. from a procedural town generator) purely so the map has
+    something accurate to render underneath that graph - it has no bearing
+    on movement and isn't linked to Nodes at all.
+    """
+
+    population_centre = models.ForeignKey(
+        "locations.PopulationCentre",
+        null=True,
+        blank=True,
+        on_delete=models.CASCADE,
+        related_name="roads",
+    )
+    name = models.CharField(max_length=255, blank=True, default="")
+    geom = gis_models.LineStringField(srid=3857, spatial_index=True)
+    width = models.FloatField(default=6.0, help_text="Road width in metres")
+
+    class Meta:
+        indexes = [
+            models.Index(fields=["population_centre"], name="road_pc_idx"),
+        ]
+
+    def __str__(self):
+        return self.name or f"Road {self.pk}"
+
+
 class Journey(models.Model):
     character = models.ForeignKey(
         "character.Character", on_delete=models.CASCADE, related_name="journeys"
@@ -304,14 +334,24 @@ class Journey(models.Model):
 
     def current_node(self):
         if self.path_nodes:
-            node_id = self.path_nodes[self.current_index]
-            return Node.objects.get(pk=node_id)
+            return self._get_node(self.path_nodes[self.current_index])
         return None
 
     def next_node(self):
         if self.path_nodes and self.current_index + 1 < len(self.path_nodes):
-            return Node.objects.get(pk=self.path_nodes[self.current_index + 1])
+            return self._get_node(self.path_nodes[self.current_index + 1])
         return None
+
+    def _get_node(self, node_id):
+        """
+        Look up a node by id, preferring a pre-fetched cache (set by callers
+        batching this across many journeys, e.g. move_characters_tick) over
+        a per-call query.
+        """
+        node_cache = getattr(self, "_node_cache", None)
+        if node_cache is not None and node_id in node_cache:
+            return node_cache[node_id]
+        return Node.objects.get(pk=node_id)
 
     def remaining_path_nodes(self, limit=None):
         """
@@ -368,11 +408,13 @@ class Building(models.Model):
         ("inn", "Inn"),
         ("mill", "Mill"),
         ("bakery", "Bakery"),
+        ("hall", "Hall"),
+        ("market", "Market"),
         ("communal", "Communal"),
         ("field_shelter", "Field Shelter"),
     ]
 
-    name = models.CharField(max_length=255, unique=True)
+    name = models.CharField(max_length=255)
     building_type = models.CharField(
         max_length=50, choices=BUILDING_TYPES, default="residential"
     )
@@ -397,18 +439,6 @@ class Building(models.Model):
 
     def __str__(self):
         return f"{self.name}"
-
-    @property
-    def display_name(self):
-        """
-        Player-facing name, stripped of the "of (Village Name)" qualifier
-        that generation commands (e.g. spawn_villages) bake into `name` for
-        backend bookkeeping/uniqueness - e.g. "Bakery of (Driftmoor
-        village)" -> "Bakery", "House 3 of (Driftmoor village)" -> "House 3".
-        Falls back to the full name unchanged when it doesn't match that
-        pattern (e.g. hand-created buildings in tests/admin).
-        """
-        return self.name.split(" of (")[0]
 
     class Meta:
         indexes = [

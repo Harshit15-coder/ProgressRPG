@@ -3,6 +3,7 @@ from economy.models import GoodsStock
 from .models import (
     Node,
     Path,
+    Road,
     InteriorSpace,
     Building,
     PopulationCentre,
@@ -24,6 +25,13 @@ class PathAdmin(admin.ModelAdmin):
     list_display = ("from_node", "to_node", "length")
     list_filter = ("from_node", "to_node")
     autocomplete_fields = ("from_node", "to_node")
+
+
+@admin.register(Road)
+class RoadAdmin(admin.ModelAdmin):
+    list_display = ("id", "name", "width", "population_centre")
+    list_filter = ("population_centre",)
+    search_fields = ("name",)
 
 
 @admin.register(InteriorSpace)

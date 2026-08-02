@@ -1,4 +1,5 @@
 import math
+import random
 from django.contrib.gis.geos import Point, Polygon
 
 
@@ -68,6 +69,38 @@ def relative_distance_direction(pc_location: Point, obj_location: Point):
     angle_deg = math.degrees(angle_rad) % 360  # normalize 0..360
     direction = compass_direction(angle_deg)
     return distance, direction
+
+
+def rotate_point(
+    x: float, y: float, origin_x: float, origin_y: float, angle_deg: float
+):
+    """Rotate (x, y) by angle_deg degrees around (origin_x, origin_y)."""
+    angle_rad = math.radians(angle_deg)
+    dx, dy = x - origin_x, y - origin_y
+    cos_a, sin_a = math.cos(angle_rad), math.sin(angle_rad)
+    return (
+        origin_x + dx * cos_a - dy * sin_a,
+        origin_y + dx * sin_a + dy * cos_a,
+    )
+
+
+def perturb_quad_corners(
+    corners: list[tuple[float, float]], width: float, height: float, irregularity: float
+) -> list[tuple[float, float]]:
+    """
+    Randomly jitter each corner of a quadrilateral, scaled by width/height, to
+    break up a perfectly rectangular shape (building footprints, field
+    plots). No-op when irregularity is 0.
+    """
+    if irregularity <= 0:
+        return corners
+
+    max_dx = width * irregularity
+    max_dy = height * irregularity
+    return [
+        (cx + random.uniform(-max_dx, max_dx), cy + random.uniform(-max_dy, max_dy))
+        for cx, cy in corners
+    ]
 
 
 def create_hub_and_spoke(self, central_node, nodes_to_connect):

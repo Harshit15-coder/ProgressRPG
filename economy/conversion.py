@@ -42,7 +42,9 @@ def convert_goods(
     input_stock = GoodsStock.objects.filter(
         building=input_building, good_type=input_good
     ).first()
-    available_input = input_stock.quantity if input_stock else 0
+    if input_stock is None:
+        return 0
+    available_input = input_stock.quantity
 
     labor_cap = workers_present * per_worker_capacity
 

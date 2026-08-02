@@ -39,11 +39,21 @@ def target_role_for(character, now=None) -> str:
     return CharacterLocation.Role.HOME
 
 
-def sync_character_location(character) -> None:
+_UNSET = object()
+
+
+def sync_character_location(
+    character, target_location=_UNSET, entrance_node=_UNSET
+) -> None:
     """Compare a character's current/target position against their schedule
     and, if they should be elsewhere, send them there via the existing
     Journey/set_destination movement stack. No-op if already there, already
     heading there, mid-journey, or no matching CharacterLocation/path exists.
+
+    `target_location` and `entrance_node` may be passed in pre-fetched (e.g.
+    by a caller batching lookups across many characters, such as
+    commute_tick) to avoid a per-character query. Left unset, they're looked
+    up here as before.
     """
     from character.models import CharacterLocation
     from locations.models import Node
@@ -52,19 +62,22 @@ def sync_character_location(character) -> None:
         return
 
     target_role = target_role_for(character)
-    target_location = (
-        CharacterLocation.objects.filter(
-            character=character, role=target_role, is_primary=True
+
+    if target_location is _UNSET:
+        target_location = (
+            CharacterLocation.objects.filter(
+                character=character, role=target_role, is_primary=True
+            )
+            .select_related("location")
+            .first()
         )
-        .select_related("location")
-        .first()
-    )
     if target_location is None:
         return
 
-    entrance_node = Node.objects.filter(
-        building=target_location.location, kind=Node.Kind.BUILDING_ENTRANCE
-    ).first()
+    if entrance_node is _UNSET:
+        entrance_node = Node.objects.filter(
+            building=target_location.location, kind=Node.Kind.BUILDING_ENTRANCE
+        ).first()
     if entrance_node is None:
         return
 

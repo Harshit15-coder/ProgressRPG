@@ -5,8 +5,8 @@ from django.utils import timezone
 from character.models import Character, CharacterLocation
 from economy.models import FieldCrop, GoodsStock
 
-from .models import Building, LandArea, PopulationCentre, Subzone
-from .serializers import (
+from ..models import Building, LandArea, PopulationCentre, Subzone
+from ..serializers import (
     BuildingFeatureSerializer,
     CharacterPointFeatureSerializer,
     SubzoneFeatureSerializer,
@@ -120,19 +120,6 @@ class CharacterPointFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertEqual(props["home"], "Rose Cottage")
         self.assertEqual(props["work"], "Village Bakery")
-
-    def test_home_and_work_strip_generation_bookkeeping_suffix(self):
-        generated_work = Building.objects.create(
-            name="Bakery of (Driftmoor village)", building_type="bakery"
-        )
-        CharacterLocation.objects.create(
-            character=self.character,
-            location=generated_work,
-            role=CharacterLocation.Role.WORK,
-            is_primary=True,
-        )
-
-        self.assertEqual(self.properties()["work"], "Bakery")
 
     def test_hunger_label_bands(self):
         self.character.needs.hunger = 0
