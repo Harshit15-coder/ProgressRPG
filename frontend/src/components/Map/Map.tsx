@@ -1,5 +1,5 @@
 import type React from "react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   Map as MapLibreMap,
@@ -60,6 +60,13 @@ interface GeoJSON {
   bbox?: [number, number, number, number];
 }
 
+// Imperative escape hatch for one-off camera commands (as opposed to the
+// declarative geojson/worldBounds props above) - "jump to this point" is an
+// action, not state the owner should have to hold and diff.
+export interface PopulationCentreMapHandle {
+  flyToPoint: (point: [number, number]) => void;
+}
+
 interface PopulationCentreMapProps {
   geojson?: GeoJSON | null;
   // Called (debounced) whenever the camera settles on a new viewport, with a
@@ -72,6 +79,13 @@ interface PopulationCentreMapProps {
   // pan. Arrives asynchronously (a separate one-shot fetch), so it's applied
   // in its own effect below rather than at map construction time.
   worldBounds?: [number, number, number, number] | null;
+  // React 19 passes `ref` through as a plain prop - no forwardRef needed.
+  ref?: Ref<PopulationCentreMapHandle>;
+  // Rendered as a floating overlay inside the map viewport itself (top-left,
+  // clear of MapLibre's own NavigationControl at top-right) - lets the owner
+  // add map-scoped controls (e.g. MapPage's "find village" button) without
+  // this component needing to know what they are.
+  children?: React.ReactNode;
 }
 
 // Placeholder palette until real character sprites/art exist. Colour is
@@ -269,6 +283,12 @@ interface WalkerState {
   receivedAt: number;
 }
 
+interface MarkerEntry {
+  marker: Marker;
+  root: Root;
+  element: HTMLDivElement;
+}
+
 // Walks `distance` units from `start` along `path`, consuming as many
 // waypoints as it reaches rather than stopping at the first one short of the
 // full distance - the same carry-over-leftover-budget approach as the
@@ -419,6 +439,7 @@ const BOUNDARY_LINE_LAYER = "boundary-line";
 const BUILDINGS_FILL_LAYER = "buildings-fill";
 const SUBZONES_FILL_LAYER = "subzones-fill";
 const PATHS_LINE_LAYER = "paths-line";
+const ROADS_LINE_LAYER = "roads-line";
 const CLICKABLE_LAYERS = [BOUNDARY_FILL_LAYER, BUILDINGS_FILL_LAYER, SUBZONES_FILL_LAYER];
 
 // Precomputes per-feature presentation properties (fill/stroke) so map
@@ -473,6 +494,8 @@ export default function PopulationCentreMap({
   geojson,
   onViewportChange,
   worldBounds,
+  ref,
+  children,
 }: PopulationCentreMapProps) {
   const features: GeoJSONFeature[] = useMemo(
     () => geojson?.features || [],
@@ -483,6 +506,16 @@ export default function PopulationCentreMap({
   const mapRef = useRef<MapLibreMap | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const initialFitDoneRef = useRef(false);
+
+  useImperativeHandle(
+    ref,
+    () => ({
+      flyToPoint: (point) => {
+        mapRef.current?.flyTo({ center: toLngLat(point), essential: true });
+      },
+    }),
+    []
+  );
 
   const [tooltip, setTooltip] = useState<TooltipOverlayState | null>(null);
   const tooltipRootRef = useRef<Root | null>(null);
@@ -562,11 +595,27 @@ export default function PopulationCentreMap({
         type: "line",
         source: "village",
         filter: ["==", ["get", "feature_type"], "path"],
-        // Paths (roads) are rendered invisible - kept as a real layer so
-        // they're available if visible styling is wanted later, but with no
-        // interactivity registered (see CLICKABLE_LAYERS) since an invisible
-        // line has nothing worth hovering.
+        // Paths are the Node/Path pathfinding graph's edges (straight lines
+        // between two nodes, not real street geometry) - rendered invisible.
+        // Kept as a real layer so they're available if visible styling is
+        // wanted later, but with no interactivity registered (see
+        // CLICKABLE_LAYERS) since an invisible line has nothing worth
+        // hovering. Actual street art is the "road" feature_type/layer below.
         paint: { "line-color": "#8b5a2b", "line-width": 2.5, "line-opacity": 0 },
+      });
+      map.addLayer({
+        id: ROADS_LINE_LAYER,
+        type: "line",
+        source: "village",
+        filter: ["==", ["get", "feature_type"], "road"],
+        // Roads are the actual imported street polylines (see the Road
+        // model / RoadFeatureSerializer) - visible, unlike the pathfinding
+        // "path" layer above. Width comes from the source data (metres);
+        // scaled down here so it reads as a road rather than a highway.
+        paint: {
+          "line-color": "#8b5a2b",
+          "line-width": ["*", ["coalesce", ["get", "width"], 6], 0.5],
+        },
       });
 
       for (const layerId of CLICKABLE_LAYERS) {
@@ -735,9 +784,7 @@ export default function PopulationCentreMap({
   // Live marker instances, keyed by character id - reused across renders so
   // idle wandering keeps its CSS transition and walking motion isn't
   // recreated (and thus reset) every poll.
-  const markersRef = useRef<
-    Map<string, { marker: Marker; root: Root; element: HTMLDivElement }>
-  >(new Map());
+  const markersRef = useRef<Map<string, MarkerEntry>>(new Map());
 
   // Resets each walking character's checkpoint to the latest poll whenever
   // the underlying geojson changes: the authoritative position, its
@@ -855,12 +902,30 @@ export default function PopulationCentreMap({
       upsertMarker(id, feature, toLngLat(pos), true);
     }
 
+    // Stale markers' roots are unmounted via queueMicrotask rather than
+    // inline here: this same effect just called entry.root.render() above
+    // for every surviving marker, and React's createRoot schedules that
+    // render work rather than flushing it immediately - synchronously
+    // unmounting a *different* root while those renders are still pending
+    // trips React's "Attempted to synchronously unmount a root while React
+    // was already rendering" warning. Deferring by a microtask lets that
+    // render work finish first. Removed from markersRef.current immediately
+    // regardless, so a re-run of this effect before the microtask fires
+    // doesn't see (or re-schedule cleanup for) these ids.
+    const staleEntries: MarkerEntry[] = [];
     for (const [id, entry] of markersRef.current) {
       if (!seenIds.has(id)) {
-        entry.marker.remove();
-        entry.root.unmount();
+        staleEntries.push(entry);
         markersRef.current.delete(id);
       }
+    }
+    if (staleEntries.length > 0) {
+      queueMicrotask(() => {
+        for (const entry of staleEntries) {
+          entry.marker.remove();
+          entry.root.unmount();
+        }
+      });
     }
   }, [positionedCharacters, walkingFeatures, mapReady]);
 
@@ -913,6 +978,7 @@ export default function PopulationCentreMap({
         {tooltip && (
           <div ref={tooltipHostRef} className={styles.tooltipHost} />
         )}
+        {children && <div className={styles.controlsOverlay}>{children}</div>}
       </div>
     </TooltipProvider>
   );
