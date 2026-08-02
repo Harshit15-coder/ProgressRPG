@@ -1,38 +1,46 @@
-db.sqlite3
-venv
-venv-windows
-venv-linux
+# Python / environment
 __pycache__/
-.venv
 .env
-env.env
+.venv
 env
-node_modules/
+env.env
+venv
+venv-linux
+venv-windows
+
+# Build output / dependencies
 /frontend/dist/
-test-results/
-gunicorn_config.py
-backup_file.sql
-backup_file.dump
-local_backup.dump
-*.log
-logs/
+frontend/dist-ds/
+node_modules/
 staticfiles/
 static/.sass-cache/
-celerybeat-schedule
-users.json
-user_data.json
+site/
+
+# Data, backups & logs
 *.dump
+*.log
 *.sql
+celerybeat-schedule
+db.sqlite3
+local/
+logs/
+media/
+user_data.json
+users.json
+
+# Test / e2e artifacts
 playwright-report/
 playwright/.auth/
-media/
-site/
+test-results/
+
+# Misc
+*:Zone.Identifier
+gunicorn_config.py
+
 # design-sync (converter scripts + generated output — durable set in .design-sync/ IS committed)
-.ds-sync/
-ds-bundle/
 .design-sync/.cache/
-.design-sync/sb-reference/
 .design-sync/learnings/
 .design-sync/node_modules
 .design-sync/sb-reference/
-frontend/dist-ds/
+.ds-sync/
+ds-bundle/
