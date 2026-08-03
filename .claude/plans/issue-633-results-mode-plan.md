@@ -257,7 +257,19 @@ Existing tests to verify unchanged:
 - Is there an existing debounce hook/utility in the codebase to reuse for
   the ~1s live relabel, or does this introduce the first one? Needs a check
   during implementation (not surfaced by the initial exploration).
-- Does "inline option to label the activity" reuse the exact same
-  input/autocomplete component used in the Input state (`ActivityInput`),
-  or a simplified text-only field? Affects whether `TimerResultsPanel`
-  pulls in the full activity-selection UI or just a lightweight text input.
+- ~~Does "inline option to label the activity" reuse the exact same
+  input/autocomplete component used in the Input state, or a simplified
+  text-only field?~~ **Resolved:** reuse `EntitySearchInput` directly, in
+  its default (non-`alwaysOpen`) config — that's the absolutely-positioned
+  overlay dropdown (`EntitySearchInput.module.scss:35-48`, `z-index:
+  $z-index-tooltip`, box-shadow), which is exactly the "renders over other
+  content" behavior wanted here, and needs no new component. Note:
+  `UnifiedTimerHome.tsx:170-181` deliberately switched its *own* label input
+  to `alwaysOpen` (in-flow, no overlay) because the floating dropdown bled
+  outside the wrapper card and overlapped the support button below it —
+  same class of layout risk applies to `TimerResultsPanel`, which also has
+  content below the input (task summary, upgrade prompt, exit button).
+  Implementation should verify the panel's overflow/z-index stacking
+  handles the overlay cleanly before assuming it's a drop-in; if it bleeds
+  the same way, falling back to `alwaysOpen` there too is the proven
+  escape hatch.
