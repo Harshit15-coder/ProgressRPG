@@ -6,6 +6,7 @@ import Button from "../Button/Button";
 import AlertDialog from "../AlertDialog/AlertDialog";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
 import SupportFlowModal from "../SupportFlow/SupportFlowModal";
+import TimerResultsPanel from "./TimerResultsPanel";
 import { useActivityInput } from "../ActivityInput/useActivityInput";
 import { useDefaultActivityEntries } from "../../hooks/useDefaultActivityEntries";
 import styles from "./UnifiedTimerHome.module.scss";
@@ -43,6 +44,8 @@ export default function UnifiedTimerHome() {
     consumeJustCancelledLabelEdit,
     submitAndOpenSupport,
     openSupportMode,
+    resultsData,
+    exitResults,
   } = useActivityInput();
 
   const defaultResults = useDefaultActivityEntries();
@@ -93,6 +96,27 @@ export default function UnifiedTimerHome() {
     if (containerRef.current?.contains(event.relatedTarget as Node)) return;
     handleLabelBlur();
   };
+
+  if (resultsData) {
+    return (
+      <>
+        <section className={styles.wrapper}>
+          <h2 className="sr-only">Activity results</h2>
+          <TimerResultsPanel
+            key={resultsData.activityId ?? `${resultsData.activityName ?? ""}-${resultsData.elapsedSeconds ?? 0}`}
+            results={resultsData}
+            onExit={exitResults}
+          />
+        </section>
+
+        <SupportFlowModal
+          state={flowState}
+          dispatch={flowDispatch}
+          onConfirmActivity={handleConfirmActivity}
+        />
+      </>
+    );
+  }
 
   return (
     <>
