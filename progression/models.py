@@ -659,6 +659,26 @@ class Project(PlayerOwnedMixin):
         return self.name
 
 
+class Note(PlayerOwnedMixin):
+    player = models.ForeignKey(
+        "users.Player", on_delete=models.CASCADE, related_name="notes"
+    )
+    task = models.ForeignKey(
+        "progression.Task",
+        on_delete=models.SET_NULL,
+        related_name="notes",
+        null=True,
+        blank=True,
+    )
+    title = models.CharField(max_length=255, blank=True)
+    body = models.TextField(max_length=10000, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return self.title or f"Note ({self.player.name})"
+
+
 class Task(PlayerOwnedMixin):
     player = models.ForeignKey(
         "users.Player", on_delete=models.CASCADE, related_name="tasks"

@@ -4,6 +4,7 @@ import * as Tabs from "@radix-ui/react-tabs";
 import TasksPanel from "../../components/TasksPanel/TasksPanel";
 import ActivitiesPanel from "../../components/ActivitiesPanel/ActivitiesPanel";
 import SkillsPanel from "../../components/SkillsPanel/SkillsPanel";
+import NotesPanel from "../../components/NotesPanel/NotesPanel";
 import ComingSoonPanel from "../../components/ComingSoonPanel/ComingSoonPanel";
 import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import styles from "./LibraryPage.module.scss";
@@ -11,6 +12,7 @@ import styles from "./LibraryPage.module.scss";
 export default function LibraryPage(): React.ReactElement {
   const hasTasksFeature = useFeatureFlag("tasksFeature");
   const hasSkillsFeature = useFeatureFlag("skillsFeature");
+  const hasNotesFeature = useFeatureFlag("notesFeature");
 
   return (
     <div className={styles.page}>
@@ -29,6 +31,9 @@ export default function LibraryPage(): React.ReactElement {
           <Tabs.Trigger value="skills" className={styles.tab}>
             Skills
           </Tabs.Trigger>
+          <Tabs.Trigger value="notes" className={styles.tab}>
+            Notes
+          </Tabs.Trigger>
         </Tabs.List>
 
         <Tabs.Content value="activities" className={styles.tabContent}>
@@ -41,6 +46,10 @@ export default function LibraryPage(): React.ReactElement {
 
         <Tabs.Content value="skills" className={styles.tabContent}>
           {hasSkillsFeature ? <SkillsPanel /> : <ComingSoonPanel itemLabelPlural="skills" />}
+        </Tabs.Content>
+
+        <Tabs.Content value="notes" className={styles.tabContent}>
+          {hasNotesFeature ? <NotesPanel /> : <ComingSoonPanel itemLabelPlural="notes" />}
         </Tabs.Content>
       </Tabs.Root>
     </div>

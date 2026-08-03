@@ -1,6 +1,7 @@
 # progression/serializers.py
 
 from django.utils import timezone
+from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from users.models import Player
@@ -15,8 +16,8 @@ from .models import (
     CharacterQuest,
     Project,
     Task,
+    Note,
 )
-
 
 #########################################
 #####      Base serializers
@@ -240,3 +241,39 @@ class TaskSerializer(serializers.ModelSerializer):
             "last_worked_on",
         ]
         read_only_fields = ["player", "first_completed_at"]
+
+
+class NoteSerializer(serializers.ModelSerializer):
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
+
+    class Meta:
+        model = Note
+        fields = [
+            "id",
+            "title",
+            "body",
+            "player",
+            "task",
+            "created_at",
+            "last_updated",
+        ]
+        read_only_fields = ["player"]
+
+    def validate_title(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_body(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_task(self, task: Task | None) -> Task | None:
+        if task is None:
+            return None
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        if player is None or task.player_id != player.id:
+            raise serializers.ValidationError(
+                "Task must belong to the requesting player."
+            )
+        return task

@@ -9,6 +9,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   tasksFeature: ['testers'],
   categoriesFeature: [],
   skillsFeature: [],
+  notesFeature: ['testers'],
   projectsFeature: [],
   toastsFeature: [],
   announcements: ['testers'],
