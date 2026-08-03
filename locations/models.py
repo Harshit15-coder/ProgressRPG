@@ -1,4 +1,5 @@
 from collections import defaultdict
+from datetime import time
 from typing import TYPE_CHECKING
 
 from django.contrib.gis.db import models as gis_models
@@ -414,11 +415,29 @@ class Building(models.Model):
         ("field_shelter", "Field Shelter"),
     ]
 
+    # Default working hours by building type. Types with no natural working
+    # hours map to None, meaning callers should fall back to whatever
+    # constants they'd otherwise use (see locations/services/schedule.py).
+    # Doesn't handle overnight-wrapping windows (e.g. 22:00-04:00).
+    BUILDING_TYPE_HOURS = {
+        "residential": None,
+        "granary": (time(7, 0), time(17, 0)),
+        "inn": (time(6, 0), time(23, 0)),
+        "mill": (time(7, 0), time(17, 0)),
+        "bakery": (time(4, 0), time(14, 0)),
+        "hall": (time(8, 0), time(18, 0)),
+        "market": (time(8, 0), time(16, 0)),
+        "communal": None,
+        "field_shelter": None,
+    }
+
     name = models.CharField(max_length=255)
     building_type = models.CharField(
         max_length=50, choices=BUILDING_TYPES, default="residential"
     )
     description = models.TextField(blank=True, default="")
+    open_time_override = models.TimeField(null=True, blank=True)
+    close_time_override = models.TimeField(null=True, blank=True)
     location = gis_models.PointField(
         srid=3857,
         default=Point(0, 0, srid=3857),
@@ -436,6 +455,20 @@ class Building(models.Model):
     )
 
     parent_for_navigation = "population_centre"
+
+    @property
+    def open_time(self):
+        if self.open_time_override is not None:
+            return self.open_time_override
+        default = self.BUILDING_TYPE_HOURS.get(self.building_type)
+        return default[0] if default else None
+
+    @property
+    def close_time(self):
+        if self.close_time_override is not None:
+            return self.close_time_override
+        default = self.BUILDING_TYPE_HOURS.get(self.building_type)
+        return default[1] if default else None
 
     def __str__(self):
         return f"{self.name}"
