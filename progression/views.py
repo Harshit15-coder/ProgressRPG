@@ -19,6 +19,9 @@ from api.views import IsOwnerPlayer
 from .models import (
     Category,
     Role,
+    SkillGroup,
+    SkillDefinition,
+    CharacterRole,
     PlayerSkill,
     CharacterSkill,
     PlayerActivity,
@@ -31,6 +34,9 @@ from .models import (
 from .serializers import (
     CategorySerializer,
     RoleSerializer,
+    SkillGroupSerializer,
+    SkillDefinitionSerializer,
+    CharacterRoleSerializer,
     PlayerSkillSerializer,
     CharacterSkillSerializer,
     PlayerActivitySerializer,
@@ -105,8 +111,35 @@ class RoleViewSet(viewsets.ModelViewSet):
     serializer_class = RoleSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["name", "description", "character__name"]
+    search_fields = ["name", "description"]
     ordering_fields = ["created_at", "last_updated"]
+
+
+class SkillGroupViewSet(viewsets.ModelViewSet):
+    queryset = SkillGroup.objects.all()
+    serializer_class = SkillGroupSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description", "role__name"]
+    ordering_fields = ["created_at", "last_updated"]
+
+
+class SkillDefinitionViewSet(viewsets.ModelViewSet):
+    queryset = SkillDefinition.objects.all()
+    serializer_class = SkillDefinitionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description", "role__name"]
+    ordering_fields = ["created_at", "last_updated"]
+
+
+class CharacterRoleViewSet(viewsets.ModelViewSet):
+    queryset = CharacterRole.objects.all()
+    serializer_class = CharacterRoleSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["character__name", "role__name"]
+    ordering_fields = ["assigned_at"]
 
 
 #########################################
@@ -133,8 +166,8 @@ class CharacterSkillViewSet(viewsets.ModelViewSet):
     serializer_class = CharacterSkillSerializer
     permission_classes = [IsAuthenticated]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["name", "description", "character__name"]
-    ordering_fields = ["level", "created_at", "last_updated"]
+    search_fields = ["skill_definition__name", "character__name"]
+    ordering_fields = ["created_at", "last_updated"]
 
 
 #########################################
