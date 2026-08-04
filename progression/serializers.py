@@ -17,7 +17,6 @@ from .models import (
     Task,
 )
 
-
 #########################################
 #####      Base serializers
 #########################################
@@ -140,11 +139,57 @@ class PlayerActivitySerializer(TimeRecordBaseSerializer):
             "player",
             "group_key",
             "is_private",
+            "origin",
             "skill",
             "project",
             "task",
         ]
-        read_only_fields = ["player"]
+        read_only_fields = ["player", "origin"]
+
+
+class OfflineActivityLogSerializer(serializers.Serializer):
+    """
+    Validates a request to manually log a completed activity after the
+    fact (offline logging, issue #630). ``skill``/``task`` are scoped to
+    the requesting player to prevent referencing another player's records.
+    """
+
+    name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+    description = serializers.CharField(
+        max_length=2000, required=False, allow_blank=True, default=""
+    )
+    skill = serializers.PrimaryKeyRelatedField(queryset=PlayerSkill.objects.none())
+    task = serializers.PrimaryKeyRelatedField(queryset=Task.objects.none())
+    started_at = serializers.DateTimeField()
+    completed_at = serializers.DateTimeField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        self.fields["skill"].queryset = (
+            PlayerSkill.objects.filter(player=player)
+            if player
+            else PlayerSkill.objects.none()
+        )
+        self.fields["skill"].required = False
+        self.fields["skill"].allow_null = True
+        self.fields["task"].queryset = (
+            Task.objects.filter(player=player) if player else Task.objects.none()
+        )
+        self.fields["task"].required = False
+        self.fields["task"].allow_null = True
+
+    def validate(self, attrs):
+        if not attrs.get("name") and not attrs.get("task"):
+            raise serializers.ValidationError(
+                "Provide a name (to create a new task) or an existing task to log against."
+            )
+        if attrs["completed_at"] <= attrs["started_at"]:
+            raise serializers.ValidationError("completed_at must be after started_at.")
+        return attrs
 
 
 class CharacterActivitySerializer(TimeRecordBaseSerializer):
