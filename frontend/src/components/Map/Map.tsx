@@ -17,8 +17,6 @@ import { scatterCharacters } from "./characters/placement";
 import {
   buildingFootprintRings,
   polygonTooltipContent,
-  styledLineFeatures,
-  styledPolygonFeatures,
 } from "./geojson";
 import {
   addCharacterImage,

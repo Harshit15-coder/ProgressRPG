@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { fromLngLat, toLngLat } from './utils';
 import { colourForCharacter } from './characters/placement';
