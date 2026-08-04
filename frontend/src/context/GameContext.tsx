@@ -5,6 +5,7 @@ import type { ReactElement, ReactNode } from 'react';
 import { useBootstrapGameData } from '../hooks/useBootstrapGameData';
 import { apiFetch } from "../utils/api";
 import useActivityTimer from '../hooks/useActivityTimer';
+import useUnloadWarning from '../hooks/useUnloadWarning';
 import { useAuth } from './AuthContext';
 import { GameContext, type GameContextValue } from './gameContext';
 import type {
@@ -80,6 +81,8 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
 
   const activityTimer = useActivityTimer();
   const { loadFromServer } = activityTimer;
+
+  useUnloadWarning(activityTimer.status === 'active');
 
 
   // ----------------------------------------
