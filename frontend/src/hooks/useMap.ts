@@ -20,7 +20,8 @@ export function usePopulationCentreId() {
   return useQuery({
     queryKey: ["population-centres", "first-id"],
     queryFn: fetchFirstPopulationCentreId,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -34,7 +35,8 @@ export function useInitialMapCentre(pcId: number | null | undefined) {
     queryKey: ["map", "population-centre", "initial-centre", pcId],
     queryFn: () => fetchPopulationCentreMap(pcId as number),
     enabled: pcId != null,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -49,6 +51,8 @@ export function useMapViewport(bbox: string | null) {
     queryFn: () => fetchMapViewport(bbox as string),
     enabled: bbox != null,
     refetchInterval: MAP_POLL_INTERVAL_MS,
+    staleTime: 5 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: (previousData: unknown) => previousData,
   });
 }
@@ -61,7 +65,8 @@ export function useMapWorldBounds() {
   return useQuery({
     queryKey: ["map", "world-bounds"],
     queryFn: fetchMapWorldBounds,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }
 
@@ -73,6 +78,7 @@ export function usePopulationCentres() {
   return useQuery({
     queryKey: ["population-centres", "all"],
     queryFn: fetchPopulationCentres,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }
