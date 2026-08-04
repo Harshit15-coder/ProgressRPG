@@ -16,8 +16,8 @@ from .models import (
     PlayerSkill,
     CharacterSkill,
     PlayerActivity,
+    ActivityDefinition,
     CharacterActivity,
-    CharacterQuest,
     Project,
     Task,
     Note,
@@ -173,6 +173,20 @@ class CharacterSkillSerializer(serializers.ModelSerializer):
 #########################################
 
 
+class ActivityDefinitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivityDefinition
+        fields = [
+            "id",
+            "name",
+            "description",
+            "kind",
+            "skill",
+            "created_at",
+            "last_updated",
+        ]
+
+
 class PlayerActivitySerializer(TimeRecordBaseSerializer):
     player: serializers.PrimaryKeyRelatedField[Player] = (
         serializers.PrimaryKeyRelatedField(read_only=True)
@@ -238,17 +252,29 @@ class OfflineActivityLogSerializer(serializers.Serializer):
         return attrs
 
 
-class CharacterActivitySerializer(TimeRecordBaseSerializer):
+class CharacterActivitySerializer(serializers.ModelSerializer):
+    name = serializers.ReadOnlyField()
+    kind = serializers.ReadOnlyField()
     status = serializers.SerializerMethodField()
 
-    class Meta(TimeRecordBaseSerializer.Meta):
+    class Meta:
         model = CharacterActivity
-        fields = TimeRecordBaseSerializer.Meta.fields + [
+        fields = [
+            "id",
             "character",
+            "activity_definition",
+            "name",
+            "kind",
+            "duration",
+            "started_at",
+            "is_complete",
+            "completed_at",
+            "xp_gained",
+            "created_at",
+            "last_updated",
             "scheduled_start",
             "scheduled_end",
             "status",
-            "kind",
         ]
 
     def get_status(self, obj) -> str:
@@ -261,20 +287,6 @@ class CharacterActivitySerializer(TimeRecordBaseSerializer):
             if now < obj.scheduled_start:
                 return "future"
         return "unknown"
-
-
-class CharacterQuestSerializer(TimeRecordBaseSerializer):
-    class Meta(TimeRecordBaseSerializer.Meta):
-        model = CharacterQuest
-        fields = TimeRecordBaseSerializer.Meta.fields + [
-            "character",
-            "skill",
-            "intro_text",
-            "outro_text",
-            "target_duration",
-            "stages",
-            "stages_fixed",
-        ]
 
 
 #########################################
