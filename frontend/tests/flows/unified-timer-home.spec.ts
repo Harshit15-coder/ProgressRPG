@@ -22,14 +22,23 @@ test.describe('Unified timer homepage (flag on)', () => {
       // Legacy "Recent activities" feed is not rendered under the flag.
       await expect(page.getByRole('heading', { name: 'Recent activities' })).toHaveCount(0);
 
-      // A single Start button, always enabled — starts blank when the input is empty.
+      // A single Start button, always enabled — starting with nothing typed
+      // auto-labels the timer "Planning" and opens Planning mode.
       const startButton = section.getByRole('button', { name: 'Start' });
       await expect(startButton).toBeEnabled();
       await startButton.click();
       await expect(section.getByRole('button', { name: 'Stop' })).toBeVisible();
 
+      const planningLabel = section.getByRole('button', { name: /Planning/ });
+      await expect(planningLabel).toBeVisible();
+      await expect(page.getByRole('radio', { name: 'Planning' })).toHaveAttribute('aria-checked', 'true');
+      await expect(page.getByPlaceholder('New task name')).toBeVisible();
+
+      // Click-to-edit: re-opens the input pre-filled with the current label,
+      // so it can be renamed to whatever the user is actually doing.
+      await planningLabel.click();
       const input = section.getByRole('combobox', { name: 'Activity name' });
-      await expect(input).toBeVisible();
+      await expect(input).toHaveValue('Planning');
       await input.fill('Flow test activity');
       await input.press('Enter');
 
@@ -76,10 +85,11 @@ test.describe('Unified timer homepage (flag on)', () => {
         has: page.getByRole('heading', { name: 'Activity timer' }),
       });
 
+      // Blank start auto-labels "Planning" and opens Planning mode already —
+      // no extra click needed to get there.
       await section.getByRole('button', { name: 'Start' }).click();
       await expect(section.getByRole('button', { name: 'Stop' })).toBeVisible();
-
-      await page.getByRole('radio', { name: 'Planning' }).click();
+      await expect(page.getByRole('radio', { name: 'Planning' })).toHaveAttribute('aria-checked', 'true');
 
       // The timer stays visible/controllable while planning.
       await expect(section.getByRole('button', { name: 'Stop' })).toBeVisible();

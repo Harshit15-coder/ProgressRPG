@@ -43,7 +43,7 @@ export default function UnifiedTimerHome() {
     flowDispatch,
     handleConfirmActivity,
     handleToggle,
-    handleBlankStart,
+    handleCreateActivity,
     handleUnifiedSelect,
     handleUnifiedSubmit,
     startEditingLabel,
@@ -93,17 +93,19 @@ export default function UnifiedTimerHome() {
     }
   }
 
-  // Single Start button: starts blank if the input is empty, otherwise
-  // starts (or labels) with whatever's typed — same distinction as before,
-  // just collapsed into one action instead of two buttons.
+  // Single Start button: starting with a typed name labels the timer with
+  // it. Starting with nothing typed reads as "I don't have a specific
+  // activity yet" — rather than leaving the timer unlabelled, it's labelled
+  // "Planning" and Planning mode opens immediately so the task list is right
+  // there instead of an empty search box.
   const handleStartClick = async () => {
     if (name.trim()) {
       await handleToggle();
       return;
     }
 
-    await handleBlankStart();
-    containerRef.current?.querySelector("input")?.focus();
+    await handleCreateActivity("Planning");
+    setMode("planning");
   };
 
   const handleWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {

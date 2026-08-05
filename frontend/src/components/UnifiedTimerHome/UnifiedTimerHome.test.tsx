@@ -174,7 +174,7 @@ describe('UnifiedTimerHome', () => {
     expect(screen.getByRole('button', { name: 'Start' })).toBeEnabled();
   });
 
-  it('Start with an empty input starts a blank timer and moves to the running-unlabelled state', async () => {
+  it('Start with an empty input labels the timer "Planning" and switches to Planning mode', async () => {
     const user = userEvent.setup();
     startActivity.mockResolvedValue(null);
 
@@ -182,14 +182,16 @@ describe('UnifiedTimerHome', () => {
 
     await user.click(screen.getByRole('button', { name: 'Start' }));
 
-    expect(startActivity).toHaveBeenCalledWith({ text: '', allowBlank: true, limitSeconds: 15 });
+    expect(startActivity).toHaveBeenCalledWith({ text: 'Planning', limitSeconds: 15 });
 
-    // Reflect the timer now being active with a blank name.
-    mockGame({ status: 'active', currentActivity: { name: '' } });
+    // Reflect the timer now being active, labelled "Planning".
+    mockGame({ status: 'active', currentActivity: { name: 'Planning' } });
     rerender(<UnifiedTimerHome />);
 
-    expect(screen.getByRole('combobox', { name: 'Activity name' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Planning/ })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Stop' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Planning' })).toHaveAttribute('aria-checked', 'true');
+    expect(screen.getByPlaceholderText('New task name')).toBeInTheDocument();
   });
 
   it('Start/Stop is the same persistent button element, not a swap', async () => {
@@ -200,7 +202,7 @@ describe('UnifiedTimerHome', () => {
     const startButton = screen.getByRole('button', { name: 'Start' });
 
     await user.click(startButton);
-    mockGame({ status: 'active', currentActivity: { name: '' } });
+    mockGame({ status: 'active', currentActivity: { name: 'Planning' } });
     rerender(<UnifiedTimerHome />);
 
     expect(screen.getByRole('button', { name: 'Stop' })).toBe(startButton);
