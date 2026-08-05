@@ -274,3 +274,44 @@ All resolved:
 
 None outstanding — implementation can proceed through Phase 4 without
 further product input.
+
+---
+
+## 9. Addendum — blank Start auto-labels "Planning"
+
+Post-implementation adjustment, on top of Phase 2 as originally shipped.
+
+**Change**: clicking Start with nothing typed no longer starts a genuinely
+unlabelled timer. It now labels the timer `"Planning"` — via the same
+`handleCreateActivity` path any typed name goes through (so it behaves like
+any other named activity: shows up in activity history, gets cached as a
+suggestion) — and sets `mode` to `"planning"` immediately, so the task list
+is right there instead of an empty search box.
+
+**Rationale**: someone who hits Start with nothing typed usually doesn't
+have a specific activity in mind yet — that's a "let me figure out what I'm
+doing" moment, which is exactly what Planning mode is for. Defaulting that
+path to an explicit "Planning" activity + Planning mode removes a click
+(the same one this feature exists to remove) for what's likely the most
+common way people land in Planning mode in practice.
+
+**What doesn't change**:
+- Starting with a typed name is unchanged — still labels with whatever's
+  typed via `handleToggle`, mode stays wherever it already was.
+- `handleBlankStart`/`isUnlabelled` stay as-is in `useActivityInput` —
+  `UnifiedTimerHome`'s Start-button branch just stops calling
+  `handleBlankStart`. Unlabelled-while-running is still reachable through
+  other paths (e.g. clicking a labelled running timer to edit it, clearing
+  the field, and blurring), so removing the primitive itself wasn't in
+  scope.
+- The separate "activity name contains 'plan'" auto-switch added during
+  Phase 2 (not documented elsewhere in this plan — flagged here for
+  completeness) is untouched and coexists without conflict: a blank start's
+  name is `""`, which never matches that substring check, so the two
+  triggers fire on disjoint inputs.
+
+**Tests updated**: `UnifiedTimerHome.test.tsx`'s blank-start case now
+asserts the `"Planning"` label, the Planning radio's `aria-checked`, and
+the task list rendering; the Playwright happy-path spec starts blank,
+confirms Planning mode opens immediately, then click-to-edits the label to
+rename it for the rest of that flow.
