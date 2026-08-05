@@ -315,3 +315,57 @@ asserts the `"Planning"` label, the Planning radio's `aria-checked`, and
 the task list rendering; the Playwright happy-path spec starts blank,
 confirms Planning mode opens immediately, then click-to-edits the label to
 rename it for the rest of that flow.
+
+---
+
+## 10. Known deviations from the plan (found during post-implementation review)
+
+Phase 2 shipped two behaviors that don't match what's written above, neither
+with an accompanying design-decision entry. Documented here after the fact,
+rather than quietly rewriting the Assumptions/Phase 2 sections to match,
+so the record of what was planned vs. what shipped stays honest.
+
+**1. The switcher is hidden while idle, not "visible regardless of
+`isActive`" (contradicts Assumption 2).**
+Assumption 2 states explicitly that "nothing in the brief restricts [the
+switch] to 'only while a timer is running'" and that hiding it while idle
+was considered and rejected. The shipped code does the opposite —
+`{isActive && <ModeSwitcher .../>}` in `UnifiedTimerHome.tsx` — the
+switcher and the planning panel only render once a timer is running. No
+design-decision entry explains the reversal.
+- *Effect*: before this plan's blank-start addendum (§9) existed, a user
+  had no way to open Planning mode, or even see the switcher, before
+  starting a timer. §9 narrows the practical gap — hitting Start with
+  nothing typed now reaches Planning mode in one click — but it's still not
+  what Assumption 2 describes, and there's still no way to preview or
+  reach Planning mode from the idle state through any other affordance.
+- *Disposition*: left as shipped. Showing the switcher while idle (with
+  `mode` defaulting to "doing" until a timer starts, so the timer's own
+  first-load behaviour stays unchanged) is a separate, deliberate product
+  decision to make — not folded into this addendum.
+
+**2. Undocumented auto-switch: typing "plan" in the activity name switches
+to Planning mode.**
+`UnifiedTimerHome` has a render-time check —
+`inputValue.toLowerCase().includes("plan")` — that force-switches `mode` to
+`"planning"` the first time it becomes true for a given `inputValue`,
+one-directional (removing "plan" from the name afterwards doesn't switch
+back). This isn't mentioned anywhere above: not in Assumptions, Strategy,
+Phases, Design decisions, Edge cases, or Open questions (§8, which was
+marked "None outstanding" at the time).
+- *Rationale (reconstructed from the shipping commit and its code comment,
+  since none was recorded in this plan)*: naming an activity around
+  planning ("plan my week", "Planning session") is treated as a
+  strong-enough signal to drop the user into Planning mode without an
+  extra click; one-directional because the user may have since interacted
+  with the tasks panel, and automatically yanking them back out on a later
+  edit would be more surprising than helpful.
+- *Interaction with §9*: the two auto-switch triggers are independent and
+  don't conflict — a blank start's `inputValue` is `""`, which never
+  matches this substring check.
+- *Disposition*: left as shipped — it's tested (`UnifiedTimerHome.test.tsx`
+  has three dedicated cases: matches, case-insensitive/substring match,
+  no-match for unrelated names) and works as designed; it should simply
+  have been written down here when it was built. No behaviour change made
+  as part of this addendum — documenting it so a future reader isn't
+  finding it cold in the diff.
