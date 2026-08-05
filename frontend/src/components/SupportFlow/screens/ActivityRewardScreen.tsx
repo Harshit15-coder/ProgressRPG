@@ -2,7 +2,8 @@
 import React, { useEffect, useRef, useState } from "react";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
-import { formatDuration, formatRewardDuration } from "../../../utils/formatUtils";
+import { formatRewardDuration } from "../../../utils/formatUtils";
+import { buildActivityRewardBreakdown } from "../../../utils/activityRewardBreakdown";
 import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
 import { useGame } from "../../../hooks/useGame";
 import styles from "../SupportFlowModal.module.scss";
@@ -98,70 +99,33 @@ export default function ActivityRewardScreen({
   const continueButtonLabel = shouldEnableCountdown
     ? `Continue with support in ${countdownSeconds}..`
     : "Continue with support";
-  const hasActivityName = typeof activityName === "string" && activityName.trim();
-  const parsedXp = Number(xpGained);
-  const hasXp = Number.isFinite(parsedXp);
-  const parsedBaseXp = Number(baseXp);
-  const parsedMultiplier = Number(xpMultiplier);
-  const hasRewardBreakdown =
-    Number.isFinite(parsedBaseXp) &&
-    parsedBaseXp >= 0 &&
-    Number.isFinite(parsedMultiplier) &&
-    parsedMultiplier > 0 &&
-    hasXp;
-  const parsedElapsedSeconds = Number(elapsedSeconds);
-  const hasElapsedSeconds =
-    Number.isFinite(parsedElapsedSeconds) && parsedElapsedSeconds >= 0;
-  const formattedElapsed = hasElapsedSeconds
-    ? formatRewardDuration(parsedElapsedSeconds)
-    : null;
-  const condensedElapsed = hasElapsedSeconds
-    ? formatDuration(parsedElapsedSeconds)
-    : null;
-  const parsedTaskXpMultiplier = Number(taskXpMultiplier);
-  const hasTaskBonus =
-    Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1;
-  // Infer premium component: combined / task (or combined if no task bonus)
-  const premiumMultiplier =
-    hasRewardBreakdown && hasTaskBonus && parsedTaskXpMultiplier > 0
-      ? parsedMultiplier / parsedTaskXpMultiplier
-      : parsedMultiplier;
 
-  function fmtMult(m: number): string {
-    return Number.isInteger(m) ? String(m) : m.toFixed(2).replace(/\.?0+$/, "");
-  }
+  const {
+    hasXp,
+    xpGained: parsedXp,
+    hasElapsedSeconds,
+    condensedElapsed,
+    rewardSummaryLine,
+    multiplierLines,
+    isLikelyPremiumUser,
+    normalizedLevelUps,
+    hasActivityName,
+  } = buildActivityRewardBreakdown({
+    activityName,
+    xpGained,
+    baseXp,
+    xpMultiplier,
+    taskXpMultiplier,
+    levelUps,
+    elapsedSeconds,
+  });
 
-  const normalizedLevelUps = Array.isArray(levelUps)
-    ? levelUps
-        .map((level) => Number(level))
-        .filter((level) => Number.isInteger(level) && level > 0)
-    : [];
-  const isLikelyPremiumUser = premiumMultiplier >= 2;
   const shouldShowUpgradePrompt = Boolean(showUpgradePrompt) && !isLikelyPremiumUser;
   const upgradeMessage = shouldShowUpgradePrompt
     ? isAutoStopped
       ? "Need more time? Upgrade to Premium for unlimited timer sessions."
       : "Want even more rewards? Upgrade to Premium for double XP on activities."
     : null;
-  const multiplierLines: Array<{ label: string; value: string }> = [];
-  let rewardSummaryLine = "Nice work ⚔️ You completed an activity.";
-
-  if (formattedElapsed && hasActivityName) {
-    rewardSummaryLine = `Nice work ⚔️ You spent ${formattedElapsed} on "${activityName!.trim()}".`;
-  } else if (hasActivityName) {
-    rewardSummaryLine = `Nice work ⚔️ You completed "${activityName!.trim()}".`;
-  } else if (formattedElapsed) {
-    rewardSummaryLine = `Nice work ⚔️ You spent ${formattedElapsed} focused.`;
-  }
-
-  if (hasRewardBreakdown) {
-    if (premiumMultiplier > 1) {
-      multiplierLines.push({ label: "Premium bonus", value: `x${fmtMult(premiumMultiplier)}` });
-    }
-    if (hasTaskBonus) {
-      multiplierLines.push({ label: "Task bonus", value: `x${fmtMult(parsedTaskXpMultiplier)}` });
-    }
-  }
 
   return (
     <div>
