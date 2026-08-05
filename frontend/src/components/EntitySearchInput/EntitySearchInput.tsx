@@ -1,4 +1,5 @@
-import type { CSSProperties } from "react";
+import { useEffect, useRef } from "react";
+import type { CSSProperties, KeyboardEvent } from "react";
 import classNames from "classnames";
 
 import { useEntitySearchInput, type SearchEntity } from "./useEntitySearchInput";
@@ -44,7 +45,6 @@ export default function EntitySearchInput({
   emptyMessage,
 }: EntitySearchInputProps) {
   const {
-    rootRef,
     canSearch,
     taskItems,
     activityItems,
@@ -53,8 +53,11 @@ export default function EntitySearchInput({
     activeHighlightedIndex,
     handleInputFocus,
     handleInputChange,
-    handleKeyDown,
     commitSelection,
+    onSelectNext,
+    onSelectPrevious,
+    onDismiss,
+    onCommit,
   } = useEntitySearchInput({
     type,
     value,
@@ -67,6 +70,45 @@ export default function EntitySearchInput({
     alwaysOpen,
     maxVisibleRows,
   });
+
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Dismiss on outside click — the hook exposes the semantic action, this
+  // component owns the DOM listener that detects the gesture.
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (!rootRef.current?.contains(event.target as Node)) {
+        onDismiss();
+      }
+    }
+
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, [onDismiss]);
+
+  const handleKeyDown = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (disabled) return;
+
+    switch (event.key) {
+      case "ArrowDown":
+        if (isDropdownOpen) event.preventDefault();
+        onSelectNext();
+        return;
+      case "ArrowUp":
+        if (isDropdownOpen) event.preventDefault();
+        onSelectPrevious();
+        return;
+      case "Escape":
+        if (isDropdownOpen) event.preventDefault();
+        onDismiss();
+        return;
+      case "Enter":
+        if (onCommit()) event.preventDefault();
+        return;
+      default:
+        return;
+    }
+  };
 
   const renderOption = (entity: SearchEntity, index: number) => {
     const isHighlighted = index === activeHighlightedIndex;
