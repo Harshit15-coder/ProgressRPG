@@ -3,6 +3,7 @@ from django.test import TestCase
 
 from character.models import Character
 from character.tasks import generate_character_days
+from character.tests.test_behaviour_services import create_activity_catalog
 from progression.models import CharacterActivity
 
 
@@ -11,6 +12,7 @@ class GenerateCharacterDaysTaskTests(TestCase):
         character = Character.objects.create(
             first_name="Genny", location=Point(0, 0, srid=3857)
         )
+        create_activity_catalog()
 
         result = generate_character_days(date_iso="2026-01-05")
 

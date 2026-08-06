@@ -4,6 +4,7 @@ from django.contrib.gis.geos import Point
 from django.test import TestCase
 
 from character.models import Character
+from character.services.behaviour_services import _FIXED_KINDS
 from character.utils import work_activities_for
 from progression.models import (
     ActivityDefinition,
@@ -71,11 +72,29 @@ class WorkActivitiesForTests(TestCase):
         self.assertNotIn(gated_activity, work_activities_for(self.character))
 
 
+def create_activity_catalog():
+    """
+    Minimal ActivityDefinition catalog generate_day needs to build a full
+    day: one skill-less definition per fixed block kind, plus two skill-less
+    "work" definitions (rng.sample needs a population of at least 2 to fill
+    both work blocks).
+    """
+    for kind in _FIXED_KINDS:
+        ActivityDefinition.objects.create(name=f"{kind} block", kind=kind)
+    ActivityDefinition.objects.create(
+        name="general work A", kind=ActivityDefinition.Kind.WORK
+    )
+    ActivityDefinition.objects.create(
+        name="general work B", kind=ActivityDefinition.Kind.WORK
+    )
+
+
 class GenerateDayWorkActivityTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
             first_name="Oswin", location=Point(0, 0, srid=3857)
         )
+        create_activity_catalog()
 
     def test_work_blocks_use_an_available_activity_definition(self):
         self.character.behaviour.generate_day(date(2026, 1, 5))
@@ -116,6 +135,7 @@ class DeleteDayTests(TestCase):
         self.character = Character.objects.create(
             first_name="Della", location=Point(0, 0, srid=3857)
         )
+        create_activity_catalog()
 
     def test_delete_day_removes_that_days_activities(self):
         target_date = date(2026, 1, 5)
