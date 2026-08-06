@@ -7,6 +7,9 @@ from .models import (
     CharacterRelationship,
     CharacterRelationshipMembership,
     Behaviour,
+    RELATIONSHIP_SPECS,
+    RelationshipRole,
+    RelationshipType,
 )
 
 from django.contrib import messages
@@ -100,7 +103,7 @@ class CharacterAdmin(admin.ModelAdmin):
             "Life & Story",
             {
                 "classes": ("collapse",),
-                "fields": ("backstory", "parents", "cause_of_death"),
+                "fields": ("backstory", "cause_of_death"),
             },
         ),
         (
@@ -143,7 +146,6 @@ class CharacterAdmin(admin.ModelAdmin):
     readonly_fields = [
         "get_player",
         "get_age",
-        "parents",
         "created_at",
     ]
 
@@ -243,7 +245,7 @@ class CharacterRelationshipAdmin(admin.ModelAdmin):
         "relationship_type",
         "strength",
         "history",
-        "biological",
+        "variant",
         ("created_at", "last_updated"),
     ]
     inlines = [CharacterInline]
@@ -252,3 +254,34 @@ class CharacterRelationshipAdmin(admin.ModelAdmin):
     @admin.display(description="Characters")
     def get_linked_characters(self, obj):
         return ", ".join([str(char) for char in obj.get_members()])
+
+    def save_related(self, request, form, formsets, change):
+        # Membership inlines save one row at a time, so a relationship can
+        # be left transiently incomplete (e.g. a PARENT_CHILD relationship
+        # with only its PARENT role filled in) - that's allowed (see
+        # CharacterRelationshipMembership.clean()), but warn staff here
+        # rather than silently leaving it incomplete.
+        super().save_related(request, form, formsets, change)
+        relationship = form.instance
+        spec = RELATIONSHIP_SPECS.get(RelationshipType(relationship.relationship_type))
+        if spec is None:
+            return
+
+        counts = {}
+        for membership in relationship.characterrelationshipmembership_set.all():
+            if not membership.role:
+                continue
+            role = RelationshipRole(membership.role)
+            counts[role] = counts.get(role, 0) + 1
+
+        missing = [
+            role.value
+            for role, (min_count, _max_count) in spec.roles.items()
+            if counts.get(role, 0) < min_count
+        ]
+        if missing:
+            messages.warning(
+                request,
+                f"This {relationship.relationship_type} relationship is missing "
+                f"required role(s): {', '.join(missing)}.",
+            )

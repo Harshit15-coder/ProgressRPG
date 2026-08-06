@@ -18,7 +18,12 @@ from gameplay.models import Currency, CurrencyAccountBase, QuestCompletion, Ques
 from gameplay.serializers import QuestResultSerializer
 from progress_rpg.exceptions import QuestError
 
-from character.services import character_services, lifecycle_services, link_services
+from character.services import (
+    character_services,
+    lifecycle_services,
+    link_services,
+    relationship_services,
+)
 from locations.models import Movable, Node, Building
 
 if TYPE_CHECKING:
@@ -142,7 +147,12 @@ class CharacterRelationship(models.Model):
         super().clean()
         if not self.relationship_type:
             return
-        spec = RELATIONSHIP_SPECS.get(RelationshipType(self.relationship_type))
+        try:
+            spec = RELATIONSHIP_SPECS.get(RelationshipType(self.relationship_type))
+        except ValueError:
+            # Not a recognised type at all - clean_fields() already reported
+            # this via the field's `choices`, nothing more to check here.
+            return
         if spec is None:
             return
         if self.variant and self.variant not in spec.allowed_variants:
@@ -189,9 +199,12 @@ class CharacterRelationshipMembership(models.Model):
         if not self.relationship_id or not self.character_id:
             return
 
-        spec = RELATIONSHIP_SPECS.get(
-            RelationshipType(self.relationship.relationship_type)
-        )
+        try:
+            spec = RELATIONSHIP_SPECS.get(
+                RelationshipType(self.relationship.relationship_type)
+            )
+        except ValueError:
+            return
         if spec is None:
             return
 
@@ -200,7 +213,13 @@ class CharacterRelationshipMembership(models.Model):
                 {"role": "A role is required for this relationship type."}
             )
 
-        role = RelationshipRole(self.role)
+        try:
+            role = RelationshipRole(self.role)
+        except ValueError:
+            # Not a recognised role at all - clean_fields() already reported
+            # this via the field's `choices`, nothing more to check here.
+            return
+
         if role not in spec.roles:
             allowed = ", ".join(sorted(r.value for r in spec.roles))
             raise ValidationError(
@@ -321,9 +340,6 @@ class Character(Person, LifeCycleMixin, Movable):
         related_name="residents",
     )
 
-    parents = models.ManyToManyField(
-        "self", related_name="children", symmetrical=False, blank=True
-    )
     sex = models.CharField(
         max_length=20, choices=SexChoices.choices, null=True, blank=True
     )
@@ -385,6 +401,33 @@ class Character(Person, LifeCycleMixin, Movable):
         """
         link = self.active_link
         return link.player if link else None
+
+    @property
+    def parents(self):
+        return relationship_services.relationship_get_parents(self)
+
+    @property
+    def children(self):
+        return relationship_services.relationship_get_children(self)
+
+    @property
+    def siblings(self):
+        return relationship_services.relationship_get_siblings(self)
+
+    def relationships_of_type(self, relationship_type):
+        return relationship_services.relationship_get_relationships_of_type(
+            self, relationship_type
+        )
+
+    def add_parent(
+        self, parent: "Character", variant: str = ""
+    ) -> "CharacterRelationship":
+        """Create a PARENT_CHILD relationship with `parent` as the parent, self as the child."""
+        return relationship_services.relationship_create(
+            RelationshipType.PARENT_CHILD,
+            [(parent, RelationshipRole.PARENT), (self, RelationshipRole.CHILD)],
+            variant=variant,
+        )
 
     def get_currency(self, code="coins") -> "CharacterCurrency":
         currency_def, _ = Currency.objects.get_or_create(

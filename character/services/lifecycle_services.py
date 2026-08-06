@@ -91,9 +91,9 @@ def lifecycle_handle_childbirth(instance) -> None:
         sex="Male" if randint(0, 1) == 0 else "Female",
     )
 
-    child.parents.add(instance)
+    child.add_parent(instance, variant="biological")
     if instance.pregnancy_partner:
-        child.parents.add(instance.pregnancy_partner)
+        child.add_parent(instance.pregnancy_partner, variant="biological")
     child.save()
 
 
