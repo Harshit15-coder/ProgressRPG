@@ -8,7 +8,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ("character", "0013_character_link_points_multiplier"),
-        ("progression", "0016_remove_xp_gained"),
+        ("progression", "0019_remove_xp_gained"),
     ]
 
     operations = [
