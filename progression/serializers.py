@@ -70,6 +70,8 @@ class SkillBaseSerializer(serializers.ModelSerializer):
 
 
 class TimeRecordBaseSerializer(serializers.ModelSerializer):
+    xp_gained = serializers.ReadOnlyField()
+
     class Meta:
         fields = [
             "id",
@@ -80,6 +82,7 @@ class TimeRecordBaseSerializer(serializers.ModelSerializer):
             "is_complete",
             "completed_at",
             "xp_gained",
+            "reward_breakdown",
             "created_at",
             "last_updated",
         ]
@@ -280,6 +283,7 @@ class OfflineActivityLogSerializer(serializers.Serializer):
 class CharacterActivitySerializer(serializers.ModelSerializer):
     name = serializers.ReadOnlyField()
     kind = serializers.ReadOnlyField()
+    xp_gained = serializers.ReadOnlyField()
     status = serializers.SerializerMethodField()
 
     class Meta:
@@ -295,6 +299,7 @@ class CharacterActivitySerializer(serializers.ModelSerializer):
             "is_complete",
             "completed_at",
             "xp_gained",
+            "reward_breakdown",
             "created_at",
             "last_updated",
             "scheduled_start",
