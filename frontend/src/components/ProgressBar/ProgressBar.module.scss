@@ -38,7 +38,28 @@
   position: relative;
 
   border-radius: sp.$border-radius;
-  border: 1px solid rgba(c.$color-border-primary, 0.8);;
+  border: 1px solid rgba(c.$color-border-primary, 0.8);
+}
+
+// Border-only counterparts to .default/.warning/.danger/.success below - kept
+// separate (rather than applying those classes to .progressTrack directly)
+// so the track's border matches the fill colour without also picking up
+// their background-color rule, which would paint over .progressTrack's own
+// background-color: c.$color-bg (the "empty" portion behind the fill).
+.trackDefault {
+  border-color: c.$color-progress-bar;
+}
+
+.trackWarning {
+  border-color: c.$color-warning;
+}
+
+.trackDanger {
+  border-color: c.$color-error;
+}
+
+.trackSuccess {
+  border-color: c.$color-status-success;
 }
 
 .progressBarFill {
