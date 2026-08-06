@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from "react-router";
 
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
 import { useNotes, useCreateNote } from "../../hooks/useNotes";
@@ -8,8 +8,10 @@ import type { Task } from "../../types";
 import type { SortOption } from "../PlayerItemList/PlayerItemList";
 import { asArray } from "../../utils/arrayUtils";
 import { isCompletable } from "../../utils/completable";
-import { formatRewardDuration } from "../../utils/formatUtils";
+import { formatRewardDuration, formatDueAt, isOverdue } from "../../utils/formatUtils";
 import { TASKS_HIDE_COMPLETED_KEY } from "../../utils/userPreferences";
+
+export type ItemRecord = Task & { [key: string]: unknown };
 
 export interface TaskEditSummary {
   created: string;
@@ -18,9 +20,14 @@ export interface TaskEditSummary {
   totalTime: string;
 }
 
+export interface ParentGroup {
+  parent: ItemRecord;
+  children: ItemRecord[];
+}
+
 export const isTaskComplete = isCompletable;
 
-export const taskSortOptions: SortOption<Task>[] = [
+export const taskSortOptions: SortOption<ItemRecord>[] = [
   {
     key: "last-worked",
     label: "Last worked",
@@ -39,6 +46,15 @@ export const taskSortOptions: SortOption<Task>[] = [
     key: "created",
     label: "Created",
     compareFn: (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+  },
+  {
+    key: "due-date",
+    label: "Due date",
+    compareFn: (a, b) => {
+      const da = a.due_at ? new Date(a.due_at).getTime() : Infinity;
+      const db = b.due_at ? new Date(b.due_at).getTime() : Infinity;
+      return da - db;
+    },
   },
 ];
 
@@ -100,6 +116,7 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
       return true;
     }
   });
+  const [addSubtaskParent, setAddSubtaskParent] = useState<ItemRecord | null>(null);
 
   useEffect(() => {
     if (!completionReward) return;
@@ -107,12 +124,71 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
     return () => clearTimeout(timer);
   }, [completionReward]);
 
-  const safeTasks = useMemo(() => asArray(tasks), [tasks]);
+  const safeTasks = useMemo(() => asArray(tasks) as ItemRecord[], [tasks]);
   const safeNotes = useMemo(() => asArray(notes), [notes]);
 
   const getLinkedNoteId = useCallback(
     (task: Task) => safeNotes.find((note) => note.task === task.id)?.id ?? null,
     [safeNotes]
+  );
+
+  const topLevelTasks = useMemo(
+    () => safeTasks.filter((task) => task.parent == null),
+    [safeTasks]
+  );
+
+  const groupedTasks = useMemo<ParentGroup[]>(() => {
+    const byId = new Map<number, ItemRecord>();
+    safeTasks.forEach((task) => byId.set(task.id, task));
+
+    const childrenByParentId = new Map<number, ItemRecord[]>();
+    const topLevel: ItemRecord[] = [];
+
+    safeTasks.forEach((task) => {
+      const parentId = task.parent;
+      const parentTask = parentId != null ? byId.get(parentId) : undefined;
+      // Defensive: a task whose parent is missing or itself a subtask
+      // (grandparent nesting) renders as top-level rather than vanishing.
+      if (parentId == null || !parentTask || parentTask.parent != null) {
+        topLevel.push(task);
+      } else {
+        const siblings = childrenByParentId.get(parentId) ?? [];
+        siblings.push(task);
+        childrenByParentId.set(parentId, siblings);
+      }
+    });
+
+    const visibleTopLevel = hideCompleted
+      ? topLevel.filter((task) => !isTaskComplete(task))
+      : topLevel;
+
+    if (hideCompleted && openTaskId != null && !visibleTopLevel.some((task) => task.id === openTaskId)) {
+      const deepLinkedTask = topLevel.find((task) => task.id === openTaskId);
+      if (deepLinkedTask) visibleTopLevel.push(deepLinkedTask);
+    }
+
+    return visibleTopLevel.map((parent) => {
+      const children = childrenByParentId.get(parent.id) ?? [];
+      return {
+        parent,
+        children: hideCompleted ? children.filter((child) => !isTaskComplete(child)) : children,
+      };
+    });
+  }, [safeTasks, hideCompleted, openTaskId]);
+
+  const visibleTasks = useMemo(
+    () => groupedTasks.flatMap((group) => [group.parent, ...group.children]),
+    [groupedTasks]
+  );
+
+  const childrenByGroupParentId = useMemo(
+    () => new Map(groupedTasks.map((group) => [group.parent.id, group.children])),
+    [groupedTasks]
+  );
+
+  const getChildren = useCallback(
+    (task: ItemRecord): ItemRecord[] => childrenByGroupParentId.get(task.id) ?? [],
+    [childrenByGroupParentId]
   );
 
   const handleCreateNoteForTask = useCallback(
@@ -124,21 +200,6 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
     },
     [createNote, onOpenNote]
   );
-
-  const visibleTasks = useMemo(() => {
-    if (!hideCompleted) return safeTasks;
-
-    const filtered = safeTasks.filter((task) => !isTaskComplete(task));
-
-    // Deep-linking into a completed task (e.g. from a note's linked task)
-    // should surface it even though completed tasks are hidden by default.
-    if (openTaskId != null && !filtered.some((task) => task.id === openTaskId)) {
-      const target = safeTasks.find((task) => task.id === openTaskId);
-      if (target) return [...filtered, target];
-    }
-
-    return filtered;
-  }, [hideCompleted, safeTasks, openTaskId]);
 
   const toggleHideCompleted = useCallback(() => {
     setHideCompleted((current) => {
@@ -153,11 +214,16 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
   }, []);
 
   const handleCreateTask = useCallback(
-    (name: string) => {
+    (name: string, options?: { parent?: number | null; due_at?: string | null }) => {
       const trimmed = name.trim();
       if (!trimmed) return;
-      createTask.mutate({ name: trimmed });
+      createTask.mutate({
+        name: trimmed,
+        ...(options?.parent !== undefined ? { parent: options.parent } : {}),
+        ...(options?.due_at !== undefined ? { due_at: options.due_at } : {}),
+      });
       setNewName("");
+      setAddSubtaskParent(null);
     },
     [createTask]
   );
@@ -165,14 +231,29 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
   const handleSubmitForm = useCallback(
     (event: React.FormEvent<HTMLFormElement>) => {
       event.preventDefault();
-      handleCreateTask(newName);
+      handleCreateTask(newName, { parent: addSubtaskParent?.id ?? undefined });
     },
-    [handleCreateTask, newName]
+    [handleCreateTask, newName, addSubtaskParent]
   );
 
+  const startAddSubtask = useCallback((task: ItemRecord) => {
+    setAddSubtaskParent(task);
+  }, []);
+
+  const clearAddSubtaskParent = useCallback(() => {
+    setAddSubtaskParent(null);
+  }, []);
+
   const handleEdit = useCallback(
-    (task: Task, name: string) => {
-      updateTask.mutate({ id: task.id, data: { name } });
+    (task: ItemRecord, name: string, options?: { parent?: number | null; due_at?: string | null }) => {
+      updateTask.mutate({
+        id: task.id,
+        data: {
+          name,
+          ...(options?.parent !== undefined ? { parent: options.parent } : {}),
+          ...(options?.due_at !== undefined ? { due_at: options.due_at } : {}),
+        },
+      });
     },
     [updateTask]
   );
@@ -227,6 +308,8 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
     (task: Task) => ({
       lastWorkedOn: formatLastWorkedOn(task),
       completionXp: completionReward?.taskId === task.id ? completionReward.xp : null,
+      dueAt: formatDueAt(task.due_at),
+      isOverdue: isOverdue(task.due_at, isTaskComplete(task)),
     }),
     [completionReward]
   );
@@ -252,6 +335,12 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
     setNewName,
     hideCompleted,
     visibleTasks,
+    groupedTasks,
+    getChildren,
+    topLevelTasks,
+    addSubtaskParent,
+    startAddSubtask,
+    clearAddSubtaskParent,
     handleCreateTask,
     handleSubmitForm,
     handleEdit,
@@ -263,5 +352,6 @@ export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: 
     getTaskEditSummary,
     getLinkedNoteId,
     handleCreateNoteForTask,
+    updateTask,
   };
 }

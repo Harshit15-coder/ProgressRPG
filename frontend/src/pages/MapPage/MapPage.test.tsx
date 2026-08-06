@@ -1,4 +1,4 @@
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,15 +44,15 @@ vi.mock('../../components/Map/Map', () => ({
   default: MapStub,
 }));
 
-function renderMapPage() {
-  const queryClient = new QueryClient({
+function renderMapPage(queryClient?: QueryClient) {
+  const client = queryClient ?? new QueryClient({
     defaultOptions: {
       queries: { retry: false },
     },
   });
 
   return render(
-    <QueryClientProvider client={queryClient}>
+    <QueryClientProvider client={client}>
       <MapPage />
     </QueryClientProvider>
   );
@@ -86,6 +86,51 @@ describe('MapPage', () => {
     renderMapPage();
 
     expect(await screen.findByTestId('map-stub')).toHaveTextContent('Driftmoor');
+  });
+
+  it('reuses cached viewport data when the page is remounted within the cache window', async () => {
+    mockFetchPopulationCentreMap.mockResolvedValue({
+      meta: { population_centre_name: 'Driftmoor' },
+      bbox: [0, 0, 100, 100],
+    });
+
+    const queryClient = new QueryClient({
+      defaultOptions: {
+        queries: { retry: false },
+      },
+    });
+
+    const { unmount } = renderMapPage(queryClient);
+
+    expect(await screen.findByTestId('map-stub')).toHaveTextContent('Driftmoor');
+    await waitFor(() => {
+      expect(mockFetchMapViewport).toHaveBeenCalledTimes(1);
+    });
+
+    unmount();
+    renderMapPage(queryClient);
+
+    expect(await screen.findByTestId('map-stub')).toHaveTextContent('Driftmoor');
+    await waitFor(() => {
+      expect(mockFetchMapViewport).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('prefetches the next village map data once the village list is available', async () => {
+    mockFetchPopulationCentreMap.mockResolvedValue({
+      meta: { population_centre_name: 'Driftmoor' },
+      bbox: [0, 0, 100, 100],
+    });
+    mockFetchPopulationCentres.mockResolvedValue([
+      { id: 1, name: 'Driftmoor village', location: [0, 0] },
+      { id: 2, name: 'Cedar Hollow', location: [100, 100] },
+    ]);
+
+    renderMapPage();
+
+    await waitFor(() => {
+      expect(mockFetchPopulationCentreMap).toHaveBeenCalledTimes(2);
+    });
   });
 
   it('does not issue a second viewport request while the previous poll is still in flight (#624)', async () => {

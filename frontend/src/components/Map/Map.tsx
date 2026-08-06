@@ -12,15 +12,18 @@ import {
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
 import { fromLngLat, quantizeBbox, toLngLat } from "./utils";
-import { CharacterTooltipContent } from "./MapTooltips";
+import { CharacterTooltipContent, PopulationCentreTooltipContent } from "./MapTooltips";
 import { scatterCharacters } from "./characters/placement";
 import {
   buildingFootprintRings,
   polygonTooltipContent,
-  styledLineFeatures,
-  styledPolygonFeatures,
 } from "./geojson";
-import { addCharacterImage, addVillageLayers, CLICKABLE_LAYERS } from "./layers";
+import {
+  addCharacterImage,
+  addVillageLayers,
+  CLICKABLE_LAYERS,
+  VILLAGE_LABEL_LAYER,
+} from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
 import styles from "./Map.module.scss";
 
@@ -211,12 +214,52 @@ export default function PopulationCentreMap({
         map.getCanvas().style.cursor = "";
       });
 
+      // Tapping/selecting a village's name label expands it into its
+      // progress bar + state (issue #673) - the label itself is coloured by
+      // state at rest (see VILLAGE_LABEL_LAYER in layers.ts).
+      map.on(
+        "click",
+        VILLAGE_LABEL_LAYER,
+        (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
+          const feature = e.features?.[0];
+          if (!feature) return;
+          e.originalEvent?.stopPropagation?.();
+          setTooltip({
+            key: `population-centre-${feature.properties?.population_centre_id ?? JSON.stringify(feature.properties)}`,
+            content: (
+              <PopulationCentreTooltipContent
+                name={feature.properties?.name as string | undefined}
+                state={feature.properties?.state as string | null | undefined}
+                progress={feature.properties?.progress as number | null | undefined}
+              />
+            ),
+            lngLat: [e.lngLat.lng, e.lngLat.lat],
+          });
+        }
+      );
+      map.on("mouseenter", VILLAGE_LABEL_LAYER, () => {
+        map.getCanvas().style.cursor = "pointer";
+      });
+      map.on("mouseleave", VILLAGE_LABEL_LAYER, () => {
+        map.getCanvas().style.cursor = "";
+      });
+
       refreshVillageSource();
 
       for (const layerId of CLICKABLE_LAYERS) {
         map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
+          // A village's name label can sit over a building/subzone
+          // underneath it - each map.on(type, layerId, ...) delegate queries
+          // features independently, so both handlers would fire for the same
+          // click (stopPropagation on the DOM event doesn't stop sibling
+          // MapLibre delegates). Deferring to the label's own handler
+          // (registered above, so it already ran and set the tooltip) keeps
+          // the progress-bar tooltip from being clobbered.
+          if (map.queryRenderedFeatures(e.point, { layers: [VILLAGE_LABEL_LAYER] }).length > 0) {
+            return;
+          }
           e.originalEvent?.stopPropagation?.();
           const content = polygonTooltipContent(
             feature.properties as GeoJSONFeatureProperties
@@ -241,7 +284,7 @@ export default function PopulationCentreMap({
         // per-layer listeners above and stops here; a click on empty map
         // area closes whatever tooltip is open.
         const hits = map.queryRenderedFeatures(e.point, {
-          layers: ["characters", ...CLICKABLE_LAYERS],
+          layers: ["characters", VILLAGE_LABEL_LAYER, ...CLICKABLE_LAYERS],
         });
         if (hits.length === 0) closeTooltip();
       });
