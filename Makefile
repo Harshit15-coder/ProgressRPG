@@ -21,8 +21,12 @@ ps:
 ds:
 	docker compose exec db psql -U progress -d progress
 
-t:
+dt:
 	docker compose exec web python manage.py test $(t) --keepdb --buffer
+
+vt:
+	cd ./frontend
+	npm test
 
 shell:
 	docker compose exec web python manage.py shell_plus
