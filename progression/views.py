@@ -27,8 +27,8 @@ from .models import (
     Activity,
     SuggestedActivity,
     PlayerActivity,
+    ActivityDefinition,
     CharacterActivity,
-    CharacterQuest,
     Project,
     Task,
     Note,
@@ -45,8 +45,8 @@ from .serializers import (
     SuggestedActivitySerializer,
     PlayerActivitySerializer,
     OfflineActivityLogSerializer,
+    ActivityDefinitionSerializer,
     CharacterActivitySerializer,
-    CharacterQuestSerializer,
     ProjectSerializer,
     TaskSerializer,
     NoteSerializer,
@@ -347,6 +347,15 @@ class CurrentCharacterScopedQuerysetMixin(_RequestMixinBase):
         return self.model._default_manager.filter(character=character)
 
 
+class ActivityDefinitionViewSet(viewsets.ModelViewSet):
+    queryset = ActivityDefinition.objects.all()
+    serializer_class = ActivityDefinitionSerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description", "kind"]
+    ordering_fields = ["created_at", "last_updated"]
+
+
 class CharacterActivityViewSet(
     CurrentCharacterScopedQuerysetMixin, viewsets.ModelViewSet
 ):
@@ -359,7 +368,7 @@ class CharacterActivityViewSet(
         filters.OrderingFilter,
     ]
     filterset_class = CharacterActivityFilter
-    search_fields = ["name", "description", "character__name"]
+    search_fields = ["activity_definition__name", "character__name"]
     ordering_fields = [
         "duration",
         "created_at",
@@ -387,15 +396,6 @@ class CharacterActivityViewSet(
         current = behaviour.sync_to_now()
         data = self.get_serializer(current).data if current else None
         return Response({"current": data})
-
-
-class CharacterQuestViewSet(CurrentCharacterScopedQuerysetMixin, viewsets.ModelViewSet):
-    model = CharacterQuest
-    serializer_class = CharacterQuestSerializer
-    permission_classes = [IsAuthenticated]
-    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
-    search_fields = ["name", "description", "character__name"]
-    ordering_fields = ["duration", "target_duration", "created_at", "last_updated"]
 
 
 #########################################

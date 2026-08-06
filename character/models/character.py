@@ -14,7 +14,6 @@ from users.models import Person, Player
 
 from gameplay.models import Currency, CurrencyAccountBase, QuestCompletion, Quest
 from gameplay.serializers import QuestResultSerializer
-from progression.models import CharacterQuest
 from progress_rpg.exceptions import QuestError
 
 from character.services import character_services, lifecycle_services, link_services
@@ -331,9 +330,7 @@ class PlayerCharacterLink(models.Model):
         a date-filtered variant of player_time, bounded to the current UTC
         day instead of the whole link lifetime.
         """
-        start_of_day = timezone.now().replace(
-            hour=0, minute=0, second=0, microsecond=0
-        )
+        start_of_day = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
         start = max(start_of_day, self.linked_at)
 
         qs = self.player.activities.filter(is_complete=True, completed_at__gte=start)
