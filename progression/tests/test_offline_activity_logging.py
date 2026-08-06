@@ -8,7 +8,7 @@ Covers:
 - The ``player-activities/log_offline/`` API endpoint
 """
 
-from datetime import timedelta
+from datetime import datetime, time, timedelta
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -26,6 +26,17 @@ from progression.services import (
 )
 
 User = get_user_model()
+
+
+def past_local_day_start(days_ago: int = 1):
+    """Return a timezone-aware midnight for a past local calendar day.
+
+    Using fixed local-day anchors keeps daily-cap tests deterministic even
+    when run near midnight or under different CI timezones.
+    """
+    tz = timezone.get_current_timezone()
+    day = timezone.localdate() - timedelta(days=days_ago)
+    return timezone.make_aware(datetime.combine(day, time.min), tz)
 
 
 class OfflineLoggingTestBase(TestCase):
@@ -107,7 +118,7 @@ class LogOfflineActivityServiceTests(OfflineLoggingTestBase):
 
     def test_daily_duration_cap_enforced_regardless_of_tier(self):
         self.grant_premium()
-        base = timezone.now() - timedelta(hours=20)
+        base = past_local_day_start()
 
         log_offline_activity(
             self.player,
@@ -126,7 +137,7 @@ class LogOfflineActivityServiceTests(OfflineLoggingTestBase):
 
     def test_daily_xp_eligible_cap_limits_premium_xp_not_duration(self):
         self.grant_premium()
-        base = timezone.now() - timedelta(hours=10)
+        base = past_local_day_start()
 
         first = log_offline_activity(
             self.player,
@@ -289,7 +300,7 @@ class PlayerActivityLogOfflineApiTests(APITestCase):
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
     def test_exceeding_daily_cap_returns_400(self):
-        base = timezone.now() - timedelta(hours=20)
+        base = past_local_day_start()
         self._log(
             name="First",
             started_at=base.isoformat(),
