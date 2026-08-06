@@ -460,8 +460,13 @@ export default function PopulationCentreMap({
   // Unmount cleanup for the tooltip root when the whole component goes away.
   useEffect(() => {
     return () => {
-      tooltipRootRef.current?.unmount();
+      const tooltipRoot = tooltipRootRef.current;
       tooltipRootRef.current = null;
+      // Defer nested-root unmount so it does not run during parent-root
+      // teardown, which can trigger React's unmount-during-render warning.
+      queueMicrotask(() => {
+        tooltipRoot?.unmount();
+      });
       sourceRef.current = null;
     };
   }, []);
