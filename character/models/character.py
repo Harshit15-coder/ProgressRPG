@@ -3,6 +3,7 @@ from celery import current_app
 from decimal import Decimal
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
+from django.core.exceptions import ValidationError
 from django.db import models, transaction, IntegrityError
 from django.db.models import Sum
 from django.utils import timezone
@@ -137,6 +138,28 @@ class CharacterRelationship(models.Model):
         """Add an event to the history log."""
         return lifecycle_services.relationship_log_event(self, event)
 
+    def clean(self):
+        super().clean()
+        if not self.relationship_type:
+            return
+        spec = RELATIONSHIP_SPECS.get(RelationshipType(self.relationship_type))
+        if spec is None:
+            return
+        if self.variant and self.variant not in spec.allowed_variants:
+            raise ValidationError(
+                {
+                    "variant": (
+                        f"'{self.variant}' is not a valid variant for "
+                        f"{self.relationship_type} (allowed: "
+                        f"{', '.join(sorted(spec.allowed_variants)) or 'none'})."
+                    )
+                }
+            )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
+
     def __str__(self):
         characters_list = [str(char) for char in self.get_members()]
         return f"{self.relationship_type} between {', '.join(characters_list)}"
@@ -158,6 +181,62 @@ class CharacterRelationshipMembership(models.Model):
 
     class Meta:
         unique_together = ("character", "relationship")
+
+    def clean(self):
+        super().clean()
+        # Required FKs missing is already reported by clean_fields(); nothing
+        # further to check against a relationship/character we don't have.
+        if not self.relationship_id or not self.character_id:
+            return
+
+        spec = RELATIONSHIP_SPECS.get(
+            RelationshipType(self.relationship.relationship_type)
+        )
+        if spec is None:
+            return
+
+        if not self.role:
+            raise ValidationError(
+                {"role": "A role is required for this relationship type."}
+            )
+
+        role = RelationshipRole(self.role)
+        if role not in spec.roles:
+            allowed = ", ".join(sorted(r.value for r in spec.roles))
+            raise ValidationError(
+                {
+                    "role": (
+                        f"'{self.role}' is not a valid role for "
+                        f"{self.relationship.relationship_type} (allowed: {allowed})."
+                    )
+                }
+            )
+
+        existing = CharacterRelationshipMembership.objects.filter(
+            relationship_id=self.relationship_id
+        ).exclude(pk=self.pk)
+
+        if existing.filter(character_id=self.character_id).exists():
+            raise ValidationError(
+                "This character is already a member of this relationship."
+            )
+
+        _min, max_count = spec.roles[role]
+        if max_count is not None:
+            current_count = existing.filter(role=self.role).count()
+            if current_count + 1 > max_count:
+                raise ValidationError(
+                    {
+                        "role": (
+                            f"{self.relationship.relationship_type} allows at most "
+                            f"{max_count} member(s) with role '{self.role}'."
+                        )
+                    }
+                )
+
+    def save(self, *args, **kwargs):
+        self.full_clean()
+        super().save(*args, **kwargs)
 
 
 class LifeCycleMixin(models.Model):
