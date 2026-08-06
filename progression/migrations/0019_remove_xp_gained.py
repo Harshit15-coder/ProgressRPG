@@ -4,7 +4,7 @@ from django.db import migrations
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0015_migrate_xp_gained_to_reward_breakdown"),
+        ("progression", "0018_migrate_xp_gained_to_reward_breakdown"),
     ]
 
     operations = [

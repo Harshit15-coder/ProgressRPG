@@ -21,7 +21,7 @@ def noop_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0014_add_reward_breakdown"),
+        ("progression", "0017_add_reward_breakdown"),
     ]
 
     operations = [
