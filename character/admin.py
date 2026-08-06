@@ -5,7 +5,11 @@ from .models import (
     CharacterLocation,
     PlayerCharacterLink,
     CharacterRelationship,
+    CharacterRelationshipMembership,
     Behaviour,
+    RELATIONSHIP_SPECS,
+    RelationshipRole,
+    RelationshipType,
 )
 
 from django.contrib import messages
@@ -30,6 +34,28 @@ class CharacterCurrencyInline(admin.TabularInline):
     extra = 0
     fields = ("currency", "earned", "spent", "balance", "last_calculated_at")
     readonly_fields = ("balance",)
+
+
+class CharacterRelationshipMembershipInline(admin.TabularInline):
+    model = CharacterRelationshipMembership
+    fk_name = "character"
+    extra = 0
+    fields = ("get_relationship_type", "relationship", "role", "get_other_members")
+    readonly_fields = ("get_relationship_type", "get_other_members")
+    ordering = ("relationship__relationship_type",)
+
+    @admin.display(description="Type")
+    def get_relationship_type(self, obj):
+        if not obj.pk:
+            return "-"
+        return obj.relationship.get_relationship_type_display()
+
+    @admin.display(description="With")
+    def get_other_members(self, obj):
+        if not obj.pk:
+            return "-"
+        others = obj.relationship.characters.exclude(pk=obj.character_id)
+        return ", ".join(str(c) for c in others)
 
 
 @admin.action(description="Mark selected characters as NPCs and unlink from players")
@@ -81,10 +107,16 @@ class CharacterAdmin(admin.ModelAdmin):
         ),
         ("Dates", {"fields": (("birth_date", "death_date", "get_age"),)}),
         (
+            "Family",
+            {
+                "fields": ("get_family_summary",),
+            },
+        ),
+        (
             "Life & Story",
             {
                 "classes": ("collapse",),
-                "fields": ("backstory", "parents", "cause_of_death"),
+                "fields": ("backstory", "cause_of_death"),
             },
         ),
         (
@@ -127,12 +159,16 @@ class CharacterAdmin(admin.ModelAdmin):
     readonly_fields = [
         "get_player",
         "get_age",
-        "parents",
         "created_at",
+        "get_family_summary",
     ]
 
     ordering = ["last_name", "first_name"]
-    inlines = [LinkInline, CharacterCurrencyInline]
+    inlines = [
+        LinkInline,
+        CharacterCurrencyInline,
+        CharacterRelationshipMembershipInline,
+    ]
     actions = [mark_as_npc, mark_as_canlink]
 
     @admin.display(description="Player")
@@ -174,6 +210,21 @@ class CharacterAdmin(admin.ModelAdmin):
         except Exception:
             return "-"
 
+    @admin.display(description="Family")
+    def get_family_summary(self, obj):
+        if not obj.pk:
+            return "-"
+
+        def names(characters):
+            return ", ".join(str(c) for c in characters) or "-"
+
+        parts = [
+            f"Parents: {names(obj.parents)}",
+            f"Children: {names(obj.children)}",
+            f"Siblings: {names(obj.siblings)}",
+        ]
+        return " · ".join(parts)
+
 
 @admin.register(PlayerCharacterLink)
 class PlayerCharacterLinkAdmin(admin.ModelAdmin):
@@ -212,7 +263,7 @@ class CharacterInline(admin.TabularInline):
     extra = 1
 
 
-# @admin.register(CharacterRelationship)
+@admin.register(CharacterRelationship)
 class CharacterRelationshipAdmin(admin.ModelAdmin):
     list_display = [
         "relationship_type",
@@ -223,7 +274,7 @@ class CharacterRelationshipAdmin(admin.ModelAdmin):
         "relationship_type",
         "strength",
         "history",
-        "biological",
+        "variant",
         ("created_at", "last_updated"),
     ]
     inlines = [CharacterInline]
@@ -232,3 +283,34 @@ class CharacterRelationshipAdmin(admin.ModelAdmin):
     @admin.display(description="Characters")
     def get_linked_characters(self, obj):
         return ", ".join([str(char) for char in obj.get_members()])
+
+    def save_related(self, request, form, formsets, change):
+        # Membership inlines save one row at a time, so a relationship can
+        # be left transiently incomplete (e.g. a PARENT_CHILD relationship
+        # with only its PARENT role filled in) - that's allowed (see
+        # CharacterRelationshipMembership.clean()), but warn staff here
+        # rather than silently leaving it incomplete.
+        super().save_related(request, form, formsets, change)
+        relationship = form.instance
+        spec = RELATIONSHIP_SPECS.get(RelationshipType(relationship.relationship_type))
+        if spec is None:
+            return
+
+        counts = {}
+        for membership in relationship.characterrelationshipmembership_set.all():
+            if not membership.role:
+                continue
+            role = RelationshipRole(membership.role)
+            counts[role] = counts.get(role, 0) + 1
+
+        missing = [
+            role.value
+            for role, (min_count, _max_count) in spec.roles.items()
+            if counts.get(role, 0) < min_count
+        ]
+        if missing:
+            messages.warning(
+                request,
+                f"This {relationship.relationship_type} relationship is missing "
+                f"required role(s): {', '.join(missing)}.",
+            )

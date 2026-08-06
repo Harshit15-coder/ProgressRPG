@@ -37,9 +37,11 @@ def lifecycle_is_alive(instance) -> bool:
 
 
 def lifecycle_get_romantic_partners(instance):
-    return instance.__class__.objects.filter(
-        characterrelationshipmembership__character=instance,
-        characterrelationshipmembership__relationship__relationship_type="romantic",
+    from character.models import RelationshipType
+    from character.services import relationship_services
+
+    return relationship_services.relationship_get_related_characters(
+        instance, RelationshipType.ROMANTIC
     )
 
 
@@ -89,9 +91,9 @@ def lifecycle_handle_childbirth(instance) -> None:
         sex="Male" if randint(0, 1) == 0 else "Female",
     )
 
-    child.parents.add(instance)
+    child.add_parent(instance, variant="biological")
     if instance.pregnancy_partner:
-        child.parents.add(instance.pregnancy_partner)
+        child.add_parent(instance.pregnancy_partner, variant="biological")
     child.save()
 
 
