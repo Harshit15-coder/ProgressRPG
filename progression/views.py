@@ -1,6 +1,7 @@
 # progression/views.py
 from typing import TYPE_CHECKING
 from datetime import timedelta
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.db import models
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils import timezone
@@ -33,12 +34,14 @@ from .serializers import (
     PlayerSkillSerializer,
     CharacterSkillSerializer,
     PlayerActivitySerializer,
+    OfflineActivityLogSerializer,
     CharacterActivitySerializer,
     CharacterQuestSerializer,
     ProjectSerializer,
     TaskSerializer,
     NoteSerializer,
 )
+from .services import log_offline_activity
 from .filters import (
     CategoryFilter,
     PlayerSkillFilter,
@@ -203,6 +206,51 @@ class PlayerActivityViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
                 "activities": PlayerActivitySerializer(activities, many=True).data,
             },
             status=status.HTTP_200_OK,
+        )
+
+    @action(
+        detail=False,
+        methods=["post"],
+        url_path="log_offline",
+        permission_classes=[IsAuthenticated],
+    )
+    def log_offline(self, request):
+        player = request.user.player
+        serializer = OfflineActivityLogSerializer(
+            data=request.data, context={"request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+
+        task = data.get("task")
+        name = data.get("name") or task.name
+
+        try:
+            result = log_offline_activity(
+                player,
+                name=name,
+                description=data.get("description", ""),
+                skill=data.get("skill"),
+                task=task,
+                started_at=data["started_at"],
+                completed_at=data["completed_at"],
+            )
+        except DjangoValidationError as exc:
+            return Response(
+                {"success": False, "message": "; ".join(exc.messages)},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        return Response(
+            {
+                "success": True,
+                "message": "Activity logged",
+                "activity": PlayerActivitySerializer(result.activity).data,
+                "xp_gained": result.reward_summary["xp_gained"],
+                "xp_eligible_seconds": result.xp_eligible_seconds,
+                "level_ups": result.level_ups,
+            },
+            status=status.HTTP_201_CREATED,
         )
 
     @action(detail=True, methods=["patch"])

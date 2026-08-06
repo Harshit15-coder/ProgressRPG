@@ -239,11 +239,18 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
     Activities may be linked to a skill or project, and can be private.
     """
 
+    class Origin(models.TextChoices):
+        TIMER = "timer", "Timer"
+        MANUAL = "manual", "Manual"
+
     player = models.ForeignKey(
         "users.Player", on_delete=models.CASCADE, related_name="activities"
     )
     group_key = models.CharField(max_length=255, null=True, blank=True, db_index=True)
     is_private = models.BooleanField(default=False)
+    origin = models.CharField(
+        max_length=10, choices=Origin.choices, default=Origin.TIMER
+    )
     skill = models.ForeignKey(
         "progression.PlayerSkill",
         on_delete=models.SET_NULL,
@@ -422,8 +429,18 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
         xp_per_second = GameSettings.current().default_activity_xp_per_second
         return int(Decimal(duration) * xp_per_second)
 
-    def get_xp_reward_summary(self) -> Dict[str, Any]:
-        base_xp = self.calculate_base_xp(self.duration)
+    def get_xp_reward_summary(self, duration: int | None = None) -> Dict[str, Any]:
+        """
+        Compute the XP reward for this activity.
+
+        ``duration`` defaults to ``self.duration`` but can be overridden to
+        compute a reward for only part of the recorded time (e.g. the
+        XP-eligible portion of a manually-logged activity).
+        """
+        if duration is None:
+            duration = self.duration
+
+        base_xp = self.calculate_base_xp(duration)
         player = self.player
         multiplier = player.get_activity_xp_multiplier()
         task_xp_multiplier = Decimal("1.0")
@@ -437,27 +454,69 @@ class PlayerActivity(TimeRecord, PlayerOwnedMixin):
             return int(d) if d == d.to_integral_value() else float(d)
 
         return {
-            "duration_seconds": self.duration,
+            "duration_seconds": duration,
             "base_xp": base_xp,
             "xp_multiplier": _fmt(multiplier),
             "task_xp_multiplier": _fmt(task_xp_multiplier),
             "xp_gained": int(Decimal(base_xp) * multiplier),
         }
 
-    def complete(self, reward_summary: Dict[str, Any] | None = None):
+    def complete(
+        self,
+        reward_summary: Dict[str, Any] | None = None,
+        completed_at: datetime | None = None,
+    ):
         """
         Mark the record as completed if not already complete.
+
+        ``completed_at`` defaults to now, but can be overridden to backdate
+        completion (e.g. for a manually-logged activity).
         """
         if getattr(self, "is_complete", False):
             return self.xp_gained
 
-        self.completed_at = timezone.now()
+        self.completed_at = completed_at or timezone.now()
         self.is_complete = True
         reward_summary = reward_summary or self.get_xp_reward_summary()
         self.xp_gained = cast(int, reward_summary["xp_gained"])
         self.save(update_fields=["completed_at", "is_complete", "xp_gained"])
 
         return self.xp_gained
+
+
+class OfflineActivityLedger(models.Model):
+    """
+    Append-only per-player-per-day ledger of manually-logged (offline)
+    activity time.
+
+    Tracks cumulative logged and XP-eligible seconds for each calendar day
+    so the daily duration/XP caps on offline logging (see
+    ``progression.services``) can be enforced. Rows are only ever
+    incremented, never decremented, so deleting a logged
+    ``PlayerActivity`` can't be used to "refund" the day's cap and
+    double-dip on XP by re-logging.
+    """
+
+    player = models.ForeignKey(
+        "users.Player",
+        on_delete=models.CASCADE,
+        related_name="offline_activity_ledgers",
+    )
+    date = models.DateField()
+    logged_seconds = models.PositiveIntegerField(default=0)
+    xp_eligible_seconds = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["player", "date"], name="unique_offline_ledger_player_date"
+            )
+        ]
+
+    def __str__(self):
+        return f"OfflineActivityLedger(player={self.player_id}, date={self.date})"
 
 
 class CharacterActivity(TimeRecord):

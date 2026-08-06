@@ -10,6 +10,7 @@ from .models import (
     PlayerActivity,
     CharacterActivity,
     CharacterQuest,
+    OfflineActivityLedger,
     Project,
     Task,
     Note,
@@ -103,15 +104,56 @@ class PlayerActivityAdmin(admin.ModelAdmin):
         "name",
         "group_key",
         "player",
+        "origin",
         "duration",
+        "xp_gained",
         "created_at",
         "started_at",
         "completed_at",
     )
     search_fields = ("name", "group_key", "description", "player__name")
-    list_filter = ("player", "is_private", "is_complete", "skill", "project", "task")
+    list_filter = (
+        "player",
+        "origin",
+        "is_private",
+        "is_complete",
+        "skill",
+        "project",
+        "task",
+    )
     date_hierarchy = "created_at"
     readonly_fields = ("created_at",)
+
+
+@admin.register(OfflineActivityLedger)
+class OfflineActivityLedgerAdmin(admin.ModelAdmin):
+    list_display = (
+        "id",
+        "player",
+        "date",
+        "logged_seconds",
+        "xp_eligible_seconds",
+        "last_updated",
+    )
+    search_fields = ("player__name",)
+    list_filter = ("date",)
+    date_hierarchy = "date"
+    readonly_fields = (
+        "player",
+        "date",
+        "logged_seconds",
+        "xp_eligible_seconds",
+        "created_at",
+        "last_updated",
+    )
+
+    def has_add_permission(self, request):
+        # Append-only ledger — rows are only ever written by
+        # progression.services.log_offline_activity.
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
 
 
 @admin.register(CharacterActivity)
