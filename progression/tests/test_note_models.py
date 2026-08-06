@@ -1,4 +1,5 @@
 from django.contrib.auth import get_user_model
+from django.db import IntegrityError, transaction
 from django.test import TestCase
 
 from progression.models import Note, Task
@@ -32,3 +33,11 @@ class NoteModelTests(TestCase):
         note.refresh_from_db()
 
         self.assertIsNone(note.task)
+
+    def test_task_unique_constraint_rejects_second_note_at_db_level(self):
+        task = Task.objects.create(player=self.player, name="Ship it")
+        Note.objects.create(player=self.player, title="First", task=task)
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                Note.objects.create(player=self.player, title="Second", task=task)

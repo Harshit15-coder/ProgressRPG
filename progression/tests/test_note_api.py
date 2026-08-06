@@ -81,6 +81,40 @@ class NoteViewSetTests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
 
+    def test_cannot_link_note_to_already_linked_task(self):
+        task = Task.objects.create(player=self.player, name="Ship it")
+        Note.objects.create(player=self.player, title="First", task=task)
+
+        response = self.client.post(
+            reverse("notes-list"), {"title": "Second", "body": "", "task": task.id}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_can_keep_own_existing_task_link_on_update(self):
+        task = Task.objects.create(player=self.player, name="Ship it")
+        note = Note.objects.create(player=self.player, title="Plan", task=task)
+
+        response = self.client.patch(
+            reverse("notes-detail", args=[note.id]),
+            {"title": "Plan v2", "task": task.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        note.refresh_from_db()
+        self.assertEqual(note.task, task)
+
+    def test_cannot_steal_another_notes_linked_task_on_update(self):
+        task = Task.objects.create(player=self.player, name="Ship it")
+        Note.objects.create(player=self.player, title="First", task=task)
+        other_note = Note.objects.create(player=self.player, title="Second")
+
+        response = self.client.patch(
+            reverse("notes-detail", args=[other_note.id]), {"task": task.id}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
     def test_html_tags_are_stripped_before_save(self):
         response = self.client.post(
             reverse("notes-list"),

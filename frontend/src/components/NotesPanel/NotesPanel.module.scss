@@ -71,6 +71,21 @@
   font-size: 0.9em;
 }
 
+.linkedTaskLink {
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: c.$color-status-info;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+  }
+}
+
 .emptyState {
   @include lp.list-page-empty-state;
 }

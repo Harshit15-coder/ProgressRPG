@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 
 import Button from "../Button/Button";
 import Input from "../Input/Input";
@@ -13,26 +13,34 @@ function bodyPreview(body: string): string {
   return `${trimmed.slice(0, 140)}…`;
 }
 
-export default function NotesPanel(): React.ReactElement | null {
+interface NotesPanelProps {
+  /** Called with a task id when the user clicks a note's linked-task link. */
+  onOpenTask?: (taskId: number) => void;
+  /** Opens the edit modal for this note id once the notes have loaded. */
+  openNoteId?: number | null;
+  /** Called once the requested `openNoteId` has been opened, so the caller can clear it. */
+  onOpenNoteHandled?: () => void;
+}
+
+export default function NotesPanel({
+  onOpenTask,
+  openNoteId,
+  onOpenNoteHandled,
+}: NotesPanelProps = {}): React.ReactElement | null {
   const {
     isLoading,
     visibleNotes,
-    taskOptions,
     getTaskName,
     newTitle,
     setNewTitle,
     newBody,
     setNewBody,
-    newTaskId,
-    setNewTaskId,
     handleCreate,
     activeNote,
     editTitle,
     setEditTitle,
     editBody,
     setEditBody,
-    editTaskId,
-    setEditTaskId,
     confirmingDelete,
     openNote,
     closeNote,
@@ -41,6 +49,25 @@ export default function NotesPanel(): React.ReactElement | null {
     cancelDeleteRequest,
     handleDeleteConfirm,
   } = useNotesPanel();
+
+  // Deep-link support: open a specific note's edit modal (e.g. navigated to
+  // from a task's "View linked note" link) once it's available in `visibleNotes`.
+  useEffect(() => {
+    if (openNoteId == null) return;
+
+    const note = visibleNotes.find((n) => n.id === openNoteId);
+    if (!note) return;
+
+    openNote(note);
+    onOpenNoteHandled?.();
+  }, [openNoteId, visibleNotes, openNote, onOpenNoteHandled]);
+
+  const handleLinkedTaskClick = () => {
+    if (activeNote?.task === null || activeNote?.task === undefined) return;
+    const taskId = activeNote.task;
+    closeNote();
+    onOpenTask?.(taskId);
+  };
 
   if (isLoading) return <p>Loading notes...</p>;
 
@@ -63,21 +90,6 @@ export default function NotesPanel(): React.ReactElement | null {
             placeholder="Note content (optional)"
             rows={2}
           />
-          {taskOptions.length > 0 ? (
-            <select
-              aria-label="Attach to task"
-              className={styles.taskSelect}
-              value={newTaskId}
-              onChange={(e) => setNewTaskId(e.target.value)}
-            >
-              <option value="">No linked task</option>
-              {taskOptions.map((task) => (
-                <option key={task.id} value={task.id}>
-                  {task.name}
-                </option>
-              ))}
-            </select>
-          ) : null}
           <Button type="submit">Add note</Button>
         </form>
 
@@ -160,25 +172,21 @@ export default function NotesPanel(): React.ReactElement | null {
                 onChange={(e) => setEditBody(e.target.value)}
                 rows={6}
               />
-              {taskOptions.length > 0 ? (
-                <>
-                  <label className={styles.bodyLabel} htmlFor="edit-note-task">
-                    Linked task
-                  </label>
-                  <select
-                    id="edit-note-task"
-                    className={styles.taskSelect}
-                    value={editTaskId}
-                    onChange={(e) => setEditTaskId(e.target.value)}
-                  >
-                    <option value="">No linked task</option>
-                    {taskOptions.map((task) => (
-                      <option key={task.id} value={task.id}>
-                        {task.name}
-                      </option>
-                    ))}
-                  </select>
-                </>
+              {activeNote.task !== null ? (
+                <div className={styles.noteMeta}>
+                  Linked task:{" "}
+                  {onOpenTask ? (
+                    <button
+                      type="button"
+                      className={styles.linkedTaskLink}
+                      onClick={handleLinkedTaskClick}
+                    >
+                      {getTaskName(activeNote.task)}
+                    </button>
+                  ) : (
+                    getTaskName(activeNote.task)
+                  )}
+                </div>
               ) : null}
               <div className={styles.editActions}>
                 <Button variant="primary" onClick={handleEditSave}>

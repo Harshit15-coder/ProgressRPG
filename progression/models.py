@@ -663,10 +663,10 @@ class Note(PlayerOwnedMixin):
     player = models.ForeignKey(
         "users.Player", on_delete=models.CASCADE, related_name="notes"
     )
-    task = models.ForeignKey(
+    task = models.OneToOneField(
         "progression.Task",
         on_delete=models.SET_NULL,
-        related_name="notes",
+        related_name="note",
         null=True,
         blank=True,
     )

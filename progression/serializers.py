@@ -276,4 +276,11 @@ class NoteSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Task must belong to the requesting player."
             )
+        existing = Note.objects.filter(task=task)
+        if self.instance is not None:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError(
+                "This task is already linked to another note."
+            )
         return task

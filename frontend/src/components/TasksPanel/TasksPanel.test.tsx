@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "../Tooltip/Tooltip";
 import TasksPanel from "./TasksPanel";
 
-function renderTasksPanel() {
+function renderTasksPanel(props: ComponentProps<typeof TasksPanel> = {}) {
   return render(
     <TooltipProvider>
-      <TasksPanel />
+      <TasksPanel {...props} />
     </TooltipProvider>
   );
 }
@@ -17,9 +18,12 @@ const mockUseTasks = vi.fn();
 const mockUseCreateTask = vi.fn();
 const mockUseUpdateTask = vi.fn();
 const mockUseDeleteTask = vi.fn();
+const mockUseNotes = vi.fn();
+const mockUseCreateNote = vi.fn();
 const createMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const createNoteMutate = vi.fn();
 
 const navigate = vi.fn();
 const startActivity = vi.fn().mockResolvedValue(undefined);
@@ -33,6 +37,11 @@ vi.mock("../../hooks/useTasks", () => ({
   useCreateTask: () => mockUseCreateTask(),
   useUpdateTask: () => mockUseUpdateTask(),
   useDeleteTask: () => mockUseDeleteTask(),
+}));
+
+vi.mock("../../hooks/useNotes", () => ({
+  useNotes: () => mockUseNotes(),
+  useCreateNote: () => mockUseCreateNote(),
 }));
 
 vi.mock("react-router-dom", () => ({
@@ -92,6 +101,7 @@ describe("TasksPanel", () => {
     createMutate.mockReset();
     updateMutate.mockReset();
     deleteMutate.mockReset();
+    createNoteMutate.mockReset();
     navigate.mockReset();
     startActivity.mockClear();
     fetchPlayerAndCharacter.mockReset();
@@ -111,6 +121,8 @@ describe("TasksPanel", () => {
     mockUseCreateTask.mockReturnValue({ mutate: createMutate });
     mockUseUpdateTask.mockReturnValue({ mutate: updateMutate });
     mockUseDeleteTask.mockReturnValue({ mutate: deleteMutate });
+    mockUseNotes.mockReturnValue({ data: [] });
+    mockUseCreateNote.mockReturnValue({ mutate: createNoteMutate });
   });
 
   it("hides completed tasks by default", () => {
@@ -182,6 +194,77 @@ describe("TasksPanel", () => {
 
     expect(startActivity).not.toHaveBeenCalled();
     expect(navigate).not.toHaveBeenCalled();
+  });
+
+  it("opens the edit dialog for openTaskId on mount", async () => {
+    const onOpenTaskHandled = vi.fn();
+    renderTasksPanel({ openTaskId: 1, onOpenTaskHandled });
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("dialog")).getByDisplayValue("Morning routine")).toBeInTheDocument();
+    });
+    expect(onOpenTaskHandled).toHaveBeenCalled();
+  });
+
+  it("reveals a completed openTaskId even though completed tasks are hidden by default", async () => {
+    const onOpenTaskHandled = vi.fn();
+    renderTasksPanel({ openTaskId: 2, onOpenTaskHandled });
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("dialog")).getByDisplayValue("Taxes")).toBeInTheDocument();
+    });
+    expect(onOpenTaskHandled).toHaveBeenCalled();
+  });
+
+  it("does not show note controls in the edit dialog when onOpenNote is not provided", async () => {
+    const user = userEvent.setup();
+    renderTasksPanel();
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", { name: "Create note for this task" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers to create a note for a task with no linked note", async () => {
+    const user = userEvent.setup();
+    const onOpenNote = vi.fn();
+    createNoteMutate.mockImplementation((_data, { onSuccess }) => onSuccess({ id: 9 }));
+    renderTasksPanel({ onOpenNote });
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Create note for this task" }),
+    );
+
+    expect(createNoteMutate).toHaveBeenCalledWith(
+      { title: "Morning routine", body: "", task: 1 },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(onOpenNote).toHaveBeenCalledWith(9);
+  });
+
+  it("shows a link to an existing linked note instead of the create button", async () => {
+    const user = userEvent.setup();
+    const onOpenNote = vi.fn();
+    mockUseNotes.mockReturnValue({
+      data: [{ id: 3, title: "Routine notes", body: "", player: 1, task: 1 }],
+    });
+    renderTasksPanel({ onOpenNote });
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "View linked note" }),
+    );
+
+    expect(onOpenNote).toHaveBeenCalledWith(3);
   });
 
   it("edits a task name through the PlayerItemList dialog", async () => {

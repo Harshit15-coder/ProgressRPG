@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
+import { useNotes, useCreateNote } from "../../hooks/useNotes";
 import { useGame } from "../../hooks/useGame";
 import type { Task } from "../../types";
 import type { SortOption } from "../PlayerItemList/PlayerItemList";
@@ -78,15 +79,17 @@ function formatLastWorkedOn(task: Task): string {
   return `Last worked on ${diffWeeks} ${diffWeeks === 1 ? "week" : "weeks"} ago`;
 }
 
-export function useTasksPanel() {
+export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: number) => void) {
   const navigate = useNavigate();
   const { fetchPlayerAndCharacter, activityTimer, freeTimerLimitSeconds, player } = useGame();
   const isPremium = Boolean(player?.is_premium);
 
   const { data: tasks, isLoading } = useTasks();
+  const { data: notes } = useNotes();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const createNote = useCreateNote();
 
   const [newName, setNewName] = useState("");
   const [completionReward, setCompletionReward] = useState<{ taskId: number; xp: number } | null>(null);
@@ -105,11 +108,37 @@ export function useTasksPanel() {
   }, [completionReward]);
 
   const safeTasks = useMemo(() => asArray(tasks), [tasks]);
+  const safeNotes = useMemo(() => asArray(notes), [notes]);
 
-  const visibleTasks = useMemo(
-    () => (hideCompleted ? safeTasks.filter((task) => !isTaskComplete(task)) : safeTasks),
-    [hideCompleted, safeTasks]
+  const getLinkedNoteId = useCallback(
+    (task: Task) => safeNotes.find((note) => note.task === task.id)?.id ?? null,
+    [safeNotes]
   );
+
+  const handleCreateNoteForTask = useCallback(
+    (task: Task) => {
+      createNote.mutate(
+        { title: task.name, body: "", task: task.id },
+        { onSuccess: (note) => onOpenNote?.(note.id) }
+      );
+    },
+    [createNote, onOpenNote]
+  );
+
+  const visibleTasks = useMemo(() => {
+    if (!hideCompleted) return safeTasks;
+
+    const filtered = safeTasks.filter((task) => !isTaskComplete(task));
+
+    // Deep-linking into a completed task (e.g. from a note's linked task)
+    // should surface it even though completed tasks are hidden by default.
+    if (openTaskId != null && !filtered.some((task) => task.id === openTaskId)) {
+      const target = safeTasks.find((task) => task.id === openTaskId);
+      if (target) return [...filtered, target];
+    }
+
+    return filtered;
+  }, [hideCompleted, safeTasks, openTaskId]);
 
   const toggleHideCompleted = useCallback(() => {
     setHideCompleted((current) => {
@@ -232,5 +261,7 @@ export function useTasksPanel() {
     toggleHideCompleted,
     getTaskMeta,
     getTaskEditSummary,
+    getLinkedNoteId,
+    handleCreateNoteForTask,
   };
 }

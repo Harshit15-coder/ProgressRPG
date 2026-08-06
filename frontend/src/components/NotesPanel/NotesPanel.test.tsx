@@ -73,7 +73,7 @@ describe("NotesPanel", () => {
     });
   });
 
-  it("edits a note's title, body and linked task", async () => {
+  it("edits a note's title and body", async () => {
     const user = userEvent.setup();
     render(<NotesPanel />);
 
@@ -83,15 +83,44 @@ describe("NotesPanel", () => {
     await user.clear(titleInput);
     await user.type(titleInput, "Weekly groceries");
 
-    await user.selectOptions(screen.getByLabelText("Linked task"), "5");
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Save" }));
 
     await waitFor(() => {
       expect(updateMutate).toHaveBeenCalledWith({
         id: 1,
-        data: { title: "Weekly groceries", body: "Milk, eggs, bread", task: 5 },
+        data: { title: "Weekly groceries", body: "Milk, eggs, bread", task: null },
       });
     });
+  });
+
+  it("does not offer a way to link a note to a task", async () => {
+    const user = userEvent.setup();
+    render(<NotesPanel />);
+
+    expect(screen.queryByLabelText("Attach to task")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Open note Groceries" }));
+
+    expect(screen.queryByLabelText("Linked task")).not.toBeInTheDocument();
+  });
+
+  it("shows the linked task in the edit modal when one is set", async () => {
+    const user = userEvent.setup();
+    mockUseNotes.mockReturnValue({ isLoading: false, data: [{ ...note, task: 5 }] });
+    render(<NotesPanel />);
+
+    await user.click(screen.getByRole("button", { name: "Open note Groceries" }));
+
+    expect(within(screen.getByRole("dialog")).getByText("Linked task: Ship it")).toBeInTheDocument();
+  });
+
+  it("opens the edit dialog for openNoteId on mount and reports it handled", async () => {
+    const onOpenNoteHandled = vi.fn();
+    render(<NotesPanel openNoteId={1} onOpenNoteHandled={onOpenNoteHandled} />);
+
+    expect(await screen.findByRole("dialog")).toBeInTheDocument();
+    expect(screen.getByLabelText("Title")).toHaveValue("Groceries");
+    expect(onOpenNoteHandled).toHaveBeenCalled();
   });
 
   it("deletes a note after confirming", async () => {

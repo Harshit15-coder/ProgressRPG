@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import * as Tabs from "@radix-ui/react-tabs";
 
 import TasksPanel from "../../components/TasksPanel/TasksPanel";
@@ -14,13 +14,27 @@ export default function LibraryPage(): React.ReactElement {
   const hasSkillsFeature = useFeatureFlag("skillsFeature");
   const hasNotesFeature = useFeatureFlag("notesFeature");
 
+  const [activeTab, setActiveTab] = useState("activities");
+  const [taskToOpen, setTaskToOpen] = useState<number | null>(null);
+  const [noteToOpen, setNoteToOpen] = useState<number | null>(null);
+
+  const handleOpenTask = (taskId: number) => {
+    setTaskToOpen(taskId);
+    setActiveTab("tasks");
+  };
+
+  const handleOpenNote = (noteId: number) => {
+    setNoteToOpen(noteId);
+    setActiveTab("notes");
+  };
+
   return (
     <div className={styles.page}>
       <div className={styles.header}>
         <h1>Your library</h1>
       </div>
 
-      <Tabs.Root className={styles.tabsRoot} defaultValue="activities">
+      <Tabs.Root className={styles.tabsRoot} value={activeTab} onValueChange={setActiveTab}>
         <Tabs.List className={styles.tabBar} aria-label="Your library sections">
           <Tabs.Trigger value="activities" className={styles.tab}>
             Activities
@@ -41,7 +55,15 @@ export default function LibraryPage(): React.ReactElement {
         </Tabs.Content>
 
         <Tabs.Content value="tasks" className={styles.tabContent}>
-          {hasTasksFeature ? <TasksPanel /> : <ComingSoonPanel itemLabelPlural="tasks" />}
+          {hasTasksFeature ? (
+            <TasksPanel
+              openTaskId={taskToOpen}
+              onOpenTaskHandled={() => setTaskToOpen(null)}
+              onOpenNote={handleOpenNote}
+            />
+          ) : (
+            <ComingSoonPanel itemLabelPlural="tasks" />
+          )}
         </Tabs.Content>
 
         <Tabs.Content value="skills" className={styles.tabContent}>
@@ -49,7 +71,15 @@ export default function LibraryPage(): React.ReactElement {
         </Tabs.Content>
 
         <Tabs.Content value="notes" className={styles.tabContent}>
-          {hasNotesFeature ? <NotesPanel /> : <ComingSoonPanel itemLabelPlural="notes" />}
+          {hasNotesFeature ? (
+            <NotesPanel
+              onOpenTask={handleOpenTask}
+              openNoteId={noteToOpen}
+              onOpenNoteHandled={() => setNoteToOpen(null)}
+            />
+          ) : (
+            <ComingSoonPanel itemLabelPlural="notes" />
+          )}
         </Tabs.Content>
       </Tabs.Root>
     </div>
