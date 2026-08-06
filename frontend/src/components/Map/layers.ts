@@ -66,7 +66,7 @@ export function addVillageLayers(map: MapLibreMap): void {
 		type: "line",
 		source: "village",
 		filter: ["==", ["get", "feature_type"], "boundary"],
-		paint: { "line-color": "#888", "line-width": 2 },
+		paint: { "line-color": "transparent", "line-width": 2 },
 	});
 	map.addLayer({
 		id: SUBZONES_FILL_LAYER,
