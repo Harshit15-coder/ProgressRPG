@@ -4,7 +4,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0013_finalize_activity_definition"),
+        ("progression", "0016_finalize_activity_definition"),
     ]
 
     operations = [

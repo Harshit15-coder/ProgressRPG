@@ -928,5 +928,89 @@
       "order": 4,
       "youtube_url": ""
     }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 1,
+    "fields": {
+      "name": "General labour",
+      "description": "Odd jobs and errands - a fallback work block for characters without an assigned role yet.",
+      "kind": "work",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 2,
+    "fields": {
+      "name": "Helping around the village",
+      "description": "Pitching in on whatever chores need doing - a second fallback so generate_day always has at least two work options to sample from.",
+      "kind": "work",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 3,
+    "fields": {
+      "name": "Sleeping",
+      "description": "The night's rest.",
+      "kind": "sleep",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 4,
+    "fields": {
+      "name": "Morning routine",
+      "description": "Washing, dressing, and getting ready for the day.",
+      "kind": "morning",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 5,
+    "fields": {
+      "name": "Mealtime",
+      "description": "Sitting down to eat.",
+      "kind": "meal",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 6,
+    "fields": {
+      "name": "Leisure time",
+      "description": "Resting, socialising, or otherwise unwinding.",
+      "kind": "leisure",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
+  },
+  {
+    "model": "progression.activitydefinition",
+    "pk": 7,
+    "fields": {
+      "name": "Winding down",
+      "description": "Settling in for the night before sleep.",
+      "kind": "wind_down",
+      "skill": null,
+      "created_at": "2026-08-06T00:00:00.000Z",
+      "last_updated": "2026-08-06T00:00:00.000Z"
+    }
   }
 ]

@@ -53,11 +53,11 @@ app.conf.beat_schedule = {
         "task": "users.tasks.send_waitlist_nudges",
         "schedule": 7200.0,  # every 2 hours
     },
-    # "generate_character_days_1am": {
-    #     "task": "character.tasks.generate_character_days",
-    #     "schedule": crontab(hour=1, minute=0),
-    #     "args": (),
-    # },
+    "generate_character_days_1am": {
+        "task": "character.tasks.generate_character_days",
+        "schedule": crontab(hour=1, minute=0),
+        "args": (),
+    },
     "compact_character_activities_3am": {
         "task": "progression.tasks.compact_character_activities",
         "schedule": crontab(hour=3, minute=0),
