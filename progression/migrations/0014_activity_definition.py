@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0010_merge_20260806_1633"),
+        ("progression", "0013_merge_role_skill_taxonomy_activity_catalog"),
     ]
 
     operations = [

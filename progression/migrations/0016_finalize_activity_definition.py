@@ -5,7 +5,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0012_migrate_activity_data"),
+        ("progression", "0015_migrate_activity_data"),
         ("gameplay", "0008_alter_questtimer_quest"),
     ]
 

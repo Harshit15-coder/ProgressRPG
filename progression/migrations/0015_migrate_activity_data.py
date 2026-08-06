@@ -70,7 +70,7 @@ def noop_reverse(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ("progression", "0011_activity_definition"),
+        ("progression", "0014_activity_definition"),
     ]
 
     operations = [
