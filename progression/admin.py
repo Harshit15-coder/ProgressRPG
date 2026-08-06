@@ -42,27 +42,27 @@ class CategoryAdmin(admin.ModelAdmin):
     readonly_fields = ("total_time", "total_records", "total_xp")
 
 
-# @admin.register(Role)
+@admin.register(Role)
 class RoleAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "created_at")
     search_fields = ("name", "description")
 
 
-# @admin.register(SkillGroup)
+@admin.register(SkillGroup)
 class SkillGroupAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "role", "created_at")
     search_fields = ("name", "description", "role__name")
     list_filter = ("role",)
 
 
-# @admin.register(SkillDefinition)
+@admin.register(SkillDefinition)
 class SkillDefinitionAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "role", "gate_group", "min_proficiency", "created_at")
     search_fields = ("name", "description", "role__name")
     list_filter = ("role", "gate_group")
 
 
-# @admin.register(CharacterRole)
+@admin.register(CharacterRole)
 class CharacterRoleAdmin(admin.ModelAdmin):
     list_display = ("id", "character", "role", "assigned_at")
     search_fields = ("character__name", "role__name")
@@ -92,7 +92,7 @@ class PlayerSkillAdmin(admin.ModelAdmin):
     readonly_fields = ("total_time", "total_records", "total_xp")
 
 
-# @admin.register(CharacterSkill)
+@admin.register(CharacterSkill)
 class CharacterSkillAdmin(admin.ModelAdmin):
     list_display = (
         "id",
@@ -119,7 +119,7 @@ class ActivityAdmin(admin.ModelAdmin):
     list_filter = ("player",)
 
 
-# @admin.register(SuggestedActivity)
+@admin.register(SuggestedActivity)
 class SuggestedActivityAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "created_at")
     search_fields = ("name", "description")
@@ -158,7 +158,7 @@ class PlayerActivityAdmin(admin.ModelAdmin):
     readonly_fields = ("created_at",)
 
 
-# @admin.register(ActivityDefinition)
+@admin.register(ActivityDefinition)
 class ActivityDefinitionAdmin(admin.ModelAdmin):
     list_display = ("id", "name", "kind", "skill", "created_at")
     search_fields = ("name", "description")
