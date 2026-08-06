@@ -6,6 +6,7 @@ from django.contrib.gis.db.models.functions import Distance
 from django.db import models, transaction, IntegrityError
 from django.db.models import Sum
 from django.utils import timezone
+from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Optional, Dict, Any, cast
 import logging
 import math
@@ -31,24 +32,86 @@ logger_errors = logging.getLogger("errors")
 ########################################################################
 
 
+class RelationshipType(models.TextChoices):
+    FRIEND = "friend", "Friend"
+    RIVAL = "rival", "Rival"
+    MENTOR = "mentor", "Mentor"
+    ENEMY = "enemy", "Enemy"
+    ALLY = "ally", "Ally"
+    ROMANTIC = "romantic", "Romantic"
+    SPOUSE = "spouse", "Spouse"
+    PARENT_CHILD = "parent_child", "Parent/Child"
+    SIBLING = "sibling", "Sibling"
+
+
+class RelationshipRole(models.TextChoices):
+    # Generic role for symmetric relationships, where members don't play
+    # structurally different parts (friend, rival, spouse, ...).
+    PARTICIPANT = "participant", "Participant"
+    PARENT = "parent", "Parent"
+    CHILD = "child", "Child"
+    MENTOR = "mentor", "Mentor"
+    MENTEE = "mentee", "Mentee"
+
+
+@dataclass(frozen=True)
+class RelationshipTypeSpec:
+    """
+    Structural rules for one relationship type: which roles it allows, how
+    many members each role may have, and (for the roles-with-a-max-of-one
+    kind of type) which `variant` values are meaningful.
+
+    A role's `(min, max)` pair says how many members must/may hold it in a
+    single relationship; `max=None` means unbounded. A type is directional
+    exactly when it declares more than one distinct role - no separate flag
+    needed, since that would just be state that could drift from `roles`.
+    """
+
+    roles: Dict[RelationshipRole, tuple]  # role -> (min, max | None)
+    allowed_variants: frozenset = field(default_factory=frozenset)
+
+
+# Symmetric relationships all reuse the same "any number of equal members"
+# shape - defined once so `RELATIONSHIP_SPECS` doesn't repeat it per type.
+_SYMMETRIC_GROUP = {RelationshipRole.PARTICIPANT: (2, None)}
+_SYMMETRIC_PAIR = {RelationshipRole.PARTICIPANT: (2, 2)}
+
+RELATIONSHIP_SPECS: Dict[RelationshipType, RelationshipTypeSpec] = {
+    RelationshipType.FRIEND: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
+    RelationshipType.RIVAL: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
+    RelationshipType.ENEMY: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
+    RelationshipType.ALLY: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
+    RelationshipType.SIBLING: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
+    RelationshipType.ROMANTIC: RelationshipTypeSpec(roles=_SYMMETRIC_PAIR),
+    RelationshipType.SPOUSE: RelationshipTypeSpec(roles=_SYMMETRIC_PAIR),
+    RelationshipType.MENTOR: RelationshipTypeSpec(
+        roles={
+            RelationshipRole.MENTOR: (1, 1),
+            RelationshipRole.MENTEE: (1, 1),
+        },
+    ),
+    # Always binary: a child with two parents is two PARENT_CHILD
+    # relationships, not one relationship with two PARENT members - keeps
+    # every relationship's shape uniform (look up "the other role", never
+    # "which parent").
+    RelationshipType.PARENT_CHILD: RelationshipTypeSpec(
+        roles={
+            RelationshipRole.PARENT: (1, 1),
+            RelationshipRole.CHILD: (1, 1),
+        },
+        allowed_variants=frozenset({"biological", "adoptive", "step", "foster"}),
+    ),
+}
+
+
 class CharacterRelationship(models.Model):
     characters: models.ManyToManyField = models.ManyToManyField(
         "Character", through="CharacterRelationshipMembership"
     )
 
-    RELATIONSHIP_TYPES = [
-        ("friend", "Friend"),
-        ("rival", "Rival"),
-        ("mentor", "Mentor"),
-        ("enemy", "Enemy"),
-        ("ally", "Ally"),
-        ("romantic", "Romantic"),
-        ("spouse", "Spouse"),
-        ("parent", "Parent"),
-        ("child", "Child"),
-        ("sibling", "Sibling"),
-    ]
-    relationship_type = models.CharField(max_length=20, choices=RELATIONSHIP_TYPES)
+    relationship_type = models.CharField(
+        max_length=20, choices=RelationshipType.choices
+    )
     is_exclusive = models.BooleanField(default=False)
     strength = models.IntegerField(default=0)  # -100 (hatred) to 100 (deep bond)
     history = models.JSONField(default=dict, blank=True)  # Logs key events
