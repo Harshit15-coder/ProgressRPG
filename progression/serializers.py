@@ -1,6 +1,8 @@
 # progression/serializers.py
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
+from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from users.models import Player
@@ -15,8 +17,8 @@ from .models import (
     CharacterQuest,
     Project,
     Task,
+    Note,
 )
-
 
 #########################################
 #####      Base serializers
@@ -221,6 +223,7 @@ class TaskSerializer(serializers.ModelSerializer):
     total_time = serializers.IntegerField(read_only=True)
     total_records = serializers.IntegerField(read_only=True)
     last_worked_on = serializers.DateTimeField(read_only=True)
+    subtask_count = serializers.IntegerField(source="subtasks.count", read_only=True)
 
     class Meta:
         model = Task
@@ -235,8 +238,79 @@ class TaskSerializer(serializers.ModelSerializer):
             "is_complete",
             "completed_at",
             "first_completed_at",
+            "due_at",
+            "parent",
+            "subtask_count",
             "total_time",
             "total_records",
             "last_worked_on",
         ]
         read_only_fields = ["player", "first_completed_at"]
+
+    def validate(self, attrs):
+        instance = self.instance
+        parent = attrs.get("parent", instance.parent if instance else None)
+
+        if instance:
+            player_id = instance.player_id
+        else:
+            request = self.context.get("request")
+            player_id = (
+                request.user.player.id
+                if request and getattr(request.user, "is_authenticated", False)
+                else None
+            )
+
+        candidate = Task(
+            id=instance.id if instance else None,
+            player_id=player_id,
+            parent=parent,
+        )
+        try:
+            candidate.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict)
+        return attrs
+
+
+class NoteSerializer(serializers.ModelSerializer):
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
+
+    class Meta:
+        model = Note
+        fields = [
+            "id",
+            "title",
+            "body",
+            "player",
+            "task",
+            "created_at",
+            "last_updated",
+        ]
+        read_only_fields = ["player"]
+
+    def validate_title(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_body(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_task(self, task: Task | None) -> Task | None:
+        if task is None:
+            return None
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        if player is None or task.player_id != player.id:
+            raise serializers.ValidationError(
+                "Task must belong to the requesting player."
+            )
+        existing = Note.objects.filter(task=task)
+        if self.instance is not None:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError(
+                "This task is already linked to another note."
+            )
+        return task

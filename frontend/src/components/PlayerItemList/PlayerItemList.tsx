@@ -1,8 +1,9 @@
-import React from "react";
+import React, { useEffect, useMemo } from "react";
 import classNames from "classnames";
 
 import Button from "../Button/Button";
 import List from "../List/List";
+import Li from "../List/Li";
 import Modal from "../Modal/Modal";
 import { usePlayerItemListControls } from "./usePlayerItemListControls";
 import { usePlayerItemModal } from "./usePlayerItemModal";
@@ -39,6 +40,11 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string }>
   sortOptions?: SortOption<T>[];
   filterOptions?: FilterOption<T>[];
   controls?: React.ReactNode;
+  /** When set, opens the edit modal for the item with this id (e.g. deep-linked from another panel). */
+  openItemId?: string | number | null;
+  /** Called once the requested `openItemId` has been opened, so the caller can clear it. */
+  onOpenItemHandled?: () => void;
+  getChildren?: (item: T) => T[] | undefined;
 }
 
 export default function PlayerItemList<T extends { id?: string | number; name?: string }>({
@@ -60,6 +66,9 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   sortOptions,
   filterOptions,
   controls,
+  openItemId,
+  onOpenItemHandled,
+  getChildren,
 }: PlayerItemListProps<T>) {
   const {
     activeFilterKey,
@@ -101,9 +110,106 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
     onDelete,
   });
 
+  // Deep-link support: open a specific item's edit modal (e.g. navigated to
+  // from another panel) once its data is available in `items`.
+  useEffect(() => {
+    if (openItemId === null || openItemId === undefined) return;
+
+    const item = items.find((i) => i.id !== undefined && i.id === openItemId);
+    if (!item) return;
+
+    handleOpenItem(item);
+    onOpenItemHandled?.();
+  }, [openItemId, items, handleOpenItem, onOpenItemHandled]);
+
   const canToggleComplete = typeof onToggleComplete === "function";
   const canEdit = typeof onEdit === "function";
   const canDelete = typeof onDelete === "function";
+
+  const childIds = useMemo(() => {
+    const ids = new Set<string | number>();
+    if (!getChildren) return ids;
+    items.forEach((item) => {
+      getChildren(item)?.forEach((child) => {
+        if (child.id !== undefined) ids.add(child.id);
+      });
+    });
+    return ids;
+  }, [items, getChildren]);
+
+  const topLevelDisplayItems = useMemo(() => {
+    if (!getChildren) return displayItems;
+    return displayItems.filter(
+      (item) => item.id === undefined || !childIds.has(item.id)
+    );
+  }, [displayItems, getChildren, childIds]);
+
+  const renderRow = (item: T): React.ReactNode => (
+    <>
+      {canToggleComplete ? (
+        <label className={styles.completeCheckboxLabel}>
+          <input
+            className={styles.completeCheckbox}
+            type="checkbox"
+            checked={Boolean(isItemComplete?.(item))}
+            onChange={() => onToggleComplete!(item)}
+            aria-label={`Mark ${getItemName(item) || itemLabelLower} as complete`}
+          />
+        </label>
+      ) : null}
+      {hoverEdit ? (
+        <div className={styles.itemContent}>
+          {canEdit ? (
+            <button
+              type="button"
+              className={classNames(styles.itemDetails, styles.itemDetailsButton)}
+              aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+              onClick={() => handleOpenItem(item)}
+            >
+              <div className={styles.itemName}>{getItemName(item)}</div>
+              {renderItemMeta ? (
+                <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+              ) : null}
+            </button>
+          ) : (
+            <div className={styles.itemDetails}>
+              <div className={styles.itemName}>{getItemName(item)}</div>
+              {renderItemMeta ? (
+                <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+              ) : null}
+            </div>
+          )}
+          <div className={styles.rowActions}>
+            {renderRowActions?.(item)}
+            {canEdit ? (
+              <button
+                type="button"
+                className={styles.editHoverButton}
+                aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
+                onClick={() => handleOpenItem(item)}
+              >
+                📝
+              </button>
+            ) : null}
+          </div>
+        </div>
+      ) : (
+        <button
+          type="button"
+          className={styles.itemButton}
+          aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
+          onClick={() => handleOpenItem(item)}
+        >
+          <div className={styles.itemDetails}>
+            <div className={styles.itemName}>{getItemName(item)}</div>
+            {renderItemMeta ? (
+              <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
+            ) : null}
+          </div>
+        </button>
+      )}
+    </>
+  );
 
   return (
     <div className={styles.wrapper}>
@@ -146,7 +252,7 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
       ) : null}
       <div className={styles.listScroll}>
       <List
-        items={displayItems}
+        items={topLevelDisplayItems}
         ariaLabel={ariaLabel}
         canHover
         className={classNames(styles.list, listClassName)}
@@ -157,72 +263,28 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
             [styles.itemCompleted]: isItemComplete?.(item),
           })
         }
-        renderItem={(item) => (
-          <>
-            {canToggleComplete ? (
-              <label className={styles.completeCheckboxLabel}>
-                <input
-                  className={styles.completeCheckbox}
-                  type="checkbox"
-                  checked={Boolean(isItemComplete?.(item))}
-                  onChange={() => onToggleComplete!(item)}
-                  aria-label={`Mark ${getItemName(item) || itemLabelLower} as complete`}
-                />
-              </label>
-            ) : null}
-            {hoverEdit ? (
-              <div className={styles.itemContent}>
-                {canEdit ? (
-                  <button
-                    type="button"
-                    className={classNames(styles.itemDetails, styles.itemDetailsButton)}
-                    aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
-                    onClick={() => handleOpenItem(item)}
-                  >
-                    <div className={styles.itemName}>{getItemName(item)}</div>
-                    {renderItemMeta ? (
-                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                    ) : null}
-                  </button>
-                ) : (
-                  <div className={styles.itemDetails}>
-                    <div className={styles.itemName}>{getItemName(item)}</div>
-                    {renderItemMeta ? (
-                      <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                    ) : null}
-                  </div>
-                )}
-                <div className={styles.rowActions}>
-                  {renderRowActions?.(item)}
-                  {canEdit ? (
-                    <button
-                      type="button"
-                      className={styles.editHoverButton}
-                      aria-label={`Edit ${itemLabelLower} ${getItemName(item)}`}
-                      onClick={() => handleOpenItem(item)}
+        renderItem={(item) => {
+          const children = getChildren?.(item);
+          return (
+            <>
+              {renderRow(item)}
+              {children?.length ? (
+                <ul className={styles.childList}>
+                  {children.map((child, index) => (
+                    <Li
+                      key={(child.id as string | number | undefined) ?? index}
+                      className={classNames(styles.item, styles.childItem, {
+                        [styles.itemCompleted]: isItemComplete?.(child),
+                      })}
                     >
-                      📝
-                    </button>
-                  ) : null}
-                </div>
-              </div>
-            ) : (
-              <button
-                type="button"
-                className={styles.itemButton}
-                aria-label={`Open ${itemLabelLower} ${getItemName(item)}`}
-                onClick={() => handleOpenItem(item)}
-              >
-                <div className={styles.itemDetails}>
-                  <div className={styles.itemName}>{getItemName(item)}</div>
-                  {renderItemMeta ? (
-                    <div className={styles.itemMeta}>{renderItemMeta(item)}</div>
-                  ) : null}
-                </div>
-              </button>
-            )}
-          </>
-        )}
+                      {renderRow(child)}
+                    </Li>
+                  ))}
+                </ul>
+              ) : null}
+            </>
+          );
+        }}
       />
       </div>
 

@@ -12,8 +12,8 @@ from .models import (
     CharacterQuest,
     Project,
     Task,
+    Note,
 )
-
 
 #########################################
 #####      Group admins
@@ -206,4 +206,18 @@ class TaskAdmin(admin.ModelAdmin):
     search_fields = ("name", "description", "player__name", "project__name")
     list_filter = ("player", "project", "is_complete", "completed_at")
     readonly_fields = ("total_time", "total_records", "created_at", "completed_at")
+    date_hierarchy = "created_at"
+
+
+@admin.register(Note)
+class NoteAdmin(admin.ModelAdmin):
+    """
+    Notes are private-by-default: title/body are excluded from both the
+    list display and the detail view here, showing only metadata.
+    """
+
+    list_display = ("id", "player", "task", "created_at", "last_updated")
+    exclude = ("title", "body")
+    list_filter = ("player", "task")
+    readonly_fields = ("player", "task", "created_at", "last_updated")
     date_hierarchy = "created_at"

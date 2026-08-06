@@ -1,9 +1,11 @@
 // src/pages/MapPage.tsx
-import React, { useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import Button from "../../components/Button/Button";
 import PopulationCentreMap, {
   type PopulationCentreMapHandle,
 } from "../../components/Map/Map";
+import TodayPointsBadge from "../../components/TodayPointsBadge/TodayPointsBadge";
 import {
   useInitialMapCentre,
   useMapViewport,
@@ -37,6 +39,7 @@ function HomeIcon(): React.ReactElement {
 }
 
 export default function MapPage(): React.ReactElement {
+  const queryClient = useQueryClient();
   const { data: pcId } = usePopulationCentreId();
   // One-time fetch of the single seeded village's map, used only to give the
   // camera somewhere to start (see useInitialMapCentre) and to have
@@ -65,6 +68,23 @@ export default function MapPage(): React.ReactElement {
     ? populationCentres[cycleIndex % populationCentres.length]
     : null;
 
+  useEffect(() => {
+    if (!populationCentres?.length || !initialCentre) return;
+
+    const currentVillage = populationCentres[cycleIndex % populationCentres.length];
+    const nextVillageToPrefetch = populationCentres[(cycleIndex + 1) % populationCentres.length];
+
+    const villagesToPrefetch = [currentVillage, nextVillageToPrefetch].filter(Boolean);
+    for (const village of villagesToPrefetch) {
+      void queryClient.prefetchQuery({
+        queryKey: ["map", "population-centre", "initial-centre", village.id],
+        queryFn: () => import("../../api/map").then(({ fetchPopulationCentreMap }) => fetchPopulationCentreMap(village.id)),
+        staleTime: 15 * 60 * 1000,
+        gcTime: 30 * 60 * 1000,
+      });
+    }
+  }, [cycleIndex, initialCentre, populationCentres, queryClient]);
+
   const handleFindVillage = () => {
     if (!nextVillage) return;
     mapRef.current?.flyToPoint(nextVillage.location);
@@ -85,6 +105,7 @@ export default function MapPage(): React.ReactElement {
             onViewportChange={setBbox}
             worldBounds={worldBounds?.bbox}
           >
+            <TodayPointsBadge />
             {nextVillage && (
               <Button
                 type="button"
