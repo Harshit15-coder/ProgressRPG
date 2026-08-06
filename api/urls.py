@@ -32,6 +32,11 @@ from progression.views import (
     ProjectViewSet,
     TaskViewSet,
     NoteViewSet,
+    RoleViewSet,
+    SkillGroupViewSet,
+    SkillDefinitionViewSet,
+    SuggestedActivityViewSet,
+    ActivityDefinitionViewSet,
 )
 from server_management.views import maintenance_status
 from users.views import PlayerViewSet
@@ -73,6 +78,17 @@ router.register(
     r"population-centres", PopulationCentreViewSet, basename="populationcentre"
 )
 router.register(r"activity_timers", ActivityTimerViewSet, basename="activitytimer")
+router.register(r"roles", RoleViewSet, basename="role")
+router.register(r"skill-groups", SkillGroupViewSet, basename="skillgroup")
+router.register(
+    r"skill-definitions", SkillDefinitionViewSet, basename="skilldefinition"
+)
+router.register(
+    r"suggested-activities", SuggestedActivityViewSet, basename="suggestedactivity"
+)
+router.register(
+    r"activity-definitions", ActivityDefinitionViewSet, basename="activitydefinition"
+)
 
 urlpatterns = [
     # General urls
