@@ -24,6 +24,7 @@ export type FeatureFlagKey =
   | "announcements"
   | "onlinePlayerCount"
   | "unified_homepage"
+  | "results_mode"
   | "map";
 
 // ---------------------------------------------------------------------------

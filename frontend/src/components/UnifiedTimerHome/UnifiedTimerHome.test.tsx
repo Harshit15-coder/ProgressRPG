@@ -9,6 +9,7 @@ const mockUseGame = vi.fn();
 const mockUseSupportFlow = vi.fn();
 const mockUseEntitySearchCache = vi.fn();
 const mockUseDefaultActivityEntries = vi.fn();
+const mockUseFeatureFlag = vi.fn();
 const fetchPlayerAndCharacter = vi.fn();
 const fetchCharacterCurrent = vi.fn();
 const fetchActivities = vi.fn();
@@ -22,6 +23,8 @@ const mockUseTasks = vi.fn();
 const mockUseCreateTask = vi.fn();
 const mockUseUpdateTask = vi.fn();
 const mockUseDeleteTask = vi.fn();
+const mockUseNotes = vi.fn();
+const mockUseCreateNote = vi.fn();
 const navigate = vi.fn();
 
 vi.mock('../../hooks/useGame', () => ({
@@ -33,6 +36,11 @@ vi.mock('../../hooks/useTasks', () => ({
   useCreateTask: () => mockUseCreateTask(),
   useUpdateTask: () => mockUseUpdateTask(),
   useDeleteTask: () => mockUseDeleteTask(),
+}));
+
+vi.mock('../../hooks/useNotes', () => ({
+  useNotes: (...args: unknown[]) => mockUseNotes(...args),
+  useCreateNote: () => mockUseCreateNote(),
 }));
 
 vi.mock('react-router', () => ({
@@ -47,8 +55,16 @@ vi.mock('../../hooks/useEntitySearchCache', () => ({
   useEntitySearchCache: (...args: unknown[]) => mockUseEntitySearchCache(...args),
 }));
 
+vi.mock('../../hooks/useFeatureFlag', () => ({
+  useFeatureFlag: (flag: string) => mockUseFeatureFlag(flag),
+}));
+
 vi.mock('../../hooks/useDefaultActivityEntries', () => ({
   useDefaultActivityEntries: () => mockUseDefaultActivityEntries(),
+}));
+
+vi.mock('../../hooks/useActivities', () => ({
+  useUpdateActivity: () => ({ mutate: vi.fn() }),
 }));
 
 vi.mock('../SupportFlow/SupportFlowModal', () => ({
@@ -134,6 +150,7 @@ describe('UnifiedTimerHome', () => {
     mockUseSupportFlow.mockReset();
     mockUseEntitySearchCache.mockReset();
     mockUseDefaultActivityEntries.mockReset().mockReturnValue([]);
+    mockUseFeatureFlag.mockReset().mockReturnValue(false);
     fetchPlayerAndCharacter.mockReset().mockResolvedValue(null);
     fetchCharacterCurrent.mockReset().mockResolvedValue(null);
     fetchActivities.mockReset().mockResolvedValue(null);
@@ -148,6 +165,8 @@ describe('UnifiedTimerHome', () => {
     mockUseCreateTask.mockReset().mockReturnValue({ mutate: vi.fn() });
     mockUseUpdateTask.mockReset().mockReturnValue({ mutate: vi.fn() });
     mockUseDeleteTask.mockReset().mockReturnValue({ mutate: vi.fn() });
+    mockUseNotes.mockReset().mockReturnValue({ isLoading: false, data: [] });
+    mockUseCreateNote.mockReset().mockReturnValue({ mutate: vi.fn() });
 
     mockUseSupportFlow.mockReturnValue({
       openWelcomeMessage: vi.fn(),
@@ -291,6 +310,29 @@ describe('UnifiedTimerHome', () => {
     expect(
       screen.getByText('This timer will stop automatically when it reaches 0:30.')
     ).toBeInTheDocument();
+  });
+
+  it('renders the Results panel instead of the timer body after a results_mode stop', async () => {
+    const user = userEvent.setup();
+    mockUseFeatureFlag.mockImplementation((flag: string) => flag === 'results_mode');
+    mockGame({ status: 'active', currentActivity: { id: 1, name: 'Deep work' }, elapsed: 30 });
+    stop.mockResolvedValue({
+      xp_gained: 10,
+      base_xp: 10,
+      xp_multiplier: 1,
+      level_ups: [],
+      duration_seconds: 30,
+    });
+
+    render(<UnifiedTimerHome />);
+
+    await user.click(screen.getByRole('button', { name: 'Stop' }));
+
+    expect(
+      screen.getByText('Nice work ⚔️ You spent 30 seconds on "Deep work".')
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Back to timer' })).toBeInTheDocument();
+    expect(screen.queryByRole('combobox', { name: 'Activity name' })).not.toBeInTheDocument();
   });
 
   describe('mode switching', () => {

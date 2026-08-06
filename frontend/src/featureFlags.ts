@@ -15,6 +15,7 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   announcements: ['testers'],
   onlinePlayerCount: ['testers'],
   unified_homepage: [],
+  results_mode: [],
   map: ['testers'],
 };
 
