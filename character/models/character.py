@@ -115,9 +115,11 @@ class CharacterRelationship(models.Model):
     is_exclusive = models.BooleanField(default=False)
     strength = models.IntegerField(default=0)  # -100 (hatred) to 100 (deep bond)
     history = models.JSONField(default=dict, blank=True)  # Logs key events
-    biological = models.BooleanField(
-        default=True
-    )  # True = blood relative, False = adopted/found family
+    # Free-form but validated per relationship_type against
+    # RELATIONSHIP_SPECS[type].allowed_variants (see clean()) - e.g.
+    # "biological"/"adoptive"/"step"/"foster" for PARENT_CHILD. Blank means
+    # unspecified. New variants are a RELATIONSHIP_SPECS edit, not a migration.
+    variant = models.CharField(max_length=30, blank=True, default="")
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
 
@@ -147,7 +149,12 @@ class CharacterRelationshipMembership(models.Model):
         related_name="characterrelationshipmembership",
     )
     relationship = models.ForeignKey("CharacterRelationship", on_delete=models.CASCADE)
-    role = models.CharField(max_length=50, blank=True, null=True)
+    # null=True/blank=True kept from before choices were added, so this stays
+    # a schema-metadata-only change - clean() (see below) is what actually
+    # requires a valid role for relationship types that need one.
+    role = models.CharField(
+        max_length=20, choices=RelationshipRole.choices, null=True, blank=True
+    )
 
     class Meta:
         unique_together = ("character", "relationship")
