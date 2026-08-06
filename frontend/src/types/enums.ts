@@ -18,6 +18,7 @@ export type FeatureFlagKey =
   | "tasksFeature"
   | "categoriesFeature"
   | "skillsFeature"
+  | "notesFeature"
   | "projectsFeature"
   | "toastsFeature"
   | "announcements"

@@ -7,9 +7,18 @@ import AlertDialog from "../AlertDialog/AlertDialog";
 import EntitySearchInput from "../EntitySearchInput/EntitySearchInput";
 import SupportFlowModal from "../SupportFlow/SupportFlowModal";
 import TimerResultsPanel from "./TimerResultsPanel";
+import ModeSwitcher from "../ModeSwitcher/ModeSwitcher";
+import TasksPanel from "../TasksPanel/TasksPanel";
 import { useActivityInput } from "../ActivityInput/useActivityInput";
 import { useDefaultActivityEntries } from "../../hooks/useDefaultActivityEntries";
 import styles from "./UnifiedTimerHome.module.scss";
+
+type TimerMode = "doing" | "planning";
+
+const TIMER_MODES = [
+  { key: "doing", label: "Doing" },
+  { key: "planning", label: "Planning" },
+];
 
 const fadeTransition = { duration: 0.18 };
 const fadeProps = {
@@ -35,7 +44,7 @@ export default function UnifiedTimerHome() {
     flowDispatch,
     handleConfirmActivity,
     handleToggle,
-    handleBlankStart,
+    handleCreateActivity,
     handleUnifiedSelect,
     handleUnifiedSubmit,
     startEditingLabel,
@@ -50,6 +59,7 @@ export default function UnifiedTimerHome() {
 
   const defaultResults = useDefaultActivityEntries();
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
+  const [mode, setMode] = useState<TimerMode>("doing");
   const containerRef = useRef<HTMLDivElement>(null);
 
   // Label display (clickable name) only shows for a labelled, non-editing
@@ -70,17 +80,35 @@ export default function UnifiedTimerHome() {
     containerRef.current?.querySelector("input")?.focus();
   }, [isEditingLabel]);
 
-  // Single Start button: starts blank if the input is empty, otherwise
-  // starts (or labels) with whatever's typed — same distinction as before,
-  // just collapsed into one action instead of two buttons.
+  // Naming an activity around planning ("plan my week", "Planning session")
+  // is a strong-enough signal to drop the user straight into Planning mode
+  // without an extra click. One-directional: removing "plan" later doesn't
+  // switch back to Doing, since the user may have since interacted with the
+  // tasks panel and an automatic yank back out would be more surprising than
+  // helpful. Adjusted during render (not an effect) per React's "adjusting
+  // state when a prop changes" pattern — state, not a ref, tracks the last
+  // seen value so this only fires once per actual inputValue change.
+  const [lastCheckedInputValue, setLastCheckedInputValue] = useState<string | null>(null);
+  if (lastCheckedInputValue !== inputValue) {
+    setLastCheckedInputValue(inputValue);
+    if (mode !== "planning" && inputValue.toLowerCase().includes("plan")) {
+      setMode("planning");
+    }
+  }
+
+  // Single Start button: starting with a typed name labels the timer with
+  // it. Starting with nothing typed reads as "I don't have a specific
+  // activity yet" — rather than leaving the timer unlabelled, it's labelled
+  // "Planning" and Planning mode opens immediately so the task list is right
+  // there instead of an empty search box.
   const handleStartClick = async () => {
     if (name.trim()) {
       await handleToggle();
       return;
     }
 
-    await handleBlankStart();
-    containerRef.current?.querySelector("input")?.focus();
+    await handleCreateActivity("Planning");
+    setMode("planning");
   };
 
   const handleWrapperKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
@@ -208,6 +236,24 @@ export default function UnifiedTimerHome() {
             </AnimatePresence>
           </motion.div>
         </motion.div>
+
+        {isActive && (
+          <>
+            <ModeSwitcher
+              modes={TIMER_MODES}
+              activeKey={mode}
+              onSelect={(key) => setMode(key as TimerMode)}
+              ariaLabel="Timer view"
+              className={styles.modeSwitcher}
+            />
+
+            {mode === "planning" && (
+              <div className={styles.planningPanel}>
+                <TasksPanel />
+              </div>
+            )}
+          </>
+        )}
 
         {showAutoStopWarning && (
           <p className={styles.limitWarning}>

@@ -37,11 +37,13 @@ vi.mock('../../utils/sounds', () => ({
   primeAudio: vi.fn(),
 }));
 
+const invalidateQueries = vi.fn();
+
 vi.mock('@tanstack/react-query', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@tanstack/react-query')>();
   return {
     ...actual,
-    useQueryClient: () => ({ invalidateQueries: vi.fn() }),
+    useQueryClient: () => ({ invalidateQueries }),
   };
 });
 
@@ -85,6 +87,7 @@ describe('useActivityInput unified handlers', () => {
     startActivity.mockReset();
     labelActivity.mockReset();
     addEntityToCache.mockReset();
+    invalidateQueries.mockReset();
 
     mockUseSupportFlow.mockReturnValue({
       openWelcomeMessage: vi.fn(),
@@ -338,6 +341,21 @@ describe('useActivityInput unified handlers', () => {
       });
 
       expect(result.current.resultsData).toBeNull();
+    });
+  });
+
+  it('invalidates the today-points query after completing an activity, so the map badge updates immediately (#673)', async () => {
+    mockGame({ status: 'active', currentActivity: { name: 'Deep work' } });
+    stop.mockResolvedValue({ xp_gained: 10 });
+
+    const { result } = renderHook(() => useActivityInput());
+
+    await act(async () => {
+      await result.current.handleToggle();
+    });
+
+    expect(invalidateQueries).toHaveBeenCalledWith({
+      queryKey: ['me', 'today-points'],
     });
   });
 });

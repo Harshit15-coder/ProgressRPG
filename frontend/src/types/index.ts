@@ -52,6 +52,7 @@ export type {
   CharacterActivity,
   Project,
   Task,
+  Note,
   Quest,
   QuestResults,
   CharacterQuest,

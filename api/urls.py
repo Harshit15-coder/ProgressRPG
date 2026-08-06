@@ -32,6 +32,7 @@ from progression.views import (
     CategoryViewSet,
     ProjectViewSet,
     TaskViewSet,
+    NoteViewSet,
 )
 from server_management.views import maintenance_status
 from users.views import PlayerViewSet
@@ -63,6 +64,7 @@ router.register(r"character", CharacterViewSet, basename="character")
 router.register(r"skills", PlayerSkillViewSet, basename="skills")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"tasks", TaskViewSet, basename="tasks")
+router.register(r"notes", NoteViewSet, basename="notes")
 router.register(r"player-activities", PlayerActivityViewSet, basename="playeractivity")
 router.register(
     r"character-activities", CharacterActivityViewSet, basename="characteractivity"
