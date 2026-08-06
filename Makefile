@@ -1,4 +1,7 @@
-.PHONY: t shell
+.PHONY: \
+	ddu ddub drub dr \
+	ddown dup dbuild dreset \
+	ps ds dt vt shell dc stripelistener
 
 ddu: ddown dup
 ddub: ddown dbuild
