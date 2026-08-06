@@ -5,6 +5,7 @@ from .models import (
     CharacterLocation,
     PlayerCharacterLink,
     CharacterRelationship,
+    CharacterRelationshipMembership,
     Behaviour,
 )
 
@@ -30,6 +31,21 @@ class CharacterCurrencyInline(admin.TabularInline):
     extra = 0
     fields = ("currency", "earned", "spent", "balance", "last_calculated_at")
     readonly_fields = ("balance",)
+
+
+class CharacterRelationshipMembershipInline(admin.TabularInline):
+    model = CharacterRelationshipMembership
+    fk_name = "character"
+    extra = 0
+    fields = ("relationship", "role", "get_other_members")
+    readonly_fields = ("get_other_members",)
+
+    @admin.display(description="With")
+    def get_other_members(self, obj):
+        if not obj.pk:
+            return "-"
+        others = obj.relationship.characters.exclude(pk=obj.character_id)
+        return ", ".join(str(c) for c in others)
 
 
 @admin.action(description="Mark selected characters as NPCs and unlink from players")
@@ -132,7 +148,11 @@ class CharacterAdmin(admin.ModelAdmin):
     ]
 
     ordering = ["last_name", "first_name"]
-    inlines = [LinkInline, CharacterCurrencyInline]
+    inlines = [
+        LinkInline,
+        CharacterCurrencyInline,
+        CharacterRelationshipMembershipInline,
+    ]
     actions = [mark_as_npc, mark_as_canlink]
 
     @admin.display(description="Player")
@@ -212,7 +232,7 @@ class CharacterInline(admin.TabularInline):
     extra = 1
 
 
-# @admin.register(CharacterRelationship)
+@admin.register(CharacterRelationship)
 class CharacterRelationshipAdmin(admin.ModelAdmin):
     list_display = [
         "relationship_type",
