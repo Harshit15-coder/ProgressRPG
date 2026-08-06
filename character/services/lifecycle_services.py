@@ -37,9 +37,11 @@ def lifecycle_is_alive(instance) -> bool:
 
 
 def lifecycle_get_romantic_partners(instance):
-    return instance.__class__.objects.filter(
-        characterrelationshipmembership__character=instance,
-        characterrelationshipmembership__relationship__relationship_type="romantic",
+    from character.models import RelationshipType
+    from character.services import relationship_services
+
+    return relationship_services.relationship_get_related_characters(
+        instance, RelationshipType.ROMANTIC
     )
 
 
