@@ -24,7 +24,7 @@ import {
   addCharacterImage,
   addVillageLayers,
   CLICKABLE_LAYERS,
-  VILLAGE_MARKER_LAYER,
+  VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
 import styles from "./Map.module.scss";
@@ -216,12 +216,12 @@ export default function PopulationCentreMap({
         map.getCanvas().style.cursor = "";
       });
 
-      // Tapping/selecting a village marker expands it into its progress bar
-      // + state label (issue #673) - the marker itself only shows a
-      // state-coded dot at rest (see VILLAGE_MARKER_LAYER in layers.ts).
+      // Tapping/selecting a village's name label expands it into its
+      // progress bar + state (issue #673) - the label itself is coloured by
+      // state at rest (see VILLAGE_LABEL_LAYER in layers.ts).
       map.on(
         "click",
-        VILLAGE_MARKER_LAYER,
+        VILLAGE_LABEL_LAYER,
         (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
@@ -239,10 +239,10 @@ export default function PopulationCentreMap({
           });
         }
       );
-      map.on("mouseenter", VILLAGE_MARKER_LAYER, () => {
+      map.on("mouseenter", VILLAGE_LABEL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
-      map.on("mouseleave", VILLAGE_MARKER_LAYER, () => {
+      map.on("mouseleave", VILLAGE_LABEL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
 
@@ -252,6 +252,16 @@ export default function PopulationCentreMap({
         map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
+          // A village's name label can sit over a building/subzone
+          // underneath it - each map.on(type, layerId, ...) delegate queries
+          // features independently, so both handlers would fire for the same
+          // click (stopPropagation on the DOM event doesn't stop sibling
+          // MapLibre delegates). Deferring to the label's own handler
+          // (registered above, so it already ran and set the tooltip) keeps
+          // the progress-bar tooltip from being clobbered.
+          if (map.queryRenderedFeatures(e.point, { layers: [VILLAGE_LABEL_LAYER] }).length > 0) {
+            return;
+          }
           e.originalEvent?.stopPropagation?.();
           const content = polygonTooltipContent(
             feature.properties as GeoJSONFeatureProperties
@@ -276,7 +286,7 @@ export default function PopulationCentreMap({
         // per-layer listeners above and stops here; a click on empty map
         // area closes whatever tooltip is open.
         const hits = map.queryRenderedFeatures(e.point, {
-          layers: ["characters", VILLAGE_MARKER_LAYER, ...CLICKABLE_LAYERS],
+          layers: ["characters", VILLAGE_LABEL_LAYER, ...CLICKABLE_LAYERS],
         });
         if (hits.length === 0) closeTooltip();
       });

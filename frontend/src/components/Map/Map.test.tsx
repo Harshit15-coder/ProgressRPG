@@ -739,8 +739,8 @@ describe('PopulationCentreMap', () => {
     expect(uniquePoints.size).toBe(3);
   });
 
-  it('colours each village marker by its state, not by a shared default', () => {
-    const geojsonWithVillageMarker = {
+  it('colours each village label by its state, not by a shared default', () => {
+    const geojsonWithVillageLabel = {
       ...baseGeojson,
       features: [
         ...baseGeojson.features,
@@ -756,14 +756,14 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    renderMap({ geojson: geojsonWithVillageMarker });
+    renderMap({ geojson: geojsonWithVillageLabel });
 
-    const markerLayer = currentMap().layers.find((l) => l.id === 'village-marker') as
-      | { paint?: { 'circle-color'?: unknown } }
+    const labelLayer = currentMap().layers.find((l) => l.id === 'village-label') as
+      | { paint?: { 'text-color'?: unknown } }
       | undefined;
     // A ["match", ["get", "state"], ...] expression, not a single flat colour
     // - every state needs its own colour, not one shared default.
-    expect(markerLayer?.paint?.['circle-color']).toEqual(
+    expect(labelLayer?.paint?.['text-color']).toEqual(
       expect.arrayContaining(['match', ['get', 'state']])
     );
 
@@ -773,8 +773,8 @@ describe('PopulationCentreMap', () => {
     expect(feature?.properties.state).toBe('Thriving');
   });
 
-  it('expands a tapped village marker into its progress bar and state label', async () => {
-    const geojsonWithVillageMarker = {
+  it('expands a tapped village label into its progress bar and state label', async () => {
+    const geojsonWithVillageLabel = {
       ...baseGeojson,
       features: [
         ...baseGeojson.features,
@@ -790,7 +790,7 @@ describe('PopulationCentreMap', () => {
         },
       ],
     };
-    renderMap({ geojson: geojsonWithVillageMarker });
+    renderMap({ geojson: geojsonWithVillageLabel });
     const feature = villageSourceFeatures().find(
       (f) => f.properties.feature_type === 'population_centre_label'
     );
@@ -799,7 +799,7 @@ describe('PopulationCentreMap', () => {
       currentMap().trigger(
         'click',
         { features: [feature], lngLat: { lng: 30, lat: 30 } },
-        'village-marker'
+        'village-label'
       );
     });
 

@@ -80,8 +80,8 @@ interface PopulationCentreTooltipProps {
   progress?: number | null;
 }
 
-// Expanded content shown when a village marker is tapped/selected - the
-// marker itself only shows a state-coded dot at rest (see VILLAGE_MARKER_LAYER
+// Expanded content shown when a village's name label is tapped/selected - the
+// label itself is only coloured by state at rest (see VILLAGE_LABEL_LAYER
 // in layers.ts); this is where the full progress bar + state label live.
 export function PopulationCentreTooltipContent({
   name,

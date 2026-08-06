@@ -7,32 +7,35 @@ export const SUBZONES_FILL_LAYER = "subzones-fill";
 export const PATHS_LINE_LAYER = "paths-line";
 export const ROADS_LINE_LAYER = "roads-line";
 export const VILLAGE_LABEL_LAYER = "village-label";
-export const VILLAGE_MARKER_LAYER = "village-marker";
+// BOUNDARY_FILL_LAYER is intentionally excluded - a village boundary tooltip
+// added nothing (just repeated the village name) and, since the boundary
+// covers the whole village, its click handler collided with
+// VILLAGE_LABEL_LAYER's (see Map.tsx).
 export const CLICKABLE_LAYERS = [
-	BOUNDARY_FILL_LAYER,
 	BUILDINGS_FILL_LAYER,
 	SUBZONES_FILL_LAYER,
 ];
 
 const CHARACTERS_LAYER = "characters";
 
-// Marker colour per PopulationCentre.state (see locations/models.py) - a
-// placeholder palette (issue #673 explicitly leaves the exact icon/colour
-// set as an open design question). Mirrors ProgressBar.module.scss's own
-// danger/warning/default/success classes (rather than inventing a separate
-// palette) so a village's marker colour and its tooltip progress bar
-// (VILLAGE_STATE_PROGRESS_COLORS below) read as the same colour per state.
+// Village name-label colour per PopulationCentre.state (see
+// locations/models.py) - a placeholder palette (issue #673 explicitly leaves
+// the exact colour set as an open design question). Mirrors
+// ProgressBar.module.scss's own danger/warning/default/success classes
+// (rather than inventing a separate palette) so a village's label colour and
+// its tooltip progress bar (VILLAGE_STATE_PROGRESS_COLORS below) read as the
+// same colour per state.
 export const VILLAGE_STATE_COLORS: Record<string, string> = {
 	Struggling: "#c62828", // ProgressBar .danger (c.$color-error)
 	Recovering: "#ff9800", // ProgressBar .warning (c.$color-warning)
 	Stable: "#007a32", // ProgressBar .default (c.$color-progress-bar)
 	Thriving: "#00612a", // ProgressBar .success (c.$color-status-success)
 };
-const VILLAGE_STATE_DEFAULT_COLOR = "#888";
+const VILLAGE_STATE_DEFAULT_COLOR = "#333"; // matches the label's old fixed text-color
 
-// ProgressBar `color` prop values per state, for the "tap a marker" expanded
+// ProgressBar `color` prop values per state, for the "tap a label" expanded
 // tooltip - see VILLAGE_STATE_COLORS above for how these line up with the
-// marker's own fill colour.
+// label's own text colour.
 export const VILLAGE_STATE_PROGRESS_COLORS: Record<string, string> = {
 	Struggling: "danger",
 	Recovering: "warning",
@@ -139,37 +142,6 @@ export function addVillageLayers(map: MapLibreMap): void {
 		},
 	});
 	map.addLayer({
-		id: VILLAGE_MARKER_LAYER,
-		type: "circle",
-		source: "village",
-		filter: [
-			"==",
-			["get", "feature_type"],
-			"population_centre_label",
-		],
-		paint: {
-			"circle-radius": [
-				"interpolate",
-				["linear"],
-				["zoom"],
-				2, 3,
-				10, 5,
-				14, 9,
-			],
-			"circle-color": [
-				"match",
-				["get", "state"],
-				"Struggling", VILLAGE_STATE_COLORS.Struggling,
-				"Recovering", VILLAGE_STATE_COLORS.Recovering,
-				"Stable", VILLAGE_STATE_COLORS.Stable,
-				"Thriving", VILLAGE_STATE_COLORS.Thriving,
-				VILLAGE_STATE_DEFAULT_COLOR,
-			],
-			"circle-stroke-width": 1.5,
-			"circle-stroke-color": "#fff",
-		},
-	});
-	map.addLayer({
 		id: VILLAGE_LABEL_LAYER,
 		type: "symbol",
 		source: "village",
@@ -201,7 +173,18 @@ export function addVillageLayers(map: MapLibreMap): void {
 			],
 		},
 		paint: {
-			"text-color": "#333",
+			// Tapping/selecting a village label expands it into its progress
+			// bar + state label (issue #673) - the label itself is coloured
+			// by state at rest (see VILLAGE_STATE_COLORS above).
+			"text-color": [
+				"match",
+				["get", "state"],
+				"Struggling", VILLAGE_STATE_COLORS.Struggling,
+				"Recovering", VILLAGE_STATE_COLORS.Recovering,
+				"Stable", VILLAGE_STATE_COLORS.Stable,
+				"Thriving", VILLAGE_STATE_COLORS.Thriving,
+				VILLAGE_STATE_DEFAULT_COLOR,
+			],
 			"text-halo-color": "#fff",
 			"text-halo-width": 2,
 			"text-opacity": [
