@@ -173,12 +173,14 @@ function currentMap(): FakeMap {
   return FakeMap.instances[FakeMap.instances.length - 1];
 }
 
-function villageSourceFeatures(): {
-  properties: Record<string, unknown>;
+type VillageSourceFeature = {
   geometry: { coordinates: unknown };
-}[] {
+  properties: Record<string, unknown>;
+};
+
+function villageSourceFeatures(): VillageSourceFeature[] {
   const data = currentMap().getSource('village')?.data as
-    | { features?: { properties: Record<string, unknown>; geometry: { coordinates: unknown } }[] }
+    | { features?: VillageSourceFeature[] }
     | undefined;
   return data?.features ?? [];
 }
