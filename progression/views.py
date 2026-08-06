@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 else:
     _RequestMixinBase = object
 
-from api.views import IsOwnerPlayer
+from api.views import IsAdminOrReadOnly, IsOwnerPlayer
 from .models import (
     Category,
     Role,
@@ -113,7 +113,7 @@ class CategoryViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
 class RoleViewSet(viewsets.ModelViewSet):
     queryset = Role.objects.all()
     serializer_class = RoleSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]
     ordering_fields = ["created_at", "last_updated"]
@@ -122,7 +122,7 @@ class RoleViewSet(viewsets.ModelViewSet):
 class SkillGroupViewSet(viewsets.ModelViewSet):
     queryset = SkillGroup.objects.all()
     serializer_class = SkillGroupSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description", "role__name"]
     ordering_fields = ["created_at", "last_updated"]
@@ -131,7 +131,7 @@ class SkillGroupViewSet(viewsets.ModelViewSet):
 class SkillDefinitionViewSet(viewsets.ModelViewSet):
     queryset = SkillDefinition.objects.all()
     serializer_class = SkillDefinitionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description", "role__name"]
     ordering_fields = ["created_at", "last_updated"]
@@ -191,7 +191,7 @@ class ActivityViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
 class SuggestedActivityViewSet(viewsets.ModelViewSet):
     queryset = SuggestedActivity.objects.all()
     serializer_class = SuggestedActivitySerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description"]
     ordering_fields = ["name", "created_at", "last_updated"]
@@ -350,7 +350,7 @@ class CurrentCharacterScopedQuerysetMixin(_RequestMixinBase):
 class ActivityDefinitionViewSet(viewsets.ModelViewSet):
     queryset = ActivityDefinition.objects.all()
     serializer_class = ActivityDefinitionSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [IsAuthenticated, IsAdminOrReadOnly]
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["name", "description", "kind"]
     ordering_fields = ["created_at", "last_updated"]
