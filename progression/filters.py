@@ -12,6 +12,7 @@ from .models import (
     CharacterQuest,
     Project,
     Task,
+    Note,
 )
 
 
@@ -88,6 +89,18 @@ class ProjectFilter(django_filters.FilterSet):
             "is_complete",
             "completed_at",
         ]
+
+
+class NoteFilter(django_filters.FilterSet):
+    title = django_filters.CharFilter(field_name="title", lookup_expr="icontains")
+    player = django_filters.NumberFilter(field_name="player_id")
+    task = django_filters.NumberFilter(field_name="task_id")
+    created_at = django_filters.DateFromToRangeFilter(field_name="created_at")
+    last_updated = django_filters.DateFromToRangeFilter(field_name="last_updated")
+
+    class Meta:
+        model = Note
+        fields = ["title", "player", "task", "created_at", "last_updated"]
 
 
 class TaskFilter(django_filters.FilterSet):

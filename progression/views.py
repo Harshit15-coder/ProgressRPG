@@ -25,6 +25,7 @@ from .models import (
     CharacterQuest,
     Project,
     Task,
+    Note,
 )
 from .serializers import (
     CategorySerializer,
@@ -36,6 +37,7 @@ from .serializers import (
     CharacterQuestSerializer,
     ProjectSerializer,
     TaskSerializer,
+    NoteSerializer,
 )
 from .filters import (
     CategoryFilter,
@@ -44,6 +46,7 @@ from .filters import (
     CharacterActivityFilter,
     ProjectFilter,
     TaskFilter,
+    NoteFilter,
 )
 
 #########################################
@@ -351,3 +354,17 @@ class TaskViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
                 "level_ups": level_ups,
             }
         )
+
+
+class NoteViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
+    model = Note
+    serializer_class = NoteSerializer
+    permission_classes = [IsAuthenticated, IsOwnerPlayer]
+    filter_backends = [
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
+    ]
+    filterset_class = NoteFilter
+    search_fields = ["title", "body", "task__name"]
+    ordering_fields = ["created_at", "last_updated"]

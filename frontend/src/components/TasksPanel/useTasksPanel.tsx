@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router";
 
 import { useTasks, useCreateTask, useUpdateTask, useDeleteTask } from "../../hooks/useTasks";
+import { useNotes, useCreateNote } from "../../hooks/useNotes";
 import { useGame } from "../../hooks/useGame";
 import type { Task } from "../../types";
 import type { SortOption } from "../PlayerItemList/PlayerItemList";
@@ -94,15 +95,17 @@ function formatLastWorkedOn(task: Task): string {
   return `Last worked on ${diffWeeks} ${diffWeeks === 1 ? "week" : "weeks"} ago`;
 }
 
-export function useTasksPanel() {
+export function useTasksPanel(openTaskId?: number | null, onOpenNote?: (noteId: number) => void) {
   const navigate = useNavigate();
   const { fetchPlayerAndCharacter, activityTimer, freeTimerLimitSeconds, player } = useGame();
   const isPremium = Boolean(player?.is_premium);
 
   const { data: tasks, isLoading } = useTasks();
+  const { data: notes } = useNotes();
   const createTask = useCreateTask();
   const updateTask = useUpdateTask();
   const deleteTask = useDeleteTask();
+  const createNote = useCreateNote();
 
   const [newName, setNewName] = useState("");
   const [completionReward, setCompletionReward] = useState<{ taskId: number; xp: number } | null>(null);
@@ -113,6 +116,7 @@ export function useTasksPanel() {
       return true;
     }
   });
+  const [addSubtaskParent, setAddSubtaskParent] = useState<ItemRecord | null>(null);
 
   useEffect(() => {
     if (!completionReward) return;
@@ -120,9 +124,13 @@ export function useTasksPanel() {
     return () => clearTimeout(timer);
   }, [completionReward]);
 
-  const [addSubtaskParent, setAddSubtaskParent] = useState<ItemRecord | null>(null);
-
   const safeTasks = useMemo(() => asArray(tasks) as ItemRecord[], [tasks]);
+  const safeNotes = useMemo(() => asArray(notes), [notes]);
+
+  const getLinkedNoteId = useCallback(
+    (task: Task) => safeNotes.find((note) => note.task === task.id)?.id ?? null,
+    [safeNotes]
+  );
 
   const topLevelTasks = useMemo(
     () => safeTasks.filter((task) => task.parent == null),
@@ -154,16 +162,19 @@ export function useTasksPanel() {
       ? topLevel.filter((task) => !isTaskComplete(task))
       : topLevel;
 
-    const groups: ParentGroup[] = visibleTopLevel.map((parent) => {
+    if (hideCompleted && openTaskId != null && !visibleTopLevel.some((task) => task.id === openTaskId)) {
+      const deepLinkedTask = topLevel.find((task) => task.id === openTaskId);
+      if (deepLinkedTask) visibleTopLevel.push(deepLinkedTask);
+    }
+
+    return visibleTopLevel.map((parent) => {
       const children = childrenByParentId.get(parent.id) ?? [];
       return {
         parent,
         children: hideCompleted ? children.filter((child) => !isTaskComplete(child)) : children,
       };
     });
-
-    return groups;
-  }, [safeTasks, hideCompleted]);
+  }, [safeTasks, hideCompleted, openTaskId]);
 
   const visibleTasks = useMemo(
     () => groupedTasks.flatMap((group) => [group.parent, ...group.children]),
@@ -178,6 +189,16 @@ export function useTasksPanel() {
   const getChildren = useCallback(
     (task: ItemRecord): ItemRecord[] => childrenByGroupParentId.get(task.id) ?? [],
     [childrenByGroupParentId]
+  );
+
+  const handleCreateNoteForTask = useCallback(
+    (task: Task) => {
+      createNote.mutate(
+        { title: task.name, body: "", task: task.id },
+        { onSuccess: (note) => onOpenNote?.(note.id) }
+      );
+    },
+    [createNote, onOpenNote]
   );
 
   const toggleHideCompleted = useCallback(() => {
@@ -329,6 +350,8 @@ export function useTasksPanel() {
     toggleHideCompleted,
     getTaskMeta,
     getTaskEditSummary,
+    getLinkedNoteId,
+    handleCreateNoteForTask,
     updateTask,
   };
 }

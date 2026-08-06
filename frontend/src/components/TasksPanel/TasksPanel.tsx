@@ -9,7 +9,20 @@ import { isTaskComplete, taskSortOptions, useTasksPanel, type ItemRecord } from 
 import { toDatetimeLocalValue, fromDatetimeLocalValue } from "../../utils/formatUtils";
 import styles from "./TasksPanel.module.scss";
 
-export default function TasksPanel(): React.ReactElement | null {
+interface TasksPanelProps {
+  /** Opens the edit modal for this task id once the tasks have loaded. */
+  openTaskId?: number | null;
+  /** Called once the requested `openTaskId` has been opened, so the caller can clear it. */
+  onOpenTaskHandled?: () => void;
+  /** Called with a note id when the user creates or opens a task's linked note. */
+  onOpenNote?: (noteId: number) => void;
+}
+
+export default function TasksPanel({
+  openTaskId,
+  onOpenTaskHandled,
+  onOpenNote,
+}: TasksPanelProps = {}): React.ReactElement | null {
   const {
     isLoading,
     newName,
@@ -30,8 +43,10 @@ export default function TasksPanel(): React.ReactElement | null {
     toggleHideCompleted,
     getTaskMeta,
     getTaskEditSummary,
+    getLinkedNoteId,
+    handleCreateNoteForTask,
     updateTask,
-  } = useTasksPanel();
+  } = useTasksPanel(openTaskId, onOpenNote);
 
   if (isLoading) return <p>Loading tasks...</p>;
 
@@ -117,6 +132,27 @@ export default function TasksPanel(): React.ReactElement | null {
                 <div>
                   Total time: {summary.totalTime}
                 </div>
+                {onOpenNote ? (
+                  (() => {
+                    const linkedNoteId = getLinkedNoteId(taskItem);
+                    return linkedNoteId !== null ? (
+                      <button
+                        type="button"
+                        className={styles.linkedNoteLink}
+                        onClick={() => onOpenNote(linkedNoteId)}
+                      >
+                        View linked note
+                      </button>
+                    ) : (
+                      <Button
+                        variant="secondary"
+                        onClick={() => handleCreateNoteForTask(taskItem)}
+                      >
+                        Create note for this task
+                      </Button>
+                    );
+                  })()
+                ) : null}
                 <div className={styles.dueDateRow}>
                   <label className={styles.timestampLabel} htmlFor="task-due-at">
                     Due date
@@ -216,6 +252,8 @@ export default function TasksPanel(): React.ReactElement | null {
           )}
           onEdit={handleEdit}
           onDelete={handleDelete}
+          openItemId={openTaskId}
+          onOpenItemHandled={onOpenTaskHandled}
           sortOptions={taskSortOptions}
           controls={
             <Button

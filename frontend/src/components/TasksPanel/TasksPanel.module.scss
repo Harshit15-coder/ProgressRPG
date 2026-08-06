@@ -134,6 +134,22 @@
   }
 }
 
+.linkedNoteLink {
+  align-self: flex-start;
+  background: none;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: c.$color-status-info;
+  text-decoration: underline;
+  cursor: pointer;
+
+  &:hover,
+  &:focus-visible {
+    text-decoration: none;
+  }
+}
+
 .taskSubtaskButton {
   border: none;
   background: transparent;
@@ -196,7 +212,6 @@
   font-family: inherit;
   color: inherit;
 }
-
 .addButtonIcon {
   display: none;
 }

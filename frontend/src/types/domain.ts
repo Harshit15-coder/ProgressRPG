@@ -222,6 +222,20 @@ export interface Task {
 }
 
 // ---------------------------------------------------------------------------
+// Note (progression/serializers.py — NoteSerializer)
+// ---------------------------------------------------------------------------
+
+export interface Note {
+  id: number;
+  title: string;
+  body: string;
+  player: number;
+  task: number | null;
+  created_at: string;
+  last_updated: string;
+}
+
+// ---------------------------------------------------------------------------
 // Quest (gameplay/serializers.py — QuestSerializer)
 // ---------------------------------------------------------------------------
 

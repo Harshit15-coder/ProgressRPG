@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import classNames from "classnames";
 
 import Button from "../Button/Button";
@@ -40,6 +40,10 @@ interface PlayerItemListProps<T extends { id?: string | number; name?: string }>
   sortOptions?: SortOption<T>[];
   filterOptions?: FilterOption<T>[];
   controls?: React.ReactNode;
+  /** When set, opens the edit modal for the item with this id (e.g. deep-linked from another panel). */
+  openItemId?: string | number | null;
+  /** Called once the requested `openItemId` has been opened, so the caller can clear it. */
+  onOpenItemHandled?: () => void;
   getChildren?: (item: T) => T[] | undefined;
 }
 
@@ -62,6 +66,8 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
   sortOptions,
   filterOptions,
   controls,
+  openItemId,
+  onOpenItemHandled,
   getChildren,
 }: PlayerItemListProps<T>) {
   const {
@@ -103,6 +109,18 @@ export default function PlayerItemList<T extends { id?: string | number; name?: 
     onEdit,
     onDelete,
   });
+
+  // Deep-link support: open a specific item's edit modal (e.g. navigated to
+  // from another panel) once its data is available in `items`.
+  useEffect(() => {
+    if (openItemId === null || openItemId === undefined) return;
+
+    const item = items.find((i) => i.id !== undefined && i.id === openItemId);
+    if (!item) return;
+
+    handleOpenItem(item);
+    onOpenItemHandled?.();
+  }, [openItemId, items, handleOpenItem, onOpenItemHandled]);
 
   const canToggleComplete = typeof onToggleComplete === "function";
   const canEdit = typeof onEdit === "function";
