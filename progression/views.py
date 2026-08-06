@@ -24,6 +24,8 @@ from .models import (
     CharacterRole,
     PlayerSkill,
     CharacterSkill,
+    Activity,
+    SuggestedActivity,
     PlayerActivity,
     CharacterActivity,
     CharacterQuest,
@@ -39,6 +41,8 @@ from .serializers import (
     CharacterRoleSerializer,
     PlayerSkillSerializer,
     CharacterSkillSerializer,
+    ActivitySerializer,
+    SuggestedActivitySerializer,
     PlayerActivitySerializer,
     OfflineActivityLogSerializer,
     CharacterActivitySerializer,
@@ -168,6 +172,29 @@ class CharacterSkillViewSet(viewsets.ModelViewSet):
     filter_backends = [filters.SearchFilter, filters.OrderingFilter]
     search_fields = ["skill_definition__name", "character__name"]
     ordering_fields = ["created_at", "last_updated"]
+
+
+#########################################
+#####      Activity viewsets
+#########################################
+
+
+class ActivityViewSet(PlayerScopedQuerysetMixin, viewsets.ModelViewSet):
+    model = Activity
+    serializer_class = ActivitySerializer
+    permission_classes = [IsAuthenticated, IsOwnerPlayer]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description"]
+    ordering_fields = ["name", "created_at", "last_updated"]
+
+
+class SuggestedActivityViewSet(viewsets.ModelViewSet):
+    queryset = SuggestedActivity.objects.all()
+    serializer_class = SuggestedActivitySerializer
+    permission_classes = [IsAuthenticated]
+    filter_backends = [filters.SearchFilter, filters.OrderingFilter]
+    search_fields = ["name", "description"]
+    ordering_fields = ["name", "created_at", "last_updated"]
 
 
 #########################################
