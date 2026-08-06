@@ -40,8 +40,15 @@ class CharacterRelationshipMembershipInline(admin.TabularInline):
     model = CharacterRelationshipMembership
     fk_name = "character"
     extra = 0
-    fields = ("relationship", "role", "get_other_members")
-    readonly_fields = ("get_other_members",)
+    fields = ("get_relationship_type", "relationship", "role", "get_other_members")
+    readonly_fields = ("get_relationship_type", "get_other_members")
+    ordering = ("relationship__relationship_type",)
+
+    @admin.display(description="Type")
+    def get_relationship_type(self, obj):
+        if not obj.pk:
+            return "-"
+        return obj.relationship.get_relationship_type_display()
 
     @admin.display(description="With")
     def get_other_members(self, obj):
@@ -100,6 +107,12 @@ class CharacterAdmin(admin.ModelAdmin):
         ),
         ("Dates", {"fields": (("birth_date", "death_date", "get_age"),)}),
         (
+            "Family",
+            {
+                "fields": ("get_family_summary",),
+            },
+        ),
+        (
             "Life & Story",
             {
                 "classes": ("collapse",),
@@ -147,6 +160,7 @@ class CharacterAdmin(admin.ModelAdmin):
         "get_player",
         "get_age",
         "created_at",
+        "get_family_summary",
     ]
 
     ordering = ["last_name", "first_name"]
@@ -195,6 +209,21 @@ class CharacterAdmin(admin.ModelAdmin):
             return f"{int(obj.get_age()/365)} years old"
         except Exception:
             return "-"
+
+    @admin.display(description="Family")
+    def get_family_summary(self, obj):
+        if not obj.pk:
+            return "-"
+
+        def names(characters):
+            return ", ".join(str(c) for c in characters) or "-"
+
+        parts = [
+            f"Parents: {names(obj.parents)}",
+            f"Children: {names(obj.children)}",
+            f"Siblings: {names(obj.siblings)}",
+        ]
+        return " · ".join(parts)
 
 
 @admin.register(PlayerCharacterLink)
