@@ -104,3 +104,54 @@ def relationship_get_relationships_of_type(character, relationship_type):
     return CharacterRelationship.objects.filter(
         relationship_type=relationship_type, characters=character
     ).distinct()
+
+
+def relationship_get_family_groups(characters):
+    """
+    Map each character's id to a group key such that characters connected via
+    PARENT_CHILD or SIBLING relationships - directly or transitively (e.g.
+    grandparent -> parent -> child) - share the same key. A character with no
+    such relationships gets a singleton group keyed by their own id.
+
+    Computed via union-find over a single bulk query, so callers that need
+    family grouping across many characters (e.g. placement logic) don't have
+    to query the relationship graph once per character.
+    """
+    from character.models import CharacterRelationship, RelationshipType
+
+    character_ids = {c.id for c in characters}
+    parent = {cid: cid for cid in character_ids}
+
+    def find(cid):
+        while parent[cid] != cid:
+            parent[cid] = parent[parent[cid]]
+            cid = parent[cid]
+        return cid
+
+    def union(a, b):
+        root_a, root_b = find(a), find(b)
+        if root_a != root_b:
+            parent[root_a] = root_b
+
+    relationships = (
+        CharacterRelationship.objects.filter(
+            relationship_type__in=[
+                RelationshipType.PARENT_CHILD,
+                RelationshipType.SIBLING,
+            ],
+            characters__in=character_ids,
+        )
+        .prefetch_related("characterrelationshipmembership_set")
+        .distinct()
+    )
+
+    for relationship in relationships:
+        member_ids = [
+            membership.character_id
+            for membership in relationship.characterrelationshipmembership_set.all()
+            if membership.character_id in character_ids
+        ]
+        for other_id in member_ids[1:]:
+            union(member_ids[0], other_id)
+
+    return {cid: find(cid) for cid in character_ids}
