@@ -45,15 +45,16 @@ class RelationshipType(models.TextChoices):
     ENEMY = "enemy", "Enemy"
     ALLY = "ally", "Ally"
     ROMANTIC = "romantic", "Romantic"
-    SPOUSE = "spouse", "Spouse"
+    MARRIAGE = "marriage", "Marriage"
     PARENT_CHILD = "parent_child", "Parent/Child"
     SIBLING = "sibling", "Sibling"
 
 
 class RelationshipRole(models.TextChoices):
     # Generic role for symmetric relationships, where members don't play
-    # structurally different parts (friend, rival, spouse, ...).
+    # structurally different parts (friend, rival, romantic partner, ...).
     PARTICIPANT = "participant", "Participant"
+    SPOUSE = "spouse", "Spouse"
     PARENT = "parent", "Parent"
     CHILD = "child", "Child"
     MENTOR = "mentor", "Mentor"
@@ -89,7 +90,9 @@ RELATIONSHIP_SPECS: Dict[RelationshipType, RelationshipTypeSpec] = {
     RelationshipType.ALLY: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
     RelationshipType.SIBLING: RelationshipTypeSpec(roles=_SYMMETRIC_GROUP),
     RelationshipType.ROMANTIC: RelationshipTypeSpec(roles=_SYMMETRIC_PAIR),
-    RelationshipType.SPOUSE: RelationshipTypeSpec(roles=_SYMMETRIC_PAIR),
+    RelationshipType.MARRIAGE: RelationshipTypeSpec(
+        roles={RelationshipRole.SPOUSE: (2, 2)},
+    ),
     RelationshipType.MENTOR: RelationshipTypeSpec(
         roles={
             RelationshipRole.MENTOR: (1, 1),
