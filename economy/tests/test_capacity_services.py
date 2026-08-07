@@ -84,7 +84,7 @@ def _make_building(centre, building_type, x):
 def _add_workers(building, node, count):
     for i in range(count):
         Character.objects.create(
-            first_name=f"Worker{i}",
+            given_name=f"Worker{i}",
             location=building.location,
             current_node=node,
             is_moving=False,
@@ -290,7 +290,7 @@ class SharedHelperTests(TestCase):
         bakery, node = _make_building(centre, "bakery", 10)
         _add_workers(bakery, node, count=2)
         Character.objects.create(
-            first_name="EnRoute",
+            given_name="EnRoute",
             location=bakery.location,
             current_node=node,
             is_moving=True,
