@@ -19,7 +19,7 @@ import {
   type MapMouseEvent,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { fromLngLat, quantizeBbox, toLngLat } from "./utils";
+import { fromLngLat, padBbox, quantizeBbox, toLngLat } from "./utils";
 import { CharacterTooltipContent, PopulationCentreTooltipContent } from "./MapTooltips";
 import { scatterCharacters } from "./characters/placement";
 import {
@@ -113,6 +113,14 @@ interface PopulationCentreMapProps {
 // only fires once the camera has actually settled.
 const VIEWPORT_DEBOUNCE_MS = 400;
 
+// MapLibre's flyTo scales its own animation length by distance/zoom delta
+// when no duration is given - villages can be many km apart (see
+// import_village.py's placement grid), which made "find village" jumps take
+// several seconds even once the destination's data was already cached.
+// Pinning a fixed duration keeps every jump feeling equally snappy
+// regardless of how far apart the two villages are.
+const FLY_TO_DURATION_MS = 1200;
+
 interface TooltipOverlayState {
   key: string;
   content: React.ReactNode;
@@ -144,6 +152,7 @@ export default function PopulationCentreMap({
         mapRef.current?.flyTo({
           center: toLngLat(point),
           zoom: 14,
+          duration: FLY_TO_DURATION_MS,
           essential: true
         });
       },
@@ -253,7 +262,7 @@ export default function PopulationCentreMap({
         const bounds = map.getBounds();
         const sw = fromLngLat([bounds.getWest(), bounds.getSouth()]);
         const ne = fromLngLat([bounds.getEast(), bounds.getNorth()]);
-        onChange(quantizeBbox([sw[0], sw[1], ne[0], ne[1]]));
+        onChange(quantizeBbox(padBbox([sw[0], sw[1], ne[0], ne[1]])));
       }, VIEWPORT_DEBOUNCE_MS);
     };
 
