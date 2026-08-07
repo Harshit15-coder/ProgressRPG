@@ -183,7 +183,7 @@ class Command(BaseCommand):
             building = random.choice(buildings)
 
             sex = random.choice(["M", "F"])
-            first_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
+            given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
             last_name = random.choice(LAST_NAMES)
 
             birth_date = random_birth_date()
@@ -192,9 +192,7 @@ class Command(BaseCommand):
             can_link = age_days >= int(15 * 365.25)
 
             char = Character.objects.create(
-                first_name=first_name,
-                last_name=last_name,
-                name=f"{first_name} {last_name}",
+                first_name=f"{given_name} {last_name}",
                 sex=sex,
                 birth_date=birth_date,
                 can_link=can_link,

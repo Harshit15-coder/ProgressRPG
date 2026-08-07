@@ -41,21 +41,21 @@ class BuildingFeatureSerializerTest(TestCase):
         self.assertEqual(props["goods"], [])
 
     def test_workers_counts_only_primary_work_locations(self):
-        worker = Character.objects.create(first_name="Worker", last_name="Bee")
+        worker = Character.objects.create(first_name="Worker")
         CharacterLocation.objects.create(
             character=worker,
             location=self.building,
             role=CharacterLocation.Role.WORK,
             is_primary=True,
         )
-        not_primary = Character.objects.create(first_name="Substitute", last_name="Bee")
+        not_primary = Character.objects.create(first_name="Substitute")
         CharacterLocation.objects.create(
             character=not_primary,
             location=self.building,
             role=CharacterLocation.Role.WORK,
             is_primary=False,
         )
-        home_only = Character.objects.create(first_name="Resident", last_name="Bee")
+        home_only = Character.objects.create(first_name="Resident")
         CharacterLocation.objects.create(
             character=home_only,
             location=self.building,
@@ -89,7 +89,7 @@ class CharacterPointFeatureSerializerTest(TestCase):
             name="Village Bakery", building_type="bakery"
         )
         self.character = Character.objects.create(
-            first_name="Alice", last_name="Smith", location=Point(0, 0, srid=3857)
+            first_name="Alice", location=Point(0, 0, srid=3857)
         )
 
     def properties(self):
@@ -277,7 +277,7 @@ class PopulationCentreLabelFeatureSerializerTest(TestCase):
         from users.models import CustomUser
 
         resident = Character.objects.create(
-            first_name="Res", last_name="Ident", population_centre=self.centre
+            first_name="Res", population_centre=self.centre
         )
         user = CustomUser.objects.create_user(
             email="villager@example.com", password="x"

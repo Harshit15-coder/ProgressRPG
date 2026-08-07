@@ -776,13 +776,11 @@ class AssignCharacterTest(TestCase):
         # Create available NPCs
         self.npc1 = Character.objects.create(
             first_name="Available",
-            last_name="NPC1",
             sex="Male",
             can_link=True,
         )
         self.npc2 = Character.objects.create(
             first_name="Available",
-            last_name="NPC2",
             sex="Female",
             can_link=True,
         )
@@ -818,7 +816,6 @@ class AssignCharacterTest(TestCase):
         # Create a character that's not linkable
         unlinkable = Character.objects.create(
             first_name="Unlinkable",
-            last_name="Character",
             sex="Male",
             can_link=False,
         )
@@ -826,7 +823,6 @@ class AssignCharacterTest(TestCase):
         # Create a dead character
         dead = Character.objects.create(
             first_name="Dead",
-            last_name="Character",
             sex="Female",
             can_link=True,
             death_date=date.today(),

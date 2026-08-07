@@ -5,6 +5,7 @@ from .models import Character
 
 
 class CharacterSerializer(serializers.ModelSerializer):
+    name = serializers.ReadOnlyField()
     age = serializers.SerializerMethodField()
     coins = serializers.SerializerMethodField()
     total_activities = serializers.IntegerField(read_only=True)
@@ -19,8 +20,7 @@ class CharacterSerializer(serializers.ModelSerializer):
         model = Character
         fields = [
             "id",
-            "first_name",
-            "last_name",
+            "name",
             "backstory",
             "age",
             "sex",

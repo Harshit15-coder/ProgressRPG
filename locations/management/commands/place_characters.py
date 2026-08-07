@@ -130,7 +130,7 @@ class Command(BaseCommand):
             char.move_to(node)
 
             self.stdout.write(
-                f"{char.full_name} moved to building {building.name} (ID {building.id})"
+                f"{char.name} moved to building {building.name} (ID {building.id})"
             )
 
         self.stdout.write(self.style.SUCCESS("Characters have been placed"))
@@ -154,6 +154,6 @@ class Command(BaseCommand):
                     is_primary=True,
                 ).delete()
                 self.stdout.write(
-                    f"Evicted {char.full_name} from overcrowded building "
+                    f"Evicted {char.name} from overcrowded building "
                     f"{building.name} (ID {building.id})"
                 )

@@ -315,7 +315,6 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
         FEMALE = "Female", "Female"
         OTHER = "Other", "Other"
 
-    name = models.CharField(max_length=100, blank=True, null=True)
     xp = models.PositiveIntegerField(default=0)
     xp_next_level = models.PositiveIntegerField(default=100)
     xp_modifier = models.FloatField(default=1)
@@ -323,7 +322,6 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     created_at = models.DateTimeField(auto_now_add=True)
 
     first_name = models.CharField(max_length=50, default="")
-    last_name = models.CharField(max_length=50, default="", null=True, blank=True)
     backstory = models.TextField(default="")
     building = models.ForeignKey(
         "locations.Building",
@@ -357,7 +355,16 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
         return not self.links.filter(is_active=True).exists()
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return self.name
+
+    @property
+    def name(self):
+        """
+        Canonical display name - currently just first_name, but will later
+        combine given_name with other components. Callers should read
+        `.name`, never reconstruct it from `.first_name` themselves.
+        """
+        return self.first_name
 
     @property
     def total_activities(self):
@@ -371,10 +378,6 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
             or 0
         )
         return live_count + archived_count
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}"
 
     @property
     def active_link(self):

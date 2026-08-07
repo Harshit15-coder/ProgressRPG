@@ -66,7 +66,7 @@ class Command(BaseCommand):
                 char.assign_work(building)
                 assigned_ids.add(char.id)
                 self.stdout.write(
-                    f"{char.full_name} now works at {building.name} (ID {building.id})"
+                    f"{char.name} now works at {building.name} (ID {building.id})"
                 )
 
         self.stdout.write(self.style.SUCCESS("Workers have been assigned"))
