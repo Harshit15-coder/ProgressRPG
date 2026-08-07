@@ -885,7 +885,7 @@ class CharacterActivity(TimeRecord):
             village_state = getattr(self.character.population_centre, "state", "Stable")
             phrase = generate_phrase(village_state, self.kind, self.character)
             activity_name = (self.name or "activity").lower()
-            message = f"{self.character.given_name} completed {activity_name}. {phrase}"
+            message = f"{self.character.name} completed {activity_name}. {phrase}"
 
             ServerMessage = apps.get_model("gameplay", "ServerMessage")
             ServerMessage.objects.create(
