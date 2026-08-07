@@ -732,7 +732,7 @@ describe('PopulationCentreMap', () => {
     expect(tooltip).not.toHaveTextContent('Workers');
   });
 
-  it('shows home, workplace, current activity, and hunger in a character tooltip', async () => {
+  it('shows home, workplace, and current activity in a character tooltip', async () => {
     const geojsonWithCharacter = {
       ...baseGeojson,
       features: [
@@ -744,8 +744,7 @@ describe('PopulationCentreMap', () => {
             name: 'Alice',
             home_type: 'residential',
             work_type: 'bakery',
-            current_activity: 'General labour',
-            hunger_label: 'Well fed',
+            current_activity: 'delivering goods to neighbours',
           },
         },
       ],
@@ -764,8 +763,7 @@ describe('PopulationCentreMap', () => {
     // label ("House"/"Bakery") shown on that building's own tooltip.
     expect(tooltip).toHaveTextContent('Lives at: House');
     expect(tooltip).toHaveTextContent('Works at: Bakery');
-    expect(tooltip).toHaveTextContent('General labour');
-    expect(tooltip).toHaveTextContent('Well fed');
+    expect(tooltip).toHaveTextContent('delivering goods to neighbours');
   });
 
   it('omits the current activity line when a character has none scheduled', async () => {

@@ -9,8 +9,10 @@ interface PopulationCentreResidentsProps {
 }
 
 const formatActivity = (activity: string | null | undefined): string => {
-  if (!activity) return "idle";
-  return String(activity).toLowerCase();
+  // current_activity is already narrative/present-tense from the backend
+  // (ActivityDefinition.narrative, e.g. "delivering goods to neighbours") -
+  // no further casing needed here.
+  return activity || "idle";
 };
 
 const formatName = (firstName: string | undefined, lastName: string | undefined): string => {
