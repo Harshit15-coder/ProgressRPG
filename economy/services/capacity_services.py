@@ -64,23 +64,45 @@ def find_bakery(population_centre):
     )
 
 
+def daily_bread_demand_for_population(resident_count):
+    """
+    Pure resident-count -> bread demand, with no PopulationCentre
+    dependency - shared with economy.services.planning_services, which
+    needs the same formula for a raw population size that has no
+    PopulationCentre yet.
+    """
+    return resident_count * BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+
+
+def daily_flour_demand_for_population(resident_count):
+    return daily_bread_demand_for_population(resident_count) / FLOUR_TO_BREAD_RATIO
+
+
+def daily_wheat_demand_for_population(resident_count):
+    """
+    Wheat that must be milled per day to keep flour demand covered - the
+    inverse of WHEAT_TO_FLOUR_RATIO, mirroring how
+    daily_flour_demand_for_population inverts FLOUR_TO_BREAD_RATIO.
+    """
+    return daily_flour_demand_for_population(resident_count) / WHEAT_TO_FLOUR_RATIO
+
+
 def daily_bread_demand(population_centre):
     if population_centre is None:
         return 0.0
-    return population_centre.resident_count * BREAD_PER_CHARACTER_DAILY_CONSUMPTION
+    return daily_bread_demand_for_population(population_centre.resident_count)
 
 
 def daily_flour_demand(population_centre):
-    return daily_bread_demand(population_centre) / FLOUR_TO_BREAD_RATIO
+    if population_centre is None:
+        return 0.0
+    return daily_flour_demand_for_population(population_centre.resident_count)
 
 
 def daily_wheat_demand(population_centre):
-    """
-    Wheat that must be milled per day to keep flour demand covered - the
-    inverse of WHEAT_TO_FLOUR_RATIO, mirroring how daily_flour_demand
-    inverts FLOUR_TO_BREAD_RATIO.
-    """
-    return daily_flour_demand(population_centre) / WHEAT_TO_FLOUR_RATIO
+    if population_centre is None:
+        return 0.0
+    return daily_wheat_demand_for_population(population_centre.resident_count)
 
 
 @dataclass
