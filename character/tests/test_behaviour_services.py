@@ -19,7 +19,7 @@ from progression.models import (
 class WorkActivitiesForTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Marigold", location=Point(0, 0, srid=3857)
+            given_name="Marigold", location=Point(0, 0, srid=3857)
         )
         self.general_activity = ActivityDefinition.objects.create(
             name="hauling water", kind=ActivityDefinition.Kind.WORK
@@ -92,7 +92,7 @@ def create_activity_catalog():
 class GenerateDayWorkActivityTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Oswin", location=Point(0, 0, srid=3857)
+            given_name="Oswin", location=Point(0, 0, srid=3857)
         )
         create_activity_catalog()
 
@@ -133,7 +133,7 @@ class GenerateDayWorkActivityTests(TestCase):
 class DeleteDayTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Della", location=Point(0, 0, srid=3857)
+            given_name="Della", location=Point(0, 0, srid=3857)
         )
         create_activity_catalog()
 

@@ -28,8 +28,8 @@ def load_phrases():
 
 
 def _character_name(character):
-    if getattr(character, "first_name", None):
-        return character.first_name
+    if getattr(character, "given_name", None):
+        return character.given_name
     if getattr(character, "name", None):
         return character.name
     return "Your companion"

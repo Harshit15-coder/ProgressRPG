@@ -321,7 +321,7 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     level = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
 
-    first_name = models.CharField(max_length=50, default="")
+    given_name = models.CharField(max_length=50, default="")
     backstory = models.TextField(default="")
     building = models.ForeignKey(
         "locations.Building",
@@ -360,11 +360,11 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     @property
     def name(self):
         """
-        Canonical display name - currently just first_name, but will later
+        Canonical display name - currently just given_name, but will later
         combine given_name with other components. Callers should read
-        `.name`, never reconstruct it from `.first_name` themselves.
+        `.name`, never reconstruct it from `.given_name` themselves.
         """
-        return self.first_name
+        return self.given_name
 
     @property
     def total_activities(self):

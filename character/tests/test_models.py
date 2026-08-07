@@ -22,12 +22,12 @@ from character.models import (
 class CharacterRelationshipTests(TestCase):
     def setUp(self):
         self.char1 = Character.objects.create(
-            first_name="Alice",
+            given_name="Alice",
             birth_date=date(2000, 1, 1),
             sex="Female",
         )
         self.char2 = Character.objects.create(
-            first_name="Bob",
+            given_name="Bob",
             birth_date=date(1998, 6, 15),
             sex="Male",
         )
@@ -118,7 +118,7 @@ class CharacterRelationshipTests(TestCase):
 class CharacterRelationshipMembershipTests(TestCase):
     def setUp(self):
         self.char = Character.objects.create(
-            first_name="Test",
+            given_name="Test",
             birth_date=date(2000, 1, 1),
             sex="Female",
         )
@@ -173,7 +173,7 @@ class CharacterRelationshipMembershipTests(TestCase):
 
     def test_role_max_count_enforced(self):
         """A role can't exceed its spec's max participant count."""
-        other = Character.objects.create(first_name="Other", sex="Male")
+        other = Character.objects.create(given_name="Other", sex="Male")
         romantic = CharacterRelationship.objects.create(relationship_type="romantic")
         CharacterRelationshipMembership.objects.create(
             character=self.char,
@@ -184,7 +184,7 @@ class CharacterRelationshipMembershipTests(TestCase):
             character=other, relationship=romantic, role=RelationshipRole.PARTICIPANT
         )
 
-        third = Character.objects.create(first_name="Third", sex="Female")
+        third = Character.objects.create(given_name="Third", sex="Female")
         with self.assertRaises(ValidationError):
             CharacterRelationshipMembership.objects.create(
                 character=third,
@@ -209,7 +209,7 @@ class CharacterRelationshipMembershipTests(TestCase):
 class LifeCycleMixinTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Test",
+            given_name="Test",
             birth_date=date.today() - timedelta(days=365 * 25),  # 25 years old
             sex="Female",
             fertility=75,
@@ -240,14 +240,14 @@ class LifeCycleMixinTests(TestCase):
     def test_can_reproduce_with(self):
         """Test reproduction compatibility"""
         male_partner = Character.objects.create(
-            first_name="Male",
+            given_name="Male",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
         )
 
         female_partner = Character.objects.create(
-            first_name="Female",
+            given_name="Female",
             birth_date=date.today() - timedelta(days=365 * 28),
             sex="Female",
             fertility=60,
@@ -267,7 +267,7 @@ class LifeCycleMixinTests(TestCase):
     def test_start_pregnancy(self):
         """Test starting pregnancy"""
         partner = Character.objects.create(
-            first_name="Partner",
+            given_name="Partner",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
@@ -287,7 +287,7 @@ class LifeCycleMixinTests(TestCase):
         )
 
         partner = Character.objects.create(
-            first_name="Partner",
+            given_name="Partner",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
@@ -303,7 +303,7 @@ class LifeCycleMixinTests(TestCase):
         self.assertEqual(Character.objects.count(), initial_count + 1)
 
         # Check child was created correctly
-        child = Character.objects.filter(first_name__startswith="Child of").first()
+        child = Character.objects.filter(given_name__startswith="Child of").first()
         self.assertIsNotNone(child)
         # Not working properly! Fix later
         # self.assertEqual(child.sex, "Female")
@@ -340,7 +340,7 @@ class PersonTests(TestCase):
     def setUp(self):
         # Create a concrete character to test Person functionality
         self.character = Character.objects.create(
-            first_name="Test",
+            given_name="Test",
             birth_date=date.today() - timedelta(days=365 * 20),
             sex="Male",
             xp=50,
@@ -408,13 +408,13 @@ class CharacterNPCTests(TestCase):
 
         # Create NPCs that are available for linking
         self.npc1 = Character.objects.create(
-            first_name="NPC1",
+            given_name="NPC1",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=True,
         )
         self.npc2 = Character.objects.create(
-            first_name="NPC2",
+            given_name="NPC2",
             birth_date=date(2000, 1, 1),
             sex="Female",
             can_link=True,
@@ -437,7 +437,7 @@ class CharacterNPCTests(TestCase):
 
         # Now create our test character and link it
         self.player_character = Character.objects.create(
-            first_name="Player",
+            given_name="Player",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=False,
@@ -519,7 +519,7 @@ class PlayerCharacterLinkPointsTodayTests(TestCase):
             email="today-points@example.com", password="pass12345"
         )
         self.player = self.user.player
-        character = Character.objects.create(first_name="Hero")
+        character = Character.objects.create(given_name="Hero")
         self.link = PlayerCharacterLink.objects.create(
             player=self.player, character=character
         )

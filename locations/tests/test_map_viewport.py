@@ -88,9 +88,9 @@ class MapViewportViewTest(TestCase):
 
     def test_character_outside_bbox_is_excluded(self):
         Character.objects.create(
-            first_name="Faraway", location=Point(9999, 9999, srid=3857)
+            given_name="Faraway", location=Point(9999, 9999, srid=3857)
         )
-        Character.objects.create(first_name="Inside", location=Point(0, 0, srid=3857))
+        Character.objects.create(given_name="Inside", location=Point(0, 0, srid=3857))
 
         response = self.client.get(self.url, {"bbox": "-20,-20,20,20"})
 

@@ -33,7 +33,7 @@ def player_for(user) -> Player:
 
 class TestMeViewSet(APITestCase):
     def setUp(self):
-        self.character = Character.objects.create(first_name="Hero", can_link=True)
+        self.character = Character.objects.create(given_name="Hero", can_link=True)
         self.user = create_test_user(
             email="duncan@example.com",
             password="pass12345",

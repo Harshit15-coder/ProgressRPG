@@ -14,7 +14,7 @@ class CharacterFilterTests(TestCase):
     def setUp(self):
         # Create NPCs that are available for linking
         self.npc1 = Character.objects.create(
-            first_name="NPC1",
+            given_name="NPC1",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=True,
@@ -22,7 +22,7 @@ class CharacterFilterTests(TestCase):
             xp=100,
         )
         self.npc2 = Character.objects.create(
-            first_name="NPC2",
+            given_name="NPC2",
             birth_date=date(2000, 1, 1),
             sex="Female",
             can_link=True,
@@ -44,7 +44,7 @@ class CharacterFilterTests(TestCase):
 
         # Create and link our test character
         self.player_char1 = Character.objects.create(
-            first_name="Player1",
+            given_name="Player1",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=False,
@@ -67,7 +67,7 @@ class CharacterFilterTests(TestCase):
 
         # Create and link our test character
         self.player_char2 = Character.objects.create(
-            first_name="Player2",
+            given_name="Player2",
             birth_date=date(2000, 1, 1),
             sex="Female",
             can_link=False,

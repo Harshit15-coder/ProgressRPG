@@ -86,7 +86,7 @@ def lifecycle_handle_childbirth(instance) -> None:
 
     child_name = f"Child of {instance.name}"
     child = Character.objects.create(
-        first_name=child_name,
+        given_name=child_name,
         birth_date=timezone.now().date(),
         sex="Male" if randint(0, 1) == 0 else "Female",
     )
