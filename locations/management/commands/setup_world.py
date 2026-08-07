@@ -55,10 +55,17 @@ class Command(BaseCommand):
             # residents, all already set by spawn_villages.
             call_command("generate_landarea")
 
-            self.stdout.write("=== Generating fields ===")
-            # Must run before generate_paths, which needs the field shelter's
-            # entrance node to exist.
-            call_command("generate_fields")
+        # Unlike generate_landarea, generate_fields is safe (and needed) for
+        # both paths: it only attaches a FieldCrop/shared shelter to "crops"
+        # Subzones that don't have one yet - it doesn't regenerate geometry,
+        # so it won't touch imported villages' real field data. Imported
+        # villages get their crops Subzones from watabou_import._import_fields
+        # instead of generate_landarea, but still need this step to get a
+        # field_shelter Building at all.
+        self.stdout.write("=== Generating fields ===")
+        # Must run before generate_paths, which needs the field shelter's
+        # entrance node to exist.
+        call_command("generate_fields")
 
         self.stdout.write("=== Generating points ===")
         call_command("generate_points")
