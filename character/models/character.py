@@ -4,7 +4,7 @@ from decimal import Decimal
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 from django.core.exceptions import ValidationError
-from django.db import models, transaction, IntegrityError
+from django.db import models, IntegrityError
 from django.db.models import Sum
 from django.utils import timezone
 from dataclasses import dataclass, field
@@ -12,7 +12,7 @@ from typing import Optional, Dict, Any, cast
 import logging
 import math
 
-from users.models import Person, Player
+from users.models import Player
 
 from gameplay.models import Currency, CurrencyAccountBase
 
@@ -23,6 +23,7 @@ from character.services import (
     relationship_services,
 )
 from locations.models import Movable, Node, Building
+from progression.mixins import LevelProgressionMixin
 
 logger = logging.getLogger("general")
 logger_errors = logging.getLogger("errors")
@@ -308,11 +309,18 @@ class LifeCycleMixin(models.Model):
 ########################################################################
 
 
-class Character(Person, LifeCycleMixin, Movable):
+class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     class SexChoices(models.TextChoices):
         MALE = "Male", "Male"
         FEMALE = "Female", "Female"
         OTHER = "Other", "Other"
+
+    name = models.CharField(max_length=100, blank=True, null=True)
+    xp = models.PositiveIntegerField(default=0)
+    xp_next_level = models.PositiveIntegerField(default=100)
+    xp_modifier = models.FloatField(default=1)
+    level = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
 
     first_name = models.CharField(max_length=50, default="")
     last_name = models.CharField(max_length=50, default="", null=True, blank=True)
