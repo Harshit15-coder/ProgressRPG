@@ -25,6 +25,7 @@ import { scatterCharacters } from "./characters/placement";
 import {
   buildingFootprintRings,
   buildingTypeLabel,
+  cropSubzoneRingsByShelterBuilding,
   polygonTooltipContent,
 } from "./geojson";
 import {
@@ -159,6 +160,14 @@ export default function PopulationCentreMap({
     [features]
   );
 
+  // Lets scatterCharacters spread a field_shelter's idle workers across the
+  // crops Subzone(s) it services instead of clustering them at the
+  // shelter's own small footprint - see scatterCharacters' own comment.
+  const shelterFieldRings = useMemo(
+    () => cropSubzoneRingsByShelterBuilding(features),
+    [features]
+  );
+
   const characterFeatures = useMemo(
     () => features.filter((f) => f.properties?.feature_type === "character"),
     [features]
@@ -178,8 +187,8 @@ export default function PopulationCentreMap({
   );
 
   const positionedCharacters = useMemo(
-    () => scatterCharacters(idleFeatures, buildingFootprints),
-    [idleFeatures, buildingFootprints]
+    () => scatterCharacters(idleFeatures, buildingFootprints, shelterFieldRings),
+    [idleFeatures, buildingFootprints, shelterFieldRings]
   );
 
   const idleCharacterPositions = useMemo(() => {

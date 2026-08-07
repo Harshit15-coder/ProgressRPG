@@ -266,6 +266,12 @@ class SubzoneFeatureSerializer(PolygonFeatureSerializer):
             "usage": obj.usage,
             "crop_stage": crop.stage if crop else None,
             "crop_progress": crop.growth_progress if crop else None,
+            # Lets the frontend scatter a field_shelter's idle workers across
+            # the crops Subzone(s) it serves instead of clustering them at the
+            # shelter's own (small, standalone) footprint - see
+            # generate_fields.py, which groups every crops Subzone in a
+            # population centre around one shared shelter Building.
+            "shelter_building_id": crop.shelter_building_id if crop else None,
         }
 
 

@@ -159,6 +159,7 @@ class SubzoneFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertIsNone(props["crop_stage"])
         self.assertIsNone(props["crop_progress"])
+        self.assertIsNone(props["shelter_building_id"])
 
     def test_fallow_stage(self):
         shelter = Building.objects.create(name="Shelter", building_type="field_shelter")
@@ -168,6 +169,7 @@ class SubzoneFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertEqual(props["crop_stage"], "fallow")
         self.assertIsNone(props["crop_progress"])
+        self.assertEqual(props["shelter_building_id"], shelter.id)
 
     def test_growing_stage_progress_between_zero_and_one(self):
         shelter = Building.objects.create(name="Shelter", building_type="field_shelter")

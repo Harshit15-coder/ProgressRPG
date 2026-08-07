@@ -424,6 +424,85 @@ describe('PopulationCentreMap', () => {
     expect(exactlyAtDoor.length).toBe(0);
   });
 
+  it("scatters a field_shelter worker across its linked crops Subzone, not the shelter's own tiny footprint", () => {
+    const geojsonWithFieldWorker = {
+      bbox: [0, 0, 100, 100] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 5], [5, 5], [5, 0], [0, 0]]], // tiny shelter
+          },
+          properties: {
+            feature_type: 'building',
+            id: 1,
+            name: 'Field Shelter',
+            building_type: 'field_shelter',
+          },
+        },
+        {
+          geometry: {
+            // the field itself - far from the shelter, so a shelter-footprint
+            // placement and a field placement land in disjoint regions
+            type: 'Polygon',
+            coordinates: [[[50, 50], [50, 90], [90, 90], [90, 50], [50, 50]]],
+          },
+          properties: {
+            feature_type: 'subzone',
+            id: 2,
+            name: 'Field',
+            usage: 'crops',
+            shelter_building_id: 1,
+          },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [2, 2] }, // at the shelter's entrance
+          properties: { feature_type: 'character', id: 40, name: 'Farmhand' },
+        },
+      ],
+    };
+
+    renderMap({ geojson: geojsonWithFieldWorker });
+    const [farmhand] = characterMarkers();
+
+    expect(farmhand.gisPosition?.[0]).toBeGreaterThan(50);
+    expect(farmhand.gisPosition?.[0]).toBeLessThan(90);
+    expect(farmhand.gisPosition?.[1]).toBeGreaterThan(50);
+    expect(farmhand.gisPosition?.[1]).toBeLessThan(90);
+  });
+
+  it("falls back to the field_shelter's own footprint when no linked crops Subzone is loaded", () => {
+    const geojsonWithUnlinkedShelter = {
+      bbox: [0, 0, 20, 20] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 20], [20, 20], [20, 0], [0, 0]]],
+          },
+          properties: {
+            feature_type: 'building',
+            id: 1,
+            name: 'Field Shelter',
+            building_type: 'field_shelter',
+          },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [10, 0] },
+          properties: { feature_type: 'character', id: 41, name: 'Farmhand' },
+        },
+      ],
+    };
+
+    renderMap({ geojson: geojsonWithUnlinkedShelter });
+    const [farmhand] = characterMarkers();
+
+    expect(farmhand.gisPosition?.[0]).toBeGreaterThan(0);
+    expect(farmhand.gisPosition?.[0]).toBeLessThan(20);
+    expect(farmhand.gisPosition?.[1]).toBeGreaterThan(0);
+    expect(farmhand.gisPosition?.[1]).toBeLessThan(20);
+  });
+
   it('assigns a ready-to-harvest crops subzone a gold fill, distinct from the default grey building fill', () => {
     const geojsonWithCropSubzone = {
       ...baseGeojson,
