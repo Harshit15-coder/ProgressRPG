@@ -5,15 +5,13 @@ from django.core.management.base import BaseCommand
 from character.models import Character
 from locations.models import Building
 
+# Every building type is a work site except residential - kept derived from
+# Building.BUILDING_TYPES (the single source of truth) so a new building
+# type added there doesn't also need remembering here.
 WORK_BUILDING_TYPES = [
-    "granary",
-    "inn",
-    "mill",
-    "bakery",
-    "hall",
-    "market",
-    "communal",
-    "field_shelter",
+    building_type
+    for building_type, _label in Building.BUILDING_TYPES
+    if building_type != "residential"
 ]
 MIN_WORKING_AGE = 16
 MAX_WORKING_AGE = 65
@@ -24,8 +22,7 @@ MAX_WORKERS_PER_BUILDING = 3
 class Command(BaseCommand):
     help = (
         "Assign a handful of working-age characters to work in the village's "
-        "non-residential buildings (granary, inn, mill, bakery, hall, market, "
-        "communal, field_shelter). "
+        "non-residential buildings. "
         "Not every character gets a job - children and elders are excluded, "
         "and each building only takes on 2-3 workers, scoped to its own "
         "population centre."
