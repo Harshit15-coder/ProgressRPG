@@ -115,15 +115,16 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
         # MapViewportView) filtered to the one CharacterActivity active right
         # now - falls back to Behaviour.get_current_activity()'s own query
         # (e.g. for a single un-prefetched character) rather than requiring
-        # every caller to set it up. activity_definition.name is already a
-        # display string ("Sleeping", "General labour", ...), not a raw
-        # ActivityDefinition.Kind value - same idea as building_type below.
+        # every caller to set it up. activity_definition.narrative is the
+        # verb-phrase form for "X is ___" sentences ("delivering goods to
+        # neighbours", not the label "Deliver goods to neighbours") - see
+        # ActivityDefinition.narrative.
         activities = getattr(obj, "current_activity_list", None)
         if activities is not None:
             activity = activities[0] if activities else None
         else:
             activity = obj.behaviour.get_current_activity()
-        return activity.name if activity else None
+        return activity.narrative if activity else None
 
     def get_properties(self, obj):
         needs = getattr(obj, "needs", None)

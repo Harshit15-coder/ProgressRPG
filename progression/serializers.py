@@ -184,6 +184,7 @@ class ActivityDefinitionSerializer(serializers.ModelSerializer):
         fields = [
             "id",
             "name",
+            "present_tense",
             "description",
             "kind",
             "skill",

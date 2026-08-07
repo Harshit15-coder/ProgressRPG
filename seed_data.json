@@ -1123,6 +1123,7 @@
     "pk": 1,
     "fields": {
       "name": "General labour",
+      "present_tense": "doing odd jobs around the village",
       "description": "Odd jobs and errands - a fallback work block for characters without an assigned role yet.",
       "kind": "work",
       "skill": null,
@@ -1135,6 +1136,7 @@
     "pk": 2,
     "fields": {
       "name": "Helping around the village",
+      "present_tense": "helping around the village",
       "description": "Pitching in on whatever chores need doing - a second fallback so generate_day always has at least two work options to sample from.",
       "kind": "work",
       "skill": null,
@@ -1147,6 +1149,7 @@
     "pk": 3,
     "fields": {
       "name": "Sleeping",
+      "present_tense": "sleeping",
       "description": "The night's rest.",
       "kind": "sleep",
       "skill": null,
@@ -1159,6 +1162,7 @@
     "pk": 4,
     "fields": {
       "name": "Morning routine",
+      "present_tense": "going through their morning routine",
       "description": "Washing, dressing, and getting ready for the day.",
       "kind": "morning",
       "skill": null,
@@ -1171,6 +1175,7 @@
     "pk": 5,
     "fields": {
       "name": "Mealtime",
+      "present_tense": "eating",
       "description": "Sitting down to eat.",
       "kind": "meal",
       "skill": null,
@@ -1183,6 +1188,7 @@
     "pk": 6,
     "fields": {
       "name": "Leisure time",
+      "present_tense": "relaxing",
       "description": "Resting, socialising, or otherwise unwinding.",
       "kind": "leisure",
       "skill": null,
@@ -1195,6 +1201,7 @@
     "pk": 7,
     "fields": {
       "name": "Winding down",
+      "present_tense": "winding down for the night",
       "description": "Settling in for the night before sleep.",
       "kind": "wind_down",
       "skill": null,

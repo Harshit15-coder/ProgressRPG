@@ -160,8 +160,8 @@ class PlayerActivityAdmin(admin.ModelAdmin):
 
 @admin.register(ActivityDefinition)
 class ActivityDefinitionAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "kind", "skill", "created_at")
-    search_fields = ("name", "description")
+    list_display = ("id", "name", "present_tense", "kind", "skill", "created_at")
+    search_fields = ("name", "present_tense", "description")
     list_filter = ("kind", "skill")
 
 

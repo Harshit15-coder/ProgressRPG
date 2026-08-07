@@ -700,6 +700,15 @@ class ActivityDefinition(models.Model):
         IDLE = "idle", "Idling"
 
     name = models.CharField(max_length=255)
+    present_tense = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Narrative verb phrase for 'X is ___' sentences, e.g. "
+            "'delivering goods to neighbours' for the label 'Deliver goods "
+            "to neighbours'. Falls back to a lowercased name when blank."
+        ),
+    )
     description = models.TextField(max_length=2000, blank=True)
     kind = models.CharField(max_length=50, choices=Kind.choices)
     skill = models.ForeignKey(
@@ -714,6 +723,14 @@ class ActivityDefinition(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def narrative(self) -> str:
+        """The verb-phrase form used in "X is ___" sentences - see
+        present_tense's help_text. Falls back to a lowercased name so
+        definitions authored before this field existed still read
+        sensibly, just less naturally (e.g. "is general labour")."""
+        return self.present_tense or (self.name[:1].lower() + self.name[1:])
 
 
 class OfflineActivityLedger(models.Model):
@@ -780,6 +797,10 @@ class CharacterActivity(TimeRecord):
     @property
     def name(self) -> str:
         return self.activity_definition.name
+
+    @property
+    def narrative(self) -> str:
+        return self.activity_definition.narrative
 
     @property
     def kind(self) -> str:

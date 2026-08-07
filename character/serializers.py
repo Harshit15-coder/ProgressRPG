@@ -46,7 +46,7 @@ class CharacterSerializer(serializers.ModelSerializer):
 
     def get_current_activity(self, obj) -> str | None:
         activity = obj.behaviour.get_current_activity()
-        return activity.name if activity else None
+        return activity.narrative if activity else None
 
     def get_coins(self, obj) -> int:
         return obj.get_currency("coins").balance

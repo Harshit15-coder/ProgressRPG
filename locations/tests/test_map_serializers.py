@@ -130,7 +130,28 @@ class CharacterPointFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertIsNone(props["current_activity"])
 
-    def test_current_activity_from_scheduled_activity_definition_name(self):
+    def test_current_activity_uses_present_tense_narrative(self):
+        activity_definition = ActivityDefinition.objects.create(
+            name="Deliver goods to neighbours",
+            present_tense="delivering goods to neighbours",
+            kind=ActivityDefinition.Kind.WORK,
+        )
+        now = timezone.now()
+        CharacterActivity.objects.create(
+            character=self.character,
+            activity_definition=activity_definition,
+            scheduled_start=now - timezone.timedelta(minutes=30),
+            scheduled_end=now + timezone.timedelta(minutes=30),
+        )
+
+        # present_tense, not name/kind - the frontend shows this verbatim
+        # in the character's tooltip ("Currently: delivering goods to
+        # neighbours").
+        self.assertEqual(
+            self.properties()["current_activity"], "delivering goods to neighbours"
+        )
+
+    def test_current_activity_falls_back_to_lowercased_name(self):
         activity_definition = ActivityDefinition.objects.create(
             name="General labour", kind=ActivityDefinition.Kind.WORK
         )
@@ -142,9 +163,9 @@ class CharacterPointFeatureSerializerTest(TestCase):
             scheduled_end=now + timezone.timedelta(minutes=30),
         )
 
-        # activity_definition.name, not its kind ("work") - the frontend
-        # shows this verbatim in the character's tooltip.
-        self.assertEqual(self.properties()["current_activity"], "General labour")
+        # No present_tense authored yet - falls back to a lowercased name
+        # (see ActivityDefinition.narrative) rather than crashing/blanking.
+        self.assertEqual(self.properties()["current_activity"], "general labour")
 
     def test_current_activity_ignores_activities_outside_their_scheduled_window(self):
         activity_definition = ActivityDefinition.objects.create(

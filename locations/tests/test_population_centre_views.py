@@ -125,8 +125,10 @@ class PopulationCentreMapViewCurrentActivityTest(TestCase):
         ]
         self.assertEqual(len(character_features), len(self.working_characters))
         for feature in character_features:
+            # No present_tense authored for this definition - falls back to
+            # a lowercased name (see ActivityDefinition.narrative).
             self.assertEqual(
-                feature["properties"]["current_activity"], "General labour"
+                feature["properties"]["current_activity"], "general labour"
             )
 
     def test_map_response_does_not_scale_activity_queries_with_character_count(self):
