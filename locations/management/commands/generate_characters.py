@@ -142,8 +142,22 @@ class Command(BaseCommand):
             f"{centre.name}: Buildings={building_count}, Generating {num_chars} characters..."
         )
 
-        for _ in range(num_chars):
-            building = random.choice(buildings)
+        # Weight home assignment by each building's own sleeping capacity,
+        # not uniformly across buildings - starting_population only bounds
+        # the *centre's* total (see population_estimation.starting_population),
+        # so a uniform random.choice() here could still pile many characters
+        # into one small house while others sit empty. One "slot" per unit of
+        # residential_capacity, shuffled and handed out one per character,
+        # keeps every building at or under its own capacity.
+        home_slots = [
+            building
+            for building in buildings
+            for _ in range(population_estimation.residential_capacity(building))
+        ]
+        random.shuffle(home_slots)
+
+        for i in range(num_chars):
+            building = home_slots[i]
 
             sex = random.choice(["M", "F"])
             given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)

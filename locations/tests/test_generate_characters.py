@@ -73,3 +73,22 @@ class GenerateForCentreTests(TestCase):
         self.assertGreater(characters.count(), 0)
         for character in characters:
             self.assertEqual(character.building, building)
+
+    def test_no_building_exceeds_its_own_capacity(self):
+        # Regression test: home assignment used to be a uniform
+        # random.choice() across all residential buildings, so a small
+        # house was just as likely to be picked as a large one and could
+        # end up massively overcrowded even though the *centre's* total
+        # stayed under its combined capacity. Home slots are now weighted
+        # by each building's own residential_capacity.
+        centre = self._make_centre()
+        small = self._make_residential_building(centre, size=15, x=0)
+        large = self._make_residential_building(centre, size=60, x=40)
+
+        call_command("generate_characters", centre=centre.id)
+
+        for building in (small, large):
+            count = Character.objects.filter(building=building).count()
+            self.assertLessEqual(
+                count, population_estimation.residential_capacity(building)
+            )
