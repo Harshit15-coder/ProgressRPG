@@ -10,6 +10,7 @@ from datetime import date, timedelta
 from locations.models import PopulationCentre, Node, Path, Building
 from locations.services import population_estimation
 from character.models import Character, PlayerCharacterLink
+from character.services import household_services
 
 
 MALE_NAMES = [
@@ -82,17 +83,13 @@ FEMALE_NAMES = [
 ]
 
 
-def random_birth_date():
+def birth_date_for_age(age_years: int):
     today = date.today()
 
-    # Give age between 0 and 90
-    age_years = int(random.triangular(0, 90, 25))
-    # triangular(min, max, mode) → mode makes age cluster around 25
-
-    # Add fuzz: random extra days in the year
+    # Add fuzz: random extra days in the year, so a whole household doesn't
+    # land on suspiciously round ages.
     extra_days = random.randint(0, 364)
 
-    # Convert “age in years” + extra days into a date
     return today - timedelta(days=age_years * 365 + extra_days)
 
 
@@ -156,23 +153,41 @@ class Command(BaseCommand):
         ]
         random.shuffle(home_slots)
 
-        for i in range(num_chars):
-            building = home_slots[i]
+        # Generate whole household units (family/single-adult/roommates -
+        # see household_services) rather than num_chars independent
+        # characters, so ages and relationships (MARRIAGE/PARENT_CHILD) come
+        # out coherent instead of being assigned independently and hoping
+        # they happen to form plausible families. Deliberately decoupled
+        # from housing for now (see household_services' docstring):
+        # household members are generated together but still handed out to
+        # home_slots individually below, same as before this change.
+        created_characters = []
+        remaining = num_chars
+        while remaining > 0:
+            household = household_services.household_member_ages(remaining)
+            household_members = []
+            for age, role in household:
+                sex = random.choice(["M", "F"])
+                given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
 
-            sex = random.choice(["M", "F"])
-            given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
+                birth_date = birth_date_for_age(age)
+                # can_link possible for chars over 15 years old
+                age_days = (date.today() - birth_date).days
+                can_link = age_days >= int(15 * 365.25)
 
-            birth_date = random_birth_date()
-            # can_link possible for chars over 15 years old
-            age_days = (date.today() - birth_date).days
-            can_link = age_days >= int(15 * 365.25)
+                char = Character.objects.create(
+                    given_name=given_name,
+                    sex=sex,
+                    birth_date=birth_date,
+                    can_link=can_link,
+                )
+                household_members.append((char, role))
+                created_characters.append(char)
 
-            char = Character.objects.create(
-                given_name=given_name,
-                sex=sex,
-                birth_date=birth_date,
-                can_link=can_link,
-            )
+            household_services.create_household_relationships(household_members)
+            remaining -= len(household)
+
+        for char, building in zip(created_characters, home_slots):
             char.assign_home(building)
             node = building.nodes.first()
             if node is not None:
