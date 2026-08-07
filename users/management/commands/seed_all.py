@@ -16,7 +16,6 @@ class Command(BaseCommand):
         call_command("seed_superuser")
 
         self.stdout.write("⏳ Setting up world...")
-        # self.stdout.write("World setup is currently disabled.")
 
         call_command("setup_world")
 
