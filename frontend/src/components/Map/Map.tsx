@@ -322,7 +322,8 @@ export default function PopulationCentreMap({
         map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
-          // A village's name label can sit over a building/subzone
+          // A village's name label - or a character standing inside a
+          // building's footprint - can sit over a building/subzone
           // underneath it, and CLICKABLE_LAYERS entries can overlap each
           // other too - each map.on(type, layerId, ...) delegate queries
           // features independently, so every handler whose layer has a hit
@@ -330,7 +331,10 @@ export default function PopulationCentreMap({
           // doesn't stop sibling MapLibre delegates). Deferring to the
           // higher-priority handler (registered/run first, so it already
           // set the tooltip) keeps its tooltip from being clobbered.
-          if (map.queryRenderedFeatures(e.point, { layers: [VILLAGE_LABEL_LAYER] }).length > 0) {
+          if (
+            map.queryRenderedFeatures(e.point, { layers: ["characters", VILLAGE_LABEL_LAYER] })
+              .length > 0
+          ) {
             return;
           }
           if (
