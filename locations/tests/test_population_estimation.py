@@ -17,6 +17,7 @@ from locations.management.commands.populate_interiors import (
 )
 from locations.models import Building, PopulationCentre
 from locations.services.population_estimation import (
+    RESIDENTIAL_OCCUPANCY_FACTOR,
     SLEEPING_AREA_PER_RESIDENT_SQM,
     STARTING_POPULATION_FRACTION_RANGE,
     estimate_population_from_footprint_areas,
@@ -29,7 +30,12 @@ SLEEPING_FRACTION = BUILDING_INTERIORS_PROPORTIONS["residential"]["sleeping"]
 
 
 def _expected_capacity(area):
-    return math.floor(area * SLEEPING_FRACTION / SLEEPING_AREA_PER_RESIDENT_SQM)
+    return math.floor(
+        area
+        * SLEEPING_FRACTION
+        / SLEEPING_AREA_PER_RESIDENT_SQM
+        * RESIDENTIAL_OCCUPANCY_FACTOR
+    )
 
 
 def _square_footprint(size, x=0, y=0):

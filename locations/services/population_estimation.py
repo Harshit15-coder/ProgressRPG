@@ -26,11 +26,19 @@ from locations.management.commands.populate_interiors import (
 
 # Square metres of sleeping space assumed to house one resident - a shared/
 # historical sleeping density (a room sleeps several people), not modern
-# one-person-per-bedroom floor space. The single arbitrary number in this
-# module; every estimate below derives from it plus the existing
-# BUILDING_INTERIORS_PROPORTIONS sleeping-space split, so retuning either
-# automatically flows through.
+# one-person-per-bedroom floor space. Every estimate below derives from
+# this plus the existing BUILDING_INTERIORS_PROPORTIONS sleeping-space
+# split, so retuning either automatically flows through.
 SLEEPING_AREA_PER_RESIDENT_SQM = 6.0
+
+# A building's footprint is a visual/architectural shape (Watabou-imported
+# footprints in particular run large - single "houses" of 100-500 sqm - see
+# watabou_import.py), not a literal floor plan divided cleanly into bunks.
+# Treating 100% of the theoretical sleeping-area capacity as occupiable
+# overstates household size well past anything plausible; this scales it
+# down to one. Tuned so a large imported "house" footprint lands around
+# 6-11 residents rather than 17-31.
+RESIDENTIAL_OCCUPANCY_FACTOR = 0.35
 
 # Fraction of residential capacity a settlement starts populated to - below
 # 1.0 so there's room for growth and player impact, and randomised within
@@ -48,8 +56,9 @@ def _capacity_from_area(footprint_area: float) -> int:
     (or even a database row) exist.
     """
     sleeping_fraction = BUILDING_INTERIORS_PROPORTIONS["residential"]["sleeping"]
+    sleeping_area = footprint_area * sleeping_fraction
     return math.floor(
-        footprint_area * sleeping_fraction / SLEEPING_AREA_PER_RESIDENT_SQM
+        sleeping_area / SLEEPING_AREA_PER_RESIDENT_SQM * RESIDENTIAL_OCCUPANCY_FACTOR
     )
 
 
