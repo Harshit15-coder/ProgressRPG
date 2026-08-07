@@ -24,7 +24,7 @@ class CharacterPointFeatureSerializerJourneyTest(TestCase):
 
     def test_idle_character_has_no_path(self):
         character = Character.objects.create(
-            first_name="Idle",
+            given_name="Idle",
             location=Point(0, 0, srid=3857),
             current_node=self.node_a,
             movement_speed=2.5,
@@ -37,7 +37,7 @@ class CharacterPointFeatureSerializerJourneyTest(TestCase):
 
     def test_moving_character_exposes_remaining_path_and_speed(self):
         character = Character.objects.create(
-            first_name="Walker",
+            given_name="Walker",
             location=Point(0, 0, srid=3857),
             current_node=self.node_a,
             is_moving=True,
@@ -68,7 +68,7 @@ class CharacterPointFeatureSerializerJourneyTest(TestCase):
             Path.objects.create(from_node=nodes[-2], to_node=nodes[-1])
 
         character = Character.objects.create(
-            first_name="LongHauler",
+            given_name="LongHauler",
             location=Point(0, 0, srid=3857),
             current_node=self.node_a,
             is_moving=True,

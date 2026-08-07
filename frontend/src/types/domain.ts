@@ -76,8 +76,7 @@ export interface GeoJSONPoint {
 
 export interface Character {
   id: number;
-  first_name: string;
-  last_name: string;
+  name: string;
   backstory: string;
   age: number;
   sex: string;

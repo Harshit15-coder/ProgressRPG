@@ -1,19 +1,19 @@
 # progression/ap.py
 """
 Activity Points (AP) - the universal, level-driving currency shared by
-Player and Character (see users.models.Person). Extracted out of Person so
-the level-up curve and multiplier lookup have one clearly-named home,
-independent of where the running total ends up being stored.
+Player and Character. Extracted so the level-up curve and multiplier lookup
+have one clearly-named home, independent of where the running total ends up
+being stored.
 
 This is Phase 1 of the progression-track migration in
 .claude/plans/progression-track-abstraction.md: a same-file extraction with
-no schema change. Person still owns the `xp`/`level`/`xp_next_level` columns
-and still does the actual reads/writes/saves - these functions only carry
-the pure curve math and the multiplier query, with a method surface
-(`apply_xp` returning a new level/xp/levelups; a total-earned reconstruction;
-a multiplier lookup) that a future ProgressionTrack model can adopt directly
-without every caller (Person.add_xp, total_ap_earned, get_xp_multiplier)
-having to change twice.
+no schema change. Player and Character still own the `xp`/`level`/
+`xp_next_level` columns and still do the actual reads/writes/saves - these
+functions only carry the pure curve math and the multiplier query, with a
+method surface (`apply_xp` returning a new level/xp/levelups; a total-earned
+reconstruction; a multiplier lookup) that a future ProgressionTrack model
+can adopt directly without every caller (Player.add_xp, Character.add_xp,
+total_ap_earned, get_xp_multiplier) having to change twice.
 """
 
 from decimal import Decimal

@@ -12,7 +12,7 @@ from locations.models import Building
 class CharacterLocationModelTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Homer", location=Point(0, 0, srid=3857)
+            given_name="Homer", location=Point(0, 0, srid=3857)
         )
         self.home = Building.objects.create(
             name="Homer's House",
@@ -97,12 +97,12 @@ class CharacterLocationBackfillMigrationTests(TestCase):
             location=Point(0, 0, srid=3857),
         )
         character = Character.objects.create(
-            first_name="Backfilled",
+            given_name="Backfilled",
             location=Point(0, 0, srid=3857),
             building=building,
         )
         homeless_character = Character.objects.create(
-            first_name="Homeless", location=Point(0, 0, srid=3857)
+            given_name="Homeless", location=Point(0, 0, srid=3857)
         )
 
         backfill(apps, None)

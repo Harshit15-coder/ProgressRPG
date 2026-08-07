@@ -171,7 +171,7 @@ def _make_bakery(centre, storage_area=1000.0):
 
 def _make_resident(centre, home_building, name, hunger=0.0):
     character = Character.objects.create(
-        first_name=name, location=home_building.location
+        given_name=name, location=home_building.location
     )
     CharacterLocation.objects.create(
         character=character,
@@ -243,13 +243,13 @@ class GenerateFieldsEconomyTickTests(TestCase):
         _make_granary(centre, storage_area=10000.0)
 
         Character.objects.create(
-            first_name="Worker1",
+            given_name="Worker1",
             location=shelter.location,
             current_node=shelter_node,
             is_moving=False,
         )
         Character.objects.create(
-            first_name="Worker2",
+            given_name="Worker2",
             location=shelter.location,
             current_node=shelter_node,
             is_moving=False,
@@ -275,7 +275,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
 
         for i in range(5):
             Character.objects.create(
-                first_name=f"Worker{i}",
+                given_name=f"Worker{i}",
                 location=shelter.location,
                 current_node=shelter_node,
                 is_moving=False,
@@ -303,7 +303,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         granary = _make_granary(centre, storage_area=0.1)
 
         Character.objects.create(
-            first_name="Worker1",
+            given_name="Worker1",
             location=shelter.location,
             current_node=shelter_node,
             is_moving=False,
@@ -324,7 +324,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         crop.save(update_fields=["ready_yield", "harvested_amount"])
 
         Character.objects.create(
-            first_name="Worker1",
+            given_name="Worker1",
             location=shelter.location,
             current_node=shelter_node,
             is_moving=False,
@@ -346,7 +346,7 @@ class GenerateFieldsEconomyTickTests(TestCase):
         _make_granary(centre, storage_area=10000.0)
 
         Character.objects.create(
-            first_name="Worker1",
+            given_name="Worker1",
             location=shelter.location,
             current_node=shelter_node,
             is_moving=False,
@@ -381,13 +381,13 @@ class AdvanceMillEconomyTickTests(TestCase):
         mill, mill_node = _make_mill(centre)
 
         Character.objects.create(
-            first_name="Miller1",
+            given_name="Miller1",
             location=mill.location,
             current_node=mill_node,
             is_moving=False,
         )
         Character.objects.create(
-            first_name="Miller2",
+            given_name="Miller2",
             location=mill.location,
             current_node=mill_node,
             is_moving=False,
@@ -413,7 +413,7 @@ class AdvanceMillEconomyTickTests(TestCase):
         )
         mill, mill_node = _make_mill(centre)
         Character.objects.create(
-            first_name="Miller1",
+            given_name="Miller1",
             location=mill.location,
             current_node=mill_node,
             is_moving=False,
@@ -429,7 +429,7 @@ class AdvanceMillEconomyTickTests(TestCase):
         centre, granary = self._make_centre_with_wheat()
         mill, mill_node = _make_mill(centre)
         Character.objects.create(
-            first_name="Miller1",
+            given_name="Miller1",
             location=mill.location,
             current_node=mill_node,
             is_moving=False,
@@ -473,13 +473,13 @@ class AdvanceMillEconomyTickTests(TestCase):
         )
 
         Character.objects.create(
-            first_name="MillerA",
+            given_name="MillerA",
             location=mill_a.location,
             current_node=node_a,
             is_moving=False,
         )
         Character.objects.create(
-            first_name="MillerB",
+            given_name="MillerB",
             location=mill_b_building.location,
             current_node=node_b,
             is_moving=False,
@@ -519,13 +519,13 @@ class AdvanceBakeryEconomyTickTests(TestCase):
         bakery, bakery_node = _make_bakery(centre)
 
         Character.objects.create(
-            first_name="Baker1",
+            given_name="Baker1",
             location=bakery.location,
             current_node=bakery_node,
             is_moving=False,
         )
         Character.objects.create(
-            first_name="Baker2",
+            given_name="Baker2",
             location=bakery.location,
             current_node=bakery_node,
             is_moving=False,
@@ -551,7 +551,7 @@ class AdvanceBakeryEconomyTickTests(TestCase):
         )
         bakery, bakery_node = _make_bakery(centre)
         Character.objects.create(
-            first_name="Baker1",
+            given_name="Baker1",
             location=bakery.location,
             current_node=bakery_node,
             is_moving=False,
@@ -567,7 +567,7 @@ class AdvanceBakeryEconomyTickTests(TestCase):
         centre, mill = self._make_centre_with_flour()
         bakery, bakery_node = _make_bakery(centre)
         Character.objects.create(
-            first_name="Baker1",
+            given_name="Baker1",
             location=bakery.location,
             current_node=bakery_node,
             is_moving=False,
@@ -602,13 +602,13 @@ class AdvanceBakeryEconomyTickTests(TestCase):
         )
 
         Character.objects.create(
-            first_name="BakerA",
+            given_name="BakerA",
             location=bakery_a.location,
             current_node=node_a,
             is_moving=False,
         )
         Character.objects.create(
-            first_name="BakerB",
+            given_name="BakerB",
             location=bakery_b.location,
             current_node=node_b,
             is_moving=False,

@@ -29,7 +29,7 @@ class PopulationCentreMapViewJourneyTest(TestCase):
         self.moving_characters = []
         for i in range(5):
             character = Character.objects.create(
-                first_name=f"Mover{i}",
+                given_name=f"Mover{i}",
                 location=Point(0, 0, srid=3857),
                 current_node=self.node_a,
                 population_centre=self.centre,
@@ -97,7 +97,7 @@ class PopulationCentreMapViewCurrentActivityTest(TestCase):
         self.working_characters = []
         for i in range(5):
             character = Character.objects.create(
-                first_name=f"Worker{i}",
+                given_name=f"Worker{i}",
                 location=Point(0, 0, srid=3857),
                 population_centre=self.centre,
             )
@@ -167,7 +167,7 @@ class PopulationCentreVillagePointsTest(TestCase):
         )
         self.residents = [
             Character.objects.create(
-                first_name=f"Resident{i}",
+                given_name=f"Resident{i}",
                 location=Point(0, 0, srid=3857),
                 population_centre=self.centre,
             )

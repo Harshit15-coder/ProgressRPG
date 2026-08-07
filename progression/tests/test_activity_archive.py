@@ -38,7 +38,7 @@ class CharacterActivityArchiveAggregationTests(TestCase):
 
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Aggregatia", location=Point(0, 0, srid=3857)
+            given_name="Aggregatia", location=Point(0, 0, srid=3857)
         )
         self.role = Role.objects.create(name="Farmer")
         self.skill = SkillDefinition.objects.create(name="Farming", role=self.role)
@@ -119,7 +119,7 @@ class CharacterActivityArchiveAggregationTests(TestCase):
 class CompactCharacterActivitiesTaskTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Compactia", location=Point(0, 0, srid=3857)
+            given_name="Compactia", location=Point(0, 0, srid=3857)
         )
         self.activity_definition = ActivityDefinition.objects.create(
             name="hauling water", kind=ActivityDefinition.Kind.WORK

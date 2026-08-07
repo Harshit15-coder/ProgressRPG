@@ -82,42 +82,6 @@ FEMALE_NAMES = [
     "Maud",
 ]
 
-LAST_NAMES = [
-    "Drake",
-    "Dewhurst",
-    "Ironhand",
-    "Weaver",
-    "Blackthorne",
-    "Lockwood",
-    "Brightwater",
-    "Fenwick",
-    "Thornbrook",
-    "Stormvale",
-    "Holt",
-    "Briarwood",
-    "Holloway",
-    "Ashford",
-    "Mossgrove",
-    "Atwood",
-    "Baker",
-    "Brook",
-    "Cartwright",
-    "Clayton",
-    "Cooper",
-    "Crowhurst",
-    "Fielding",
-    "Fletcher",
-    "Greenhill",
-    "Hardwick",
-    "Millward",
-    "Shepherd",
-    "Stonebridge",
-    "Tanner",
-    "Underhill",
-    "Webster",
-    "Whiteoak",
-]
-
 
 def random_birth_date():
     today = date.today()
@@ -183,8 +147,7 @@ class Command(BaseCommand):
             building = random.choice(buildings)
 
             sex = random.choice(["M", "F"])
-            first_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
-            last_name = random.choice(LAST_NAMES)
+            given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
 
             birth_date = random_birth_date()
             # can_link possible for chars over 15 years old
@@ -192,9 +155,7 @@ class Command(BaseCommand):
             can_link = age_days >= int(15 * 365.25)
 
             char = Character.objects.create(
-                first_name=first_name,
-                last_name=last_name,
-                name=f"{first_name} {last_name}",
+                given_name=given_name,
                 sex=sex,
                 birth_date=birth_date,
                 can_link=can_link,

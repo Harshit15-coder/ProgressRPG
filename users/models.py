@@ -2,14 +2,13 @@
 User Management Models
 
 This module contains the models and custom manager for handling user-related data in the application.
-It includes a custom user model for email-based authentication, an abstract base model for shared
-attributes, and a player model for tracking gameplay-specific details.
+It includes a custom user model for email-based authentication and a player model for tracking
+gameplay-specific details.
 
 Classes:
     - CustomUserManager: A custom manager to handle the creation of users and superusers.
     - CustomUser: A custom user model extending Django's AbstractUser with email-based login.
-    - Person: An abstract base model for characters or players, tracking levels and XP.
-    - Player: A concrete model for user players, extending the Person model to add gameplay-specific
+    - Player: A concrete model for user players, tracking levels, XP, and gameplay-specific
       attributes like activities and streaks.
 
 Usage:
@@ -34,12 +33,10 @@ import logging
 from timezone_field import TimeZoneField
 
 from gameplay.models import Currency, CurrencyAccountBase, ServerMessage
+from progression.mixins import LevelProgressionMixin
 
 if TYPE_CHECKING:
-    from django.db.models import Manager
-
-    from character.models import Character, PlayerCharacterLink
-    from gameplay.models import XpModifier
+    from character.models import Character
 
 logger = logging.getLogger("general")
 
@@ -300,9 +297,10 @@ class UserLogin(models.Model):
         return f"{self.user.email} @ {self.timestamp.isoformat()}"
 
 
-class Person(models.Model):
+class Player(LevelProgressionMixin, models.Model):
     """
-    An abstract base model representing a generic person with levels and XP.
+    Represents a user's gameplay player.
+    Tracks user-specific gameplay data such as total activities and characters.
     """
 
     name = models.CharField(max_length=100, blank=True, null=True)
@@ -311,63 +309,6 @@ class Person(models.Model):
     xp_modifier = models.FloatField(default=1)
     level = models.PositiveIntegerField(default=0)
     created_at = models.DateTimeField(auto_now_add=True)
-
-    if TYPE_CHECKING:
-        # Provided by concrete subclasses (Player, Character): `active_link`
-        # is a property on each, `xp_mods` is a reverse FK from XpModifier.
-        @property
-        def active_link(self) -> "PlayerCharacterLink | None": ...
-
-        xp_mods: "Manager[XpModifier]"
-
-    class Meta:
-        abstract = True
-
-    @transaction.atomic
-    def add_xp(self, amount: int):
-        """
-        Add experience points (XP) to the person and handle level-up logic.
-        """
-        from progression import ap
-
-        self.level, self.xp, levelups = ap.apply_xp(self.level, self.xp, amount)
-        self.xp_next_level = self.get_xp_for_next_level()
-
-        self.save(update_fields=["xp", "level", "xp_next_level"])
-        return [{**event, "person": self, "name": self.name} for event in levelups]
-
-    def get_xp_for_next_level(self):
-        """
-        Calculate the XP required to reach the next level.
-        """
-        from progression import ap
-
-        return ap.threshold_for_level(self.level)
-
-    @property
-    def total_ap_earned(self):
-        """
-        Total Activity Points ever earned, reconstructed from level plus the
-        current xp-toward-next-level remainder. Level-up thresholds are
-        cumulative, so unlike `xp` (which resets on every level-up) this
-        stays monotonic - used wherever a long-term progress/prestige figure
-        is needed, e.g. village points.
-        """
-        from progression import ap
-
-        return ap.total_ap_earned(self.level, self.xp)
-
-    def get_xp_multiplier(self, now=None):
-        from progression import ap
-
-        return ap.get_multiplier(self, now=now)
-
-
-class Player(Person):
-    """
-    Represents a user's gameplay player, extending the abstract Person model.
-    Tracks user-specific gameplay data such as total activities and characters.
-    """
 
     user = models.OneToOneField(CustomUser, on_delete=models.CASCADE)
     bio = models.TextField(max_length=1000, blank=True)

@@ -14,7 +14,7 @@ from character.models import Character, CharacterLocation
 class ScheduleServiceTargetRoleTest(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Scheduled", location=Point(0, 0, srid=3857)
+            given_name="Scheduled", location=Point(0, 0, srid=3857)
         )
 
     def test_target_role_is_work_at_midday(self):
@@ -59,7 +59,7 @@ class ScheduleServiceTargetRoleTest(TestCase):
 class ScheduleServiceBuildingHoursTest(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Worker", location=Point(0, 0, srid=3857)
+            given_name="Worker", location=Point(0, 0, srid=3857)
         )
 
     def _assign_work(self, building):
@@ -83,9 +83,7 @@ class ScheduleServiceBuildingHoursTest(TestCase):
             "locations.services.schedule._stagger_offset_seconds", return_value=0
         ):
             during_override = timezone.make_aware(datetime(2026, 1, 1, 21, 0, 0))
-            outside_default_hours = timezone.make_aware(
-                datetime(2026, 1, 1, 8, 0, 0)
-            )
+            outside_default_hours = timezone.make_aware(datetime(2026, 1, 1, 8, 0, 0))
             self.assertEqual(
                 target_role_for(self.character, now=during_override),
                 CharacterLocation.Role.WORK,
@@ -192,7 +190,7 @@ class SyncCharacterLocationTest(TestCase):
         Path.objects.create(from_node=self.home_node, to_node=self.work_node)
 
         self.character = Character.objects.create(
-            first_name="Commuter",
+            given_name="Commuter",
             location=Point(0, 0, srid=3857),
             current_node=self.start_node,
         )
@@ -301,19 +299,19 @@ class CommuteTickTaskTest(TestCase):
             name="Commute Village", location=Point(0, 0, srid=3857)
         )
         self.idle_character = Character.objects.create(
-            first_name="Idle",
+            given_name="Idle",
             location=Point(0, 0, srid=3857),
             population_centre=self.centre,
             is_moving=False,
         )
         self.moving_character = Character.objects.create(
-            first_name="Moving",
+            given_name="Moving",
             location=Point(0, 0, srid=3857),
             population_centre=self.centre,
             is_moving=True,
         )
         self.orphan_character = Character.objects.create(
-            first_name="Orphan",
+            given_name="Orphan",
             location=Point(0, 0, srid=3857),
             is_moving=False,
         )
