@@ -1,5 +1,13 @@
 import type React from "react";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   Map as MapLibreMap,
@@ -145,13 +153,73 @@ export default function PopulationCentreMap({
   const tooltipRootRef = useRef<Root | null>(null);
   const tooltipHostRef = useRef<HTMLDivElement | null>(null);
 
-  // Creates the map once. onViewportChange is read via a ref inside the
-  // handler below rather than as an effect dep, so the camera event
-  // listener isn't torn down and re-attached on every poll.
+  const buildingFootprints = useMemo(
+    () => buildingFootprintRings(features),
+    [features]
+  );
+
+  const characterFeatures = useMemo(
+    () => features.filter((f) => f.properties?.feature_type === "character"),
+    [features]
+  );
+
+  // Characters with an active journey (a non-empty `path` from the backend,
+  // see CharacterPointFeatureSerializer) are animated by the walker loop
+  // below instead of the idle scatter-inside-building placement, which only
+  // makes sense for characters standing still.
+  const walkingFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
+    [characterFeatures]
+  );
+  const idleFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
+    [characterFeatures]
+  );
+
+  const positionedCharacters = useMemo(
+    () => scatterCharacters(idleFeatures, buildingFootprints),
+    [idleFeatures, buildingFootprints]
+  );
+
+  const idleCharacterPositions = useMemo(() => {
+    return new Map(
+      positionedCharacters.map(({ feature, cx, cy }) => [
+        String(feature.properties?.id),
+        [cx, cy] as [number, number],
+      ])
+    );
+  }, [positionedCharacters]);
+
+  // Per-character walker state (current interpolated position, remaining
+  // path, speed), keyed by character id. Lives in a ref rather than state -
+  // it's updated up to 60x/sec by the animation loop below.
+  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
+
+  const refreshVillageSource = useCallback(() => {
+    sourceRef.current?.setData(
+      buildVillageSourceData({
+        features,
+        characterFeatures,
+        idleCharacterPositions,
+        walkers: walkersRef.current,
+        now: Date.now(),
+      })
+    );
+  }, [features, characterFeatures, idleCharacterPositions]);
+
+  // Creates the map once. onViewportChange and refreshVillageSource are each
+  // read via a ref inside the handlers below rather than as effect deps, so
+  // the map (and its camera event listener) isn't torn down and recreated on
+  // every poll/feature update.
   const onViewportChangeRef = useRef(onViewportChange);
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange;
   }, [onViewportChange]);
+
+  const refreshVillageSourceRef = useRef(refreshVillageSource);
+  useEffect(() => {
+    refreshVillageSourceRef.current = refreshVillageSource;
+  }, [refreshVillageSource]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -244,20 +312,31 @@ export default function PopulationCentreMap({
         map.getCanvas().style.cursor = "";
       });
 
-      refreshVillageSource();
+      refreshVillageSourceRef.current();
 
-      for (const layerId of CLICKABLE_LAYERS) {
+      CLICKABLE_LAYERS.forEach((layerId, index) => {
+        // Layers earlier in CLICKABLE_LAYERS take priority when polygons
+        // overlap (e.g. a "field_shelter" building's footprint sits inside
+        // its crop subzone's boundary) - see the array's own comment.
+        const higherPriorityLayers = CLICKABLE_LAYERS.slice(0, index);
         map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
           // A village's name label can sit over a building/subzone
-          // underneath it - each map.on(type, layerId, ...) delegate queries
-          // features independently, so both handlers would fire for the same
-          // click (stopPropagation on the DOM event doesn't stop sibling
-          // MapLibre delegates). Deferring to the label's own handler
-          // (registered above, so it already ran and set the tooltip) keeps
-          // the progress-bar tooltip from being clobbered.
+          // underneath it, and CLICKABLE_LAYERS entries can overlap each
+          // other too - each map.on(type, layerId, ...) delegate queries
+          // features independently, so every handler whose layer has a hit
+          // fires for the same click (stopPropagation on the DOM event
+          // doesn't stop sibling MapLibre delegates). Deferring to the
+          // higher-priority handler (registered/run first, so it already
+          // set the tooltip) keeps its tooltip from being clobbered.
           if (map.queryRenderedFeatures(e.point, { layers: [VILLAGE_LABEL_LAYER] }).length > 0) {
+            return;
+          }
+          if (
+            higherPriorityLayers.length > 0 &&
+            map.queryRenderedFeatures(e.point, { layers: higherPriorityLayers }).length > 0
+          ) {
             return;
           }
           e.originalEvent?.stopPropagation?.();
@@ -277,7 +356,7 @@ export default function PopulationCentreMap({
         map.on("mouseleave", layerId, () => {
           map.getCanvas().style.cursor = "";
         });
-      }
+      });
 
       map.on("click", (e: MapMouseEvent) => {
         // A click that hit one of the clickable layers is handled by the
@@ -385,60 +464,6 @@ export default function PopulationCentreMap({
     const [minX, minY, maxX, maxY] = worldBounds;
     map.setMaxBounds(new LngLatBounds(toLngLat([minX, minY]), toLngLat([maxX, maxY])));
   }, [worldBounds, mapReady]);
-
-  const buildingFootprints = useMemo(
-    () => buildingFootprintRings(features),
-    [features]
-  );
-
-  const characterFeatures = useMemo(
-    () => features.filter((f) => f.properties?.feature_type === "character"),
-    [features]
-  );
-
-  // Characters with an active journey (a non-empty `path` from the backend,
-  // see CharacterPointFeatureSerializer) are animated by the walker loop
-  // below instead of the idle scatter-inside-building placement, which only
-  // makes sense for characters standing still.
-  const walkingFeatures = useMemo(
-    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
-    [characterFeatures]
-  );
-  const idleFeatures = useMemo(
-    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
-    [characterFeatures]
-  );
-
-  const positionedCharacters = useMemo(
-    () => scatterCharacters(idleFeatures, buildingFootprints),
-    [idleFeatures, buildingFootprints]
-  );
-
-  const idleCharacterPositions = useMemo(() => {
-    return new Map(
-      positionedCharacters.map(({ feature, cx, cy }) => [
-        String(feature.properties?.id),
-        [cx, cy] as [number, number],
-      ])
-    );
-  }, [positionedCharacters]);
-
-  function refreshVillageSource() {
-    sourceRef.current?.setData(
-      buildVillageSourceData({
-        features,
-        characterFeatures,
-        idleCharacterPositions,
-        walkers: walkersRef.current,
-        now: Date.now(),
-      })
-    );
-  }
-
-  // Per-character walker state (current interpolated position, remaining
-  // path, speed), keyed by character id. Lives in a ref rather than state -
-  // it's updated up to 60x/sec by the animation loop below.
-  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
 
   // Resets each walking character's checkpoint to the latest poll whenever
   // the underlying geojson changes: the authoritative position, its
