@@ -10,7 +10,7 @@ settlement (see locations/services/watabou_import.py) - which has no real
 residents yet at import time - can still get a population figure.
 
 starting_population() is what setup_world.py's pipeline actually uses,
-via spawn_characters.py, to size a settlement's initial cast instead of a
+via generate_characters.py, to size a settlement's initial cast instead of a
 flat per-building ratio. Feeding population_capacity() into
 planning_services.settlement_plan(population=...) to size economy
 infrastructure (granary/mill/bakery counts) by the same figure is not

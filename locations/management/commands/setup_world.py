@@ -45,7 +45,7 @@ class Command(BaseCommand):
         # many characters get generated) and before place_characters below,
         # which also handles linked player characters and any characters
         # left unhoused here.
-        call_command("spawn_characters")
+        call_command("generate_characters")
 
         self.stdout.write("=== Placing characters ===")
         call_command("place_characters")

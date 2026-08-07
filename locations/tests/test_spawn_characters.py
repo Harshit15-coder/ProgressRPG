@@ -1,5 +1,5 @@
 """
-Tests for the spawn_characters management command - specifically that
+Tests for the generate_characters management command - specifically that
 generate_for_centre sizes a village's cast from
 population_estimation.starting_population (residential capacity), not a
 hardcoded per-building ratio.
@@ -50,7 +50,7 @@ class GenerateForCentreTests(TestCase):
         expected = population_estimation.starting_population(centre)
         self.assertGreater(expected, 0)
 
-        call_command("spawn_characters", centre=centre.id)
+        call_command("generate_characters", centre=centre.id)
 
         self.assertEqual(
             Character.objects.filter(population_centre=centre).count(), expected
@@ -59,7 +59,7 @@ class GenerateForCentreTests(TestCase):
     def test_zero_capacity_centre_gets_no_characters(self):
         centre = self._make_centre()
 
-        call_command("spawn_characters", centre=centre.id)
+        call_command("generate_characters", centre=centre.id)
 
         self.assertEqual(Character.objects.filter(population_centre=centre).count(), 0)
 
@@ -67,7 +67,7 @@ class GenerateForCentreTests(TestCase):
         centre = self._make_centre()
         building = self._make_residential_building(centre, size=30, x=0)
 
-        call_command("spawn_characters", centre=centre.id)
+        call_command("generate_characters", centre=centre.id)
 
         characters = Character.objects.filter(population_centre=centre)
         self.assertGreater(characters.count(), 0)

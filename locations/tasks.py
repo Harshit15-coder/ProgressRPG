@@ -192,8 +192,8 @@ def spawn_villages_task():
 
 
 @shared_task
-def spawn_characters_task():
-    call_command("spawn_characters")
+def generate_characters_task():
+    call_command("generate_characters")
 
 
 @shared_task
