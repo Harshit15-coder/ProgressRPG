@@ -10,6 +10,7 @@ from django.core.management import call_command
 from django.test import TestCase
 
 from character.models import Character
+from locations.management.commands.generate_characters import Command
 from locations.models import Building, PopulationCentre
 from locations.services import population_estimation
 
@@ -92,3 +93,65 @@ class GenerateForCentreTests(TestCase):
             self.assertLessEqual(
                 count, population_estimation.residential_capacity(building)
             )
+
+
+class AssignHouseholdsToBuildingsTests(TestCase):
+    def _make_centre(self, name="Charactertown"):
+        return PopulationCentre.objects.create(
+            name=name, location=Point(0, 0, srid=3857)
+        )
+
+    def _make_residential_building(self, centre, size, x=0):
+        return Building.objects.create(
+            name=f"house at {x}",
+            building_type="residential",
+            location=Point(x, 0, srid=3857),
+            footprint=_square_footprint(size, x=x),
+            population_centre=centre,
+        )
+
+    def test_household_is_kept_together_in_one_building(self):
+        centre = self._make_centre()
+        building = self._make_residential_building(centre, size=60, x=0)
+        household = [Character.objects.create(given_name=f"C{i}") for i in range(3)]
+
+        Command()._assign_households_to_buildings([household], [building])
+
+        for char in household:
+            char.refresh_from_db()
+            self.assertEqual(char.building, building)
+
+    def test_household_larger_than_any_single_building_spills_across_buildings(self):
+        centre = self._make_centre()
+        small_a = self._make_residential_building(centre, size=15, x=0)
+        small_b = self._make_residential_building(centre, size=15, x=40)
+        cap_a = population_estimation.residential_capacity(small_a)
+        cap_b = population_estimation.residential_capacity(small_b)
+        household = [
+            Character.objects.create(given_name=f"C{i}") for i in range(cap_a + cap_b)
+        ]
+
+        Command()._assign_households_to_buildings([household], [small_a, small_b])
+
+        for char in household:
+            char.refresh_from_db()
+        self.assertLessEqual(Character.objects.filter(building=small_a).count(), cap_a)
+        self.assertLessEqual(Character.objects.filter(building=small_b).count(), cap_b)
+        # Combined capacity exactly matches the household, so everyone still
+        # ends up housed somewhere - just not all in the same building.
+        self.assertTrue(all(char.building is not None for char in household))
+
+    def test_household_exceeding_total_capacity_leaves_remainder_unhoused(self):
+        centre = self._make_centre()
+        building = self._make_residential_building(centre, size=15, x=0)
+        cap = population_estimation.residential_capacity(building)
+        household = [
+            Character.objects.create(given_name=f"C{i}") for i in range(cap + 2)
+        ]
+
+        Command()._assign_households_to_buildings([household], [building])
+
+        for char in household:
+            char.refresh_from_db()
+        self.assertLessEqual(Character.objects.filter(building=building).count(), cap)
+        self.assertEqual(sum(1 for c in household if c.building is not None), cap)

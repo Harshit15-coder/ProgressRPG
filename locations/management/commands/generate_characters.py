@@ -139,33 +139,17 @@ class Command(BaseCommand):
             f"{centre.name}: Buildings={building_count}, Generating {num_chars} characters..."
         )
 
-        # Weight home assignment by each building's own sleeping capacity,
-        # not uniformly across buildings - starting_population only bounds
-        # the *centre's* total (see population_estimation.starting_population),
-        # so a uniform random.choice() here could still pile many characters
-        # into one small house while others sit empty. One "slot" per unit of
-        # residential_capacity, shuffled and handed out one per character,
-        # keeps every building at or under its own capacity.
-        home_slots = [
-            building
-            for building in buildings
-            for _ in range(population_estimation.residential_capacity(building))
-        ]
-        random.shuffle(home_slots)
-
         # Generate whole household units (family/single-adult/roommates -
         # see household_services) rather than num_chars independent
         # characters, so ages and relationships (MARRIAGE/PARENT_CHILD) come
         # out coherent instead of being assigned independently and hoping
-        # they happen to form plausible families. Deliberately decoupled
-        # from housing for now (see household_services' docstring):
-        # household members are generated together but still handed out to
-        # home_slots individually below, same as before this change.
-        created_characters = []
+        # they happen to form plausible families.
+        households = []
         remaining = num_chars
         while remaining > 0:
             household = household_services.household_member_ages(remaining)
             household_members = []
+            household_characters = []
             for age, role in household:
                 sex = random.choice(["M", "F"])
                 given_name = random.choice(MALE_NAMES if sex == "M" else FEMALE_NAMES)
@@ -182,17 +166,61 @@ class Command(BaseCommand):
                     can_link=can_link,
                 )
                 household_members.append((char, role))
-                created_characters.append(char)
+                household_characters.append(char)
 
             household_services.create_household_relationships(household_members)
+            households.append(household_characters)
             remaining -= len(household)
 
-        for char, building in zip(created_characters, home_slots):
-            char.assign_home(building)
-            node = building.nodes.first()
-            if node is not None:
-                char.move_to(node)
-            char.save()
+        self._assign_households_to_buildings(households, buildings)
+
+    def _assign_households_to_buildings(self, households, buildings):
+        """
+        Try to keep each household together in a single building, weighted
+        by each building's own residential_capacity (not a uniform
+        random.choice() - see the regression this guards against in
+        test_no_building_exceeds_its_own_capacity). A household that can't
+        fit whole into any building with remaining room (occupancy-factored
+        capacities are often smaller than a large family) spills its
+        members individually across whatever capacity is left, rather than
+        leaving the whole household unhoused over one building being full.
+        """
+        remaining_capacity = {
+            building: population_estimation.residential_capacity(building)
+            for building in buildings
+        }
+        order = list(buildings)
+        random.shuffle(order)
+
+        for household in households:
+            size = len(household)
+            fitting = [b for b in order if remaining_capacity[b] >= size]
+            if fitting:
+                building = random.choice(fitting)
+                remaining_capacity[building] -= size
+                for char in household:
+                    self._house_character(char, building)
+                continue
+
+            members = iter(household)
+            char = next(members, None)
+            for building in order:
+                while char is not None and remaining_capacity[building] > 0:
+                    self._house_character(char, building)
+                    remaining_capacity[building] -= 1
+                    char = next(members, None)
+                if char is None:
+                    break
+            # Any characters left over here mean the centre's combined
+            # capacity is exhausted - they simply stay unhoused (Character
+            # has no building), same as an empty buildings list already did.
+
+    def _house_character(self, char, building):
+        char.assign_home(building)
+        node = building.nodes.first()
+        if node is not None:
+            char.move_to(node)
+        char.save()
 
     def generate_nodes(self, pop_centre: PopulationCentre, buildings, num: int):
         outside_nodes = []
