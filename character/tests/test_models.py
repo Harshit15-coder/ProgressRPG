@@ -18,8 +18,6 @@ from character.models import (
     RELATIONSHIP_SPECS,
 )
 
-from gameplay.models import QuestCompletion, Quest, QuestResults, QuestTimer
-
 
 class CharacterRelationshipTests(TestCase):
     def setUp(self):

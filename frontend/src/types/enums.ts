@@ -88,13 +88,6 @@ export type ServerWebSocketAction =
 export type XpModifierScope = "PLAYER" | "CHARACTER";
 
 // ---------------------------------------------------------------------------
-// Quest category / frequency
-// ---------------------------------------------------------------------------
-
-export type QuestCategory = "NONE" | "TRADE" | "RECUR" | "EVENT";
-export type QuestFrequency = "NONE" | "DAY" | "WEEK" | "MONTH";
-
-// ---------------------------------------------------------------------------
 // Subscription plan
 // ---------------------------------------------------------------------------
 

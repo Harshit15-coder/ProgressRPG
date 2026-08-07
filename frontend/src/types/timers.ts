@@ -32,22 +32,6 @@ export interface ActivityCompleteResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Quest timer API shape (QuestTimerSerializer)
-// ---------------------------------------------------------------------------
-
-export interface QuestTimerApiData {
-  id: number;
-  status: TimerStatus;
-  elapsed_time: number;
-  created_at: string;
-  last_updated: string;
-  quest: import("./domain").Quest | null;
-  duration: number;
-  remaining_time: number;
-  character: number;
-}
-
-// ---------------------------------------------------------------------------
 // useActivityTimer hook state and return value
 // ---------------------------------------------------------------------------
 

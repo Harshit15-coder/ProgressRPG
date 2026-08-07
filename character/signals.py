@@ -9,17 +9,9 @@ import logging
 
 from .models import Character, PlayerCharacterLink, Behaviour, CharacterNeeds
 
-from gameplay.models import QuestTimer
 from progression.models import CharacterActivity
 
 logger = logging.getLogger("general")
-
-
-@receiver(post_save, sender=Character)
-def create_timer(sender, instance, created, **kwargs):
-    """Create a quest timer for a new character"""
-    if created:
-        quest_timer = QuestTimer.objects.create(character=instance)
 
 
 @receiver(post_save, sender=Character)
