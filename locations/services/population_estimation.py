@@ -7,13 +7,18 @@ that layer answers "given a population, what infrastructure should exist";
 this layer answers "given the residential buildings that exist (or will),
 how big a population do they imply". It exists so a freshly-imported
 settlement (see locations/services/watabou_import.py) - which has no real
-residents yet, since population/place_characters/assign_workers all run
-later in setup_world.py's pipeline - can still get a population figure to
-feed planning_services.settlement_plan(population=...). Wiring that up is
-a separate follow-up; this module only produces the estimate.
+residents yet at import time - can still get a population figure.
+
+starting_population() is what setup_world.py's pipeline actually uses,
+via spawn_characters.py, to size a settlement's initial cast instead of a
+flat per-building ratio. Feeding population_capacity() into
+planning_services.settlement_plan(population=...) to size economy
+infrastructure (granary/mill/bakery counts) by the same figure is not
+wired up yet - a separate follow-up.
 """
 
 import math
+import random
 
 from locations.management.commands.populate_interiors import (
     BUILDING_INTERIORS_PROPORTIONS,
@@ -26,6 +31,11 @@ from locations.management.commands.populate_interiors import (
 # BUILDING_INTERIORS_PROPORTIONS sleeping-space split, so retuning either
 # automatically flows through.
 SLEEPING_AREA_PER_RESIDENT_SQM = 6.0
+
+# Fraction of residential capacity a settlement starts populated to - below
+# 1.0 so there's room for growth and player impact, and randomised within
+# the range so no settlement starts perfectly optimised.
+STARTING_POPULATION_FRACTION_RANGE = (0.4, 0.7)
 
 
 def _capacity_from_area(footprint_area: float) -> int:
@@ -75,3 +85,25 @@ def estimate_population_from_footprint_areas(footprint_areas: list[float]) -> in
     to filter on yet.
     """
     return sum(_capacity_from_area(area) for area in footprint_areas)
+
+
+def starting_population(population_centre) -> int:
+    """
+    How many residents a freshly-imported/spawned settlement should start
+    with - a fraction of population_capacity, not the full figure, so
+    there's room to grow. 0 if the settlement has no residential capacity
+    at all.
+
+    Seeded on the capacity value itself (not population_centre.id/.name):
+    those are re-assigned on every world rebuild (autoincrement PK; import
+    picks a random unused name), so they don't survive a reimport, but
+    capacity is a pure function of the imported geometry - seeding on it
+    means the same source village file always yields the same starting
+    population, even across a full setup_world rerun.
+    """
+    capacity = population_capacity(population_centre)
+    if capacity <= 0:
+        return 0
+    rng = random.Random(capacity)
+    fraction = rng.uniform(*STARTING_POPULATION_FRACTION_RANGE)
+    return max(1, math.floor(capacity * fraction))

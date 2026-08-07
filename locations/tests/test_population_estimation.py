@@ -18,9 +18,11 @@ from locations.management.commands.populate_interiors import (
 from locations.models import Building, PopulationCentre
 from locations.services.population_estimation import (
     SLEEPING_AREA_PER_RESIDENT_SQM,
+    STARTING_POPULATION_FRACTION_RANGE,
     estimate_population_from_footprint_areas,
     population_capacity,
     residential_capacity,
+    starting_population,
 )
 
 SLEEPING_FRACTION = BUILDING_INTERIORS_PROPORTIONS["residential"]["sleeping"]
@@ -159,3 +161,80 @@ class ResidentialCapacityTests(TestCase):
             population_capacity(centre),
             estimate_population_from_footprint_areas(areas),
         )
+
+
+class StartingPopulationTests(TestCase):
+    """
+    starting_population should always be a fraction of population_capacity
+    (never the full figure, never negative/crashing at zero capacity), and
+    deterministic for a given capacity - see the module docstring for why
+    it's seeded on capacity rather than population_centre.id/.name.
+    """
+
+    def _make_centre(self, name="Startingville"):
+        return PopulationCentre.objects.create(
+            name=name, location=Point(0, 0, srid=3857)
+        )
+
+    def _make_residential_building(self, centre, size, x=0):
+        return Building.objects.create(
+            name=f"house at {x}",
+            building_type="residential",
+            location=Point(x, 0, srid=3857),
+            footprint=_square_footprint(size, x=x),
+            population_centre=centre,
+        )
+
+    def test_zero_capacity_has_zero_starting_population(self):
+        centre = self._make_centre()
+
+        self.assertEqual(population_capacity(centre), 0)
+        self.assertEqual(starting_population(centre), 0)
+
+    def test_starting_population_is_below_capacity(self):
+        centre = self._make_centre()
+        for x in range(5):
+            self._make_residential_building(centre, size=30, x=x * 40)
+
+        capacity = population_capacity(centre)
+        self.assertGreater(capacity, 0)
+        self.assertLess(starting_population(centre), capacity)
+
+    def test_starting_population_is_at_least_one_when_capacity_exists(self):
+        centre = self._make_centre()
+        self._make_residential_building(centre, size=20, x=0)
+
+        capacity = population_capacity(centre)
+        self.assertGreater(capacity, 0)
+        self.assertGreaterEqual(starting_population(centre), 1)
+
+    def test_starting_population_is_deterministic_for_same_centre(self):
+        centre = self._make_centre()
+        for x in range(4):
+            self._make_residential_building(centre, size=25, x=x * 40)
+
+        self.assertEqual(starting_population(centre), starting_population(centre))
+
+    def test_starting_population_matches_for_equal_capacity(self):
+        # Known limitation, not a bug: two different settlements that land
+        # on the same capacity get the same starting population, since the
+        # seed is derived from capacity alone.
+        centre_one = self._make_centre(name="Startingville One")
+        self._make_residential_building(centre_one, size=25, x=0)
+
+        centre_two = self._make_centre(name="Startingville Two")
+        self._make_residential_building(centre_two, size=25, x=100)
+
+        self.assertEqual(
+            population_capacity(centre_one), population_capacity(centre_two)
+        )
+        self.assertEqual(
+            starting_population(centre_one), starting_population(centre_two)
+        )
+
+    def test_fraction_range_is_below_one(self):
+        # Sanity check on the tunable constant itself - starting population
+        # must never reach full capacity, or "room to grow" stops being true.
+        low, high = STARTING_POPULATION_FRACTION_RANGE
+        self.assertGreater(low, 0)
+        self.assertLess(high, 1)

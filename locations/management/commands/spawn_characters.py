@@ -8,10 +8,9 @@ from django.core.management.base import BaseCommand
 from django.db import transaction
 from datetime import date, timedelta
 from locations.models import PopulationCentre, Node, Path, Building
+from locations.services import population_estimation
 from character.models import Character, PlayerCharacterLink
 
-
-CHARS_PER_BUILDING = 5
 
 MALE_NAMES = [
     "Gareth",
@@ -98,7 +97,7 @@ def random_birth_date():
 
 
 class Command(BaseCommand):
-    help = "Generate characters for each village based on building count."
+    help = "Generate characters for each village based on residential capacity."
 
     def add_arguments(self, parser):
         parser.add_argument(
@@ -137,7 +136,7 @@ class Command(BaseCommand):
         buildings = list(centre.buildings.filter(building_type="residential"))
         building_count = len(buildings)
 
-        num_chars = int(building_count * CHARS_PER_BUILDING * random.uniform(0.8, 1.2))
+        num_chars = population_estimation.starting_population(centre)
 
         self.stdout.write(
             f"{centre.name}: Buildings={building_count}, Generating {num_chars} characters..."
