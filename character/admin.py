@@ -1,3 +1,5 @@
+from typing import Dict
+
 from django.contrib import admin
 from .models import (
     Character,
@@ -166,8 +168,8 @@ class CharacterAdmin(admin.ModelAdmin):
     ordering = ["last_name", "first_name"]
     inlines = [
         LinkInline,
-        CharacterCurrencyInline,
         CharacterRelationshipMembershipInline,
+        CharacterCurrencyInline,
     ]
     actions = [mark_as_npc, mark_as_canlink]
 
@@ -296,7 +298,7 @@ class CharacterRelationshipAdmin(admin.ModelAdmin):
         if spec is None:
             return
 
-        counts = {}
+        counts: Dict[RelationshipRole, int] = {}
         for membership in relationship.characterrelationshipmembership_set.all():
             if not membership.role:
                 continue
