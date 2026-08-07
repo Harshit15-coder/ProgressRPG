@@ -328,52 +328,39 @@ class Person(models.Model):
         """
         Add experience points (XP) to the person and handle level-up logic.
         """
-        self.xp += amount
-        levelups = []
+        from progression import ap
 
-        while True:
-            xp_needed = self.get_xp_for_next_level()
-            if self.xp < xp_needed:
-                break
-
-            old_level = self.level
-            self.xp -= xp_needed
-            self.level += 1
-            levelups.append(
-                {
-                    "old_level": old_level,
-                    "new_level": self.level,
-                    "person": self,
-                    "name": self.name,
-                }
-            )
-
-        self.xp = max(0, self.xp)
+        self.level, self.xp, levelups = ap.apply_xp(self.level, self.xp, amount)
         self.xp_next_level = self.get_xp_for_next_level()
 
         self.save(update_fields=["xp", "level", "xp_next_level"])
-        return levelups
+        return [{**event, "person": self, "name": self.name} for event in levelups]
 
     def get_xp_for_next_level(self):
         """
         Calculate the XP required to reach the next level.
         """
-        return 100 * (self.level + 1) if self.level >= 1 else 100
+        from progression import ap
+
+        return ap.threshold_for_level(self.level)
+
+    @property
+    def total_ap_earned(self):
+        """
+        Total Activity Points ever earned, reconstructed from level plus the
+        current xp-toward-next-level remainder. Level-up thresholds are
+        cumulative, so unlike `xp` (which resets on every level-up) this
+        stays monotonic - used wherever a long-term progress/prestige figure
+        is needed, e.g. village points.
+        """
+        from progression import ap
+
+        return ap.total_ap_earned(self.level, self.xp)
 
     def get_xp_multiplier(self, now=None):
-        now = now or timezone.now()
+        from progression import ap
 
-        link = self.active_link
-
-        mods = self.xp_mods.filter(
-            is_active=True,
-            starts_at__lte=now,
-        ).filter(models.Q(ends_at__isnull=True) | models.Q(ends_at__gt=now))
-        mult = Decimal("1.0")
-        for m in mods:
-            mult *= m.multiplier
-
-        return mult
+        return ap.get_multiplier(self, now=now)
 
 
 class Player(Person):
@@ -389,6 +376,9 @@ class Player(Person):
     last_seen = models.DateTimeField(null=True, blank=True)
     is_deleted = models.BooleanField(default=False)
     deleted_at = models.DateTimeField(null=True, blank=True)
+    link_points_multiplier = models.DecimalField(
+        max_digits=5, decimal_places=2, default="1.00"
+    )
 
     ONBOARDING_STEPS = [
         (0, "Not started"),
@@ -503,6 +493,17 @@ class Player(Person):
     @property
     def total_activities(self):
         return self.activities.filter(is_complete=True).count()
+
+    @property
+    def total_link_points(self):
+        """
+        Sum of link_points across every character link this player has ever
+        had (past and current) - the player-side symmetric counterpart to
+        how link_points already factors into a resident character's village.
+        """
+        from character.models import PlayerCharacterLink
+
+        return PlayerCharacterLink.total_link_points(self.links.all())
 
     def add_activity(self, time: int = 0, num: int = 1, xp: int = 0):
         """

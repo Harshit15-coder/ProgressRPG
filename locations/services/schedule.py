@@ -22,17 +22,33 @@ def _stagger_offset_seconds(character_id: int) -> int:
 
 
 def target_role_for(character, now=None) -> str:
-    """Which role (home/work) a character should currently be at, based on a
-    fixed daily time window with a per-character stagger on the transition
-    boundaries."""
+    """Which role (home/work) a character should currently be at.
+
+    The work window comes from the character's assigned work building's
+    open_time/close_time if set, else falls back to the fixed WORK_START/
+    WORK_END constants. A per-character stagger is applied to whichever
+    window is resolved, so the whole village doesn't flip in lockstep."""
     from character.models import CharacterLocation
 
     now = now or timezone.localtime()
     seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
 
+    work_start, work_end = WORK_START, WORK_END
+    work_location = (
+        CharacterLocation.objects.filter(
+            character=character, role=CharacterLocation.Role.WORK, is_primary=True
+        )
+        .select_related("location")
+        .first()
+    )
+    if work_location is not None:
+        building = work_location.location
+        if building.open_time is not None and building.close_time is not None:
+            work_start, work_end = building.open_time, building.close_time
+
     offset = _stagger_offset_seconds(character.id)
-    work_start_seconds = WORK_START.hour * 3600 + WORK_START.minute * 60 + offset
-    work_end_seconds = WORK_END.hour * 3600 + WORK_END.minute * 60 + offset
+    work_start_seconds = work_start.hour * 3600 + work_start.minute * 60 + offset
+    work_end_seconds = work_end.hour * 3600 + work_end.minute * 60 + offset
 
     if work_start_seconds <= seconds_since_midnight < work_end_seconds:
         return CharacterLocation.Role.WORK

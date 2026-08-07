@@ -124,6 +124,8 @@ class BuildingAdmin(admin.ModelAdmin):
         "description",
         "population_centre",
         "building_type",
+        "open_time_override",
+        "close_time_override",
     ]
     search_fields = [
         "name",

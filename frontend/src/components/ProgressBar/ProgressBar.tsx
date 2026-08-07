@@ -44,6 +44,20 @@ const ProgressBar = ({
     paused ? styles.paused : ""
   ].join(" ");
 
+  // Border-only variant of the same colour, applied to the track rather than
+  // the fill class above - see the .trackDefault/etc comment in
+  // ProgressBar.module.scss for why these aren't the same classes.
+  const trackColorClass: Record<string, string> = {
+    default: styles.trackDefault,
+    warning: styles.trackWarning,
+    danger: styles.trackDanger,
+    success: styles.trackSuccess,
+  };
+  const trackClass = [
+    styles.progressTrack,
+    trackColorClass[color] || trackColorClass.default,
+  ].join(" ");
+
   return (
     <div className={styles.progressBarWrapper}>
       {/* Hidden label used for measuring width */}
@@ -62,7 +76,7 @@ const ProgressBar = ({
       )}
 
       <Progress.Root
-        className={styles.progressTrack}
+        className={trackClass}
         value={Math.min(value, max)}
         max={max}
         aria-label={label || undefined}

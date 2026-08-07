@@ -7,28 +7,67 @@ export const SUBZONES_FILL_LAYER = "subzones-fill";
 export const PATHS_LINE_LAYER = "paths-line";
 export const ROADS_LINE_LAYER = "roads-line";
 export const VILLAGE_LABEL_LAYER = "village-label";
+// BOUNDARY_FILL_LAYER is intentionally excluded - a village boundary tooltip
+// added nothing (just repeated the village name) and, since the boundary
+// covers the whole village, its click handler collided with
+// VILLAGE_LABEL_LAYER's (see Map.tsx).
 export const CLICKABLE_LAYERS = [
-	BOUNDARY_FILL_LAYER,
 	BUILDINGS_FILL_LAYER,
 	SUBZONES_FILL_LAYER,
 ];
 
 const CHARACTERS_LAYER = "characters";
 
+// Village name-label colour per PopulationCentre.state (see
+// locations/models.py) - a placeholder palette (issue #673 explicitly leaves
+// the exact colour set as an open design question). Mirrors
+// ProgressBar.module.scss's own danger/warning/default/success classes
+// (rather than inventing a separate palette) so a village's label colour and
+// its tooltip progress bar (VILLAGE_STATE_PROGRESS_COLORS below) read as the
+// same colour per state.
+export const VILLAGE_STATE_COLORS: Record<string, string> = {
+	Struggling: "#c62828", // ProgressBar .danger (c.$color-error)
+	Recovering: "#ff9800", // ProgressBar .warning (c.$color-warning)
+	Stable: "#007a32", // ProgressBar .default (c.$color-progress-bar)
+	Thriving: "#00612a", // ProgressBar .success (c.$color-status-success)
+};
+const VILLAGE_STATE_DEFAULT_COLOR = "#333"; // matches the label's old fixed text-color
+
+// ProgressBar `color` prop values per state, for the "tap a label" expanded
+// tooltip - see VILLAGE_STATE_COLORS above for how these line up with the
+// label's own text colour.
+export const VILLAGE_STATE_PROGRESS_COLORS: Record<string, string> = {
+	Struggling: "danger",
+	Recovering: "warning",
+	Stable: "default",
+	Thriving: "success",
+};
+
+// Sized to tightly bound the glyph drawn below (roughly 6x11.9 units, see
+// the shape coordinates), plus a small margin - not an arbitrary square
+// canvas. MapLibre's click hit-testing for symbol/icon layers uses the
+// full image bounding box (scaled by icon-size), not per-pixel alpha, so
+// a canvas padded much larger than the visible glyph (e.g. the previous
+// 256x256, ~85% transparent margin) made clicks well outside the drawn
+// character register as hits on it - see issue #660's tooltip-priority
+// follow-up. Shrinking the canvas doesn't change the glyph's on-screen
+// size (that's governed by pixelRatio/scale below, not canvas size), only
+// how much dead space surrounds it.
 function createCharacterIcon(): ImageData {
-    const size = 256;
+    const width = 48;
+    const height = 88;
     const scale = 6;
 
 	const canvas = document.createElement("canvas");
-    canvas.width = size;
-	canvas.height = size;
+    canvas.width = width;
+	canvas.height = height;
 
 	const context = canvas.getContext("2d");
 	if (!context) {
-		return new ImageData(size, size);
+		return new ImageData(width, height);
 	}
 
-	context.translate(size/2, size/2);
+	context.translate(width/2, height/2);
     context.scale(scale, scale);
 
 	context.fillStyle = "rgba(0,0,0,0.25)";
@@ -50,7 +89,7 @@ function createCharacterIcon(): ImageData {
 	context.fill();
 	context.stroke();
 
-	return context.getImageData(0, 0, size, size);
+	return context.getImageData(0, 0, width, height);
 }
 
 export function addVillageLayers(map: MapLibreMap): void {
@@ -145,7 +184,18 @@ export function addVillageLayers(map: MapLibreMap): void {
 			],
 		},
 		paint: {
-			"text-color": "#333",
+			// Tapping/selecting a village label expands it into its progress
+			// bar + state label (issue #673) - the label itself is coloured
+			// by state at rest (see VILLAGE_STATE_COLORS above).
+			"text-color": [
+				"match",
+				["get", "state"],
+				"Struggling", VILLAGE_STATE_COLORS.Struggling,
+				"Recovering", VILLAGE_STATE_COLORS.Recovering,
+				"Stable", VILLAGE_STATE_COLORS.Stable,
+				"Thriving", VILLAGE_STATE_COLORS.Thriving,
+				VILLAGE_STATE_DEFAULT_COLOR,
+			],
 			"text-halo-color": "#fff",
 			"text-halo-width": 2,
 			"text-opacity": [

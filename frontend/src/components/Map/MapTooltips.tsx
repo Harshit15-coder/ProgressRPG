@@ -1,6 +1,8 @@
 // Structured tooltip content for building/character map markers, kept out
 // of Map.tsx since the trigger elements (polygons/glyphs) already carry a
 // lot of pan/zoom/rendering logic.
+import ProgressBar from "../ProgressBar/ProgressBar";
+import { VILLAGE_STATE_PROGRESS_COLORS } from "./layers";
 
 interface GoodEntry {
   good_type?: string;
@@ -59,15 +61,52 @@ interface CharacterTooltipProps {
   home?: string | null;
   work?: string | null;
   hungerLabel?: string | null;
+  currentActivity?: string | null;
 }
 
-export function CharacterTooltipContent({ name, home, work, hungerLabel }: CharacterTooltipProps) {
+export function CharacterTooltipContent({
+  name,
+  home,
+  work,
+  hungerLabel,
+  currentActivity,
+}: CharacterTooltipProps) {
   return (
     <div>
       <div>{name}</div>
       {home && <div>Lives at: {home}</div>}
       {work && <div>Works at: {work}</div>}
+      {currentActivity && <div>{currentActivity}</div>}
       {hungerLabel && <div>{hungerLabel}</div>}
+    </div>
+  );
+}
+
+interface PopulationCentreTooltipProps {
+  name?: string;
+  state?: string | null;
+  progress?: number | null;
+}
+
+// Expanded content shown when a village's name label is tapped/selected - the
+// label itself is only coloured by state at rest (see VILLAGE_LABEL_LAYER
+// in layers.ts); this is where the full progress bar + state label live.
+export function PopulationCentreTooltipContent({
+  name,
+  state,
+  progress,
+}: PopulationCentreTooltipProps) {
+  return (
+    <div>
+      <div>{name}</div>
+      {state && (
+        <ProgressBar
+          value={progress ?? 0}
+          max={100}
+          label={state}
+          color={VILLAGE_STATE_PROGRESS_COLORS[state] ?? "default"}
+        />
+      )}
     </div>
   );
 }

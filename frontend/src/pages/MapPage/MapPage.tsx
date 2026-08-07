@@ -5,12 +5,14 @@ import Button from "../../components/Button/Button";
 import PopulationCentreMap, {
   type PopulationCentreMapHandle,
 } from "../../components/Map/Map";
+import TodayPointsBadge from "../../components/TodayPointsBadge/TodayPointsBadge";
 import {
   useInitialMapCentre,
   useMapViewport,
   useMapWorldBounds,
   usePopulationCentreId,
   usePopulationCentres,
+  useTargetCentreMap,
 } from "../../hooks/useMap";
 
 import styles from "./MapPage.module.scss";
@@ -50,11 +52,27 @@ export default function MapPage(): React.ReactElement {
   const { data: viewportGeojson } = useMapViewport(bbox);
   const { data: worldBounds } = useMapWorldBounds();
 
+  // Set by handleFindVillage when the camera starts flying to a new
+  // village, and cleared once the real viewport data for it arrives (see
+  // handleViewportChange below). onViewportChange only fires on "moveend"
+  // plus a debounce (Map.tsx), so without this the map would keep showing
+  // the departure village - stale and possibly off-screen - for the whole
+  // flight; useTargetCentreMap reads the cache MapPage's prefetch effect
+  // already primed for this village, so it resolves instantly.
+  const [targetCentreId, setTargetCentreId] = useState<number | null>(null);
+  const { data: targetCentreGeojson } = useTargetCentreMap(targetCentreId);
+
   // Once the map's camera has fitted itself to the initial village and
   // reported its first viewport (Map.tsx's onViewportChange), the
   // bbox-scoped viewport poll becomes the source of truth for what's on
-  // screen; until then, fall back to the one-time initial fetch.
-  const geojson = viewportGeojson ?? initialCentre;
+  // screen; until then, fall back to the mid-flight target (if any) or the
+  // one-time initial fetch.
+  const geojson = viewportGeojson ?? targetCentreGeojson ?? initialCentre;
+
+  const handleViewportChange = (nextBbox: string) => {
+    setBbox(nextBbox);
+    setTargetCentreId(null);
+  };
 
   const mapRef = useRef<PopulationCentreMapHandle>(null);
   const { data: populationCentres } = usePopulationCentres();
@@ -87,6 +105,7 @@ export default function MapPage(): React.ReactElement {
   const handleFindVillage = () => {
     if (!nextVillage) return;
     mapRef.current?.flyToPoint(nextVillage.location);
+    setTargetCentreId(nextVillage.id);
     setCycleIndex((index) => index + 1);
   };
 
@@ -101,9 +120,10 @@ export default function MapPage(): React.ReactElement {
           <PopulationCentreMap
             ref={mapRef}
             geojson={geojson}
-            onViewportChange={setBbox}
+            onViewportChange={handleViewportChange}
             worldBounds={worldBounds?.bbox}
           >
+            <TodayPointsBadge />
             {nextVillage && (
               <Button
                 type="button"

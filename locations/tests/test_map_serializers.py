@@ -4,11 +4,13 @@ from django.utils import timezone
 
 from character.models import Character, CharacterLocation
 from economy.models import FieldCrop, GoodsStock
+from progression.models import ActivityDefinition, CharacterActivity
 
 from ..models import Building, LandArea, PopulationCentre, Subzone
 from ..serializers import (
     BuildingFeatureSerializer,
     CharacterPointFeatureSerializer,
+    PopulationCentreLabelFeatureSerializer,
     SubzoneFeatureSerializer,
 )
 
@@ -100,10 +102,10 @@ class CharacterPointFeatureSerializerTest(TestCase):
 
     def test_no_home_or_work_assigned(self):
         props = self.properties()
-        self.assertIsNone(props["home"])
-        self.assertIsNone(props["work"])
+        self.assertIsNone(props["home_type"])
+        self.assertIsNone(props["work_type"])
 
-    def test_home_and_work_from_primary_locations_only(self):
+    def test_home_and_work_type_from_primary_locations_only(self):
         CharacterLocation.objects.create(
             character=self.character,
             location=self.home,
@@ -118,8 +120,45 @@ class CharacterPointFeatureSerializerTest(TestCase):
         )
 
         props = self.properties()
-        self.assertEqual(props["home"], "Rose Cottage")
-        self.assertEqual(props["work"], "Village Bakery")
+        # building_type, not the building's bookkeeping name (see
+        # _primary_location_type) - the frontend maps this to a plain label
+        # ("House", "Bakery", ...) the same way a building's own tooltip does.
+        self.assertEqual(props["home_type"], "residential")
+        self.assertEqual(props["work_type"], "bakery")
+
+    def test_no_current_activity_scheduled(self):
+        props = self.properties()
+        self.assertIsNone(props["current_activity"])
+
+    def test_current_activity_from_scheduled_activity_definition_name(self):
+        activity_definition = ActivityDefinition.objects.create(
+            name="General labour", kind=ActivityDefinition.Kind.WORK
+        )
+        now = timezone.now()
+        CharacterActivity.objects.create(
+            character=self.character,
+            activity_definition=activity_definition,
+            scheduled_start=now - timezone.timedelta(minutes=30),
+            scheduled_end=now + timezone.timedelta(minutes=30),
+        )
+
+        # activity_definition.name, not its kind ("work") - the frontend
+        # shows this verbatim in the character's tooltip.
+        self.assertEqual(self.properties()["current_activity"], "General labour")
+
+    def test_current_activity_ignores_activities_outside_their_scheduled_window(self):
+        activity_definition = ActivityDefinition.objects.create(
+            name="Sleeping", kind=ActivityDefinition.Kind.SLEEP
+        )
+        now = timezone.now()
+        CharacterActivity.objects.create(
+            character=self.character,
+            activity_definition=activity_definition,
+            scheduled_start=now - timezone.timedelta(hours=10),
+            scheduled_end=now - timezone.timedelta(hours=8),
+        )
+
+        self.assertIsNone(self.properties()["current_activity"])
 
     def test_hunger_label_bands(self):
         self.character.needs.hunger = 0
@@ -155,6 +194,7 @@ class SubzoneFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertIsNone(props["crop_stage"])
         self.assertIsNone(props["crop_progress"])
+        self.assertIsNone(props["shelter_building_id"])
 
     def test_fallow_stage(self):
         shelter = Building.objects.create(name="Shelter", building_type="field_shelter")
@@ -164,6 +204,7 @@ class SubzoneFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertEqual(props["crop_stage"], "fallow")
         self.assertIsNone(props["crop_progress"])
+        self.assertEqual(props["shelter_building_id"], shelter.id)
 
     def test_growing_stage_progress_between_zero_and_one(self):
         shelter = Building.objects.create(name="Shelter", building_type="field_shelter")
@@ -185,3 +226,57 @@ class SubzoneFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertEqual(props["crop_stage"], "ready")
         self.assertIsNone(props["crop_progress"])
+
+
+class PopulationCentreLabelFeatureSerializerTest(TestCase):
+    """
+    The marker feature MapViewportView sends for each village on the
+    cross-village map (see issue #673) - needs state/progress alongside the
+    name/id it already carried, so the frontend can colour each marker by
+    state without an extra per-village fetch.
+    """
+
+    def setUp(self):
+        self.centre = PopulationCentre.objects.create(
+            name="Testville", location=Point(0, 0, srid=3857)
+        )
+
+    def properties(self):
+        return PopulationCentreLabelFeatureSerializer(self.centre).data["properties"]
+
+    def test_includes_state_and_progress_with_no_residents(self):
+        props = self.properties()
+        self.assertEqual(props["name"], "Testville")
+        self.assertEqual(props["population_centre_id"], self.centre.id)
+        self.assertEqual(props["state"], "Struggling")
+        self.assertEqual(props["progress"], 0)
+
+    def test_reflects_village_points_derived_state(self):
+        from character.models import Character, PlayerCharacterLink
+        from users.models import CustomUser
+
+        resident = Character.objects.create(
+            first_name="Res", last_name="Ident", population_centre=self.centre
+        )
+        user = CustomUser.objects.create_user(
+            email="villager@example.com", password="x"
+        )
+        # Deactivate the auto-assigned link/character so only `resident`
+        # (with a controllable link_points via days_linked) counts here.
+        for link in PlayerCharacterLink.objects.filter(
+            player=user.player, is_active=True
+        ):
+            link.unlink()
+        link = PlayerCharacterLink.objects.create(
+            player=user.player, character=resident
+        )
+        link.linked_at = timezone.now() - timezone.timedelta(days=10)
+        link.save(update_fields=["linked_at"])
+
+        # village_points is a cached_property read fresh per PopulationCentre
+        # instance, so re-fetch rather than reuse self.centre.
+        centre = PopulationCentre.objects.get(pk=self.centre.pk)
+        props = PopulationCentreLabelFeatureSerializer(centre).data["properties"]
+
+        self.assertEqual(props["state"], centre.state)
+        self.assertEqual(props["progress"], centre.progress)

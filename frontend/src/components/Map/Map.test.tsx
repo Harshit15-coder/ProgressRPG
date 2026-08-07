@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { act, render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { fromLngLat, toLngLat } from './utils';
 import { colourForCharacter } from './characters/placement';
@@ -425,6 +424,85 @@ describe('PopulationCentreMap', () => {
     expect(exactlyAtDoor.length).toBe(0);
   });
 
+  it("scatters a field_shelter worker across its linked crops Subzone, not the shelter's own tiny footprint", () => {
+    const geojsonWithFieldWorker = {
+      bbox: [0, 0, 100, 100] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 5], [5, 5], [5, 0], [0, 0]]], // tiny shelter
+          },
+          properties: {
+            feature_type: 'building',
+            id: 1,
+            name: 'Field Shelter',
+            building_type: 'field_shelter',
+          },
+        },
+        {
+          geometry: {
+            // the field itself - far from the shelter, so a shelter-footprint
+            // placement and a field placement land in disjoint regions
+            type: 'Polygon',
+            coordinates: [[[50, 50], [50, 90], [90, 90], [90, 50], [50, 50]]],
+          },
+          properties: {
+            feature_type: 'subzone',
+            id: 2,
+            name: 'Field',
+            usage: 'crops',
+            shelter_building_id: 1,
+          },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [2, 2] }, // at the shelter's entrance
+          properties: { feature_type: 'character', id: 40, name: 'Farmhand' },
+        },
+      ],
+    };
+
+    renderMap({ geojson: geojsonWithFieldWorker });
+    const [farmhand] = characterMarkers();
+
+    expect(farmhand.gisPosition?.[0]).toBeGreaterThan(50);
+    expect(farmhand.gisPosition?.[0]).toBeLessThan(90);
+    expect(farmhand.gisPosition?.[1]).toBeGreaterThan(50);
+    expect(farmhand.gisPosition?.[1]).toBeLessThan(90);
+  });
+
+  it("falls back to the field_shelter's own footprint when no linked crops Subzone is loaded", () => {
+    const geojsonWithUnlinkedShelter = {
+      bbox: [0, 0, 20, 20] as [number, number, number, number],
+      features: [
+        {
+          geometry: {
+            type: 'Polygon',
+            coordinates: [[[0, 0], [0, 20], [20, 20], [20, 0], [0, 0]]],
+          },
+          properties: {
+            feature_type: 'building',
+            id: 1,
+            name: 'Field Shelter',
+            building_type: 'field_shelter',
+          },
+        },
+        {
+          geometry: { type: 'Point', coordinates: [10, 0] },
+          properties: { feature_type: 'character', id: 41, name: 'Farmhand' },
+        },
+      ],
+    };
+
+    renderMap({ geojson: geojsonWithUnlinkedShelter });
+    const [farmhand] = characterMarkers();
+
+    expect(farmhand.gisPosition?.[0]).toBeGreaterThan(0);
+    expect(farmhand.gisPosition?.[0]).toBeLessThan(20);
+    expect(farmhand.gisPosition?.[1]).toBeGreaterThan(0);
+    expect(farmhand.gisPosition?.[1]).toBeLessThan(20);
+  });
+
   it('assigns a ready-to-harvest crops subzone a gold fill, distinct from the default grey building fill', () => {
     const geojsonWithCropSubzone = {
       ...baseGeojson,
@@ -654,7 +732,7 @@ describe('PopulationCentreMap', () => {
     expect(tooltip).not.toHaveTextContent('Workers');
   });
 
-  it('shows home, workplace, and hunger in a character tooltip', async () => {
+  it('shows home, workplace, current activity, and hunger in a character tooltip', async () => {
     const geojsonWithCharacter = {
       ...baseGeojson,
       features: [
@@ -664,8 +742,9 @@ describe('PopulationCentreMap', () => {
             feature_type: 'character',
             id: 1,
             name: 'Alice',
-            home: 'Rose Cottage',
-            work: 'Village Bakery',
+            home_type: 'residential',
+            work_type: 'bakery',
+            current_activity: 'General labour',
             hunger_label: 'Well fed',
           },
         },
@@ -680,9 +759,40 @@ describe('PopulationCentreMap', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
-    expect(tooltip).toHaveTextContent('Lives at: Rose Cottage');
-    expect(tooltip).toHaveTextContent('Works at: Village Bakery');
+    // home_type/work_type are the building_type ("residential"/"bakery"),
+    // not the building's bookkeeping name - resolved to the same plain
+    // label ("House"/"Bakery") shown on that building's own tooltip.
+    expect(tooltip).toHaveTextContent('Lives at: House');
+    expect(tooltip).toHaveTextContent('Works at: Bakery');
+    expect(tooltip).toHaveTextContent('General labour');
     expect(tooltip).toHaveTextContent('Well fed');
+  });
+
+  it('omits the current activity line when a character has none scheduled', async () => {
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            current_activity: null,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Alice');
+    expect(tooltip.textContent).toBe('Alice');
   });
 
   it('shows the crop stage in a field tooltip instead of the literal word "Crops"', async () => {
@@ -739,6 +849,77 @@ describe('PopulationCentreMap', () => {
 
     const uniquePoints = new Set(points.map(([x, y]) => `${x.toFixed(3)},${y.toFixed(3)}`));
     expect(uniquePoints.size).toBe(3);
+  });
+
+  it('colours each village label by its state, not by a shared default', () => {
+    const geojsonWithVillageLabel = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Point', coordinates: [30, 30] },
+          properties: {
+            feature_type: 'population_centre_label',
+            name: 'Driftmoor village',
+            population_centre_id: 7,
+            state: 'Thriving',
+            progress: 42,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithVillageLabel });
+
+    const labelLayer = currentMap().layers.find((l) => l.id === 'village-label') as
+      | { paint?: { 'text-color'?: unknown } }
+      | undefined;
+    // A ["match", ["get", "state"], ...] expression, not a single flat colour
+    // - every state needs its own colour, not one shared default.
+    expect(labelLayer?.paint?.['text-color']).toEqual(
+      expect.arrayContaining(['match', ['get', 'state']])
+    );
+
+    const feature = villageSourceFeatures().find(
+      (f) => f.properties.feature_type === 'population_centre_label'
+    );
+    expect(feature?.properties.state).toBe('Thriving');
+  });
+
+  it('expands a tapped village label into its progress bar and state label', async () => {
+    const geojsonWithVillageLabel = {
+      ...baseGeojson,
+      features: [
+        ...baseGeojson.features,
+        {
+          geometry: { type: 'Point', coordinates: [30, 30] },
+          properties: {
+            feature_type: 'population_centre_label',
+            name: 'Driftmoor village',
+            population_centre_id: 7,
+            state: 'Recovering',
+            progress: 65,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithVillageLabel });
+    const feature = villageSourceFeatures().find(
+      (f) => f.properties.feature_type === 'population_centre_label'
+    );
+
+    act(() => {
+      currentMap().trigger(
+        'click',
+        { features: [feature], lngLat: { lng: 30, lat: 30 } },
+        'village-label'
+      );
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Driftmoor village');
+    expect(tooltip).toHaveTextContent('Recovering');
+    const bar = screen.getByRole('progressbar');
+    expect(bar).toHaveAttribute('aria-valuenow', '65');
   });
 
   it('renders path lines invisibly (line-opacity 0)', () => {

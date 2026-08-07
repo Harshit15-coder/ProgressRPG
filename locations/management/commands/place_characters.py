@@ -3,6 +3,7 @@ from django.contrib.gis.geos import Point
 import random
 
 from character.models import Character
+from character.services import relationship_services
 from locations.models import Building, Node
 
 DEFAULT_MAX_PER_BUILDING = 5
@@ -59,6 +60,14 @@ class Command(BaseCommand):
         characters = [char for char in characters if char.id not in already_housed_ids]
         random.shuffle(characters)
 
+        # Family members prefer to end up in the same population centre as
+        # each other (not necessarily the same building). Computed once up
+        # front so placement doesn't re-query the relationship graph per
+        # character; group_population_centre records, per family group, the
+        # population centre its first-placed member landed in.
+        family_groups = relationship_services.relationship_get_family_groups(characters)
+        group_population_centre = {}
+
         for char in characters:
             available = [b for b in buildings if occupancy[b.id] < max_per_building]
             if not available:
@@ -70,7 +79,23 @@ class Command(BaseCommand):
                 )
                 break
 
-            building = random.choice(available)
+            group_key = family_groups[char.id]
+            preferred_pc_id = group_population_centre.get(group_key)
+            if preferred_pc_id is not None:
+                preferred = [
+                    b for b in available if b.population_centre_id == preferred_pc_id
+                ]
+                building = (
+                    random.choice(preferred) if preferred else random.choice(available)
+                )
+            else:
+                building = random.choice(available)
+
+            if building.population_centre_id is not None:
+                group_population_centre.setdefault(
+                    group_key, building.population_centre_id
+                )
+
             if not building.nodes.exists():
                 self.stdout.write(
                     self.style.WARNING(

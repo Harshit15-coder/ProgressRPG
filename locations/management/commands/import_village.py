@@ -115,6 +115,13 @@ class Command(BaseCommand):
             )
         )
 
+        # Watabou exports carry their own "crops" Subzone geometry (see
+        # watabou_import._import_fields), but not a field_shelter Building or
+        # FieldCrop - generate_fields attaches those. Must run before
+        # generate_paths, which needs the shelter's entrance node to exist.
+        call_command("generate_fields")
+        self.stdout.write(self.style.SUCCESS("Generated fields for the new centre"))
+
         call_command("generate_paths", centre=population_centre.id)
         self.stdout.write(self.style.SUCCESS("Generated paths for the new centre"))
 

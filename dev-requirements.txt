@@ -305,6 +305,8 @@ pycparser==3.0
     # via cffi
 pygments==2.20.0
     # via pytest
+pygraphviz==2.0.1
+    # via -r dev-requirements.in
 pyjwt==2.13.0
     # via
     #   -r requirements.in

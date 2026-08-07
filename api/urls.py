@@ -27,11 +27,16 @@ from locations.views import PopulationCentreViewSet
 from progression.views import (
     PlayerActivityViewSet,
     CharacterActivityViewSet,
-    CharacterQuestViewSet,
     PlayerSkillViewSet,
     CategoryViewSet,
     ProjectViewSet,
     TaskViewSet,
+    NoteViewSet,
+    RoleViewSet,
+    SkillGroupViewSet,
+    SkillDefinitionViewSet,
+    SuggestedActivityViewSet,
+    ActivityDefinitionViewSet,
 )
 from server_management.views import maintenance_status
 from users.views import PlayerViewSet
@@ -63,16 +68,27 @@ router.register(r"character", CharacterViewSet, basename="character")
 router.register(r"skills", PlayerSkillViewSet, basename="skills")
 router.register(r"projects", ProjectViewSet, basename="projects")
 router.register(r"tasks", TaskViewSet, basename="tasks")
+router.register(r"notes", NoteViewSet, basename="notes")
 router.register(r"player-activities", PlayerActivityViewSet, basename="playeractivity")
 router.register(
     r"character-activities", CharacterActivityViewSet, basename="characteractivity"
 )
 router.register(r"categories", CategoryViewSet, basename="category")
-router.register(r"character_quests", CharacterQuestViewSet, basename="characterquest")
 router.register(
     r"population-centres", PopulationCentreViewSet, basename="populationcentre"
 )
 router.register(r"activity_timers", ActivityTimerViewSet, basename="activitytimer")
+router.register(r"roles", RoleViewSet, basename="role")
+router.register(r"skill-groups", SkillGroupViewSet, basename="skillgroup")
+router.register(
+    r"skill-definitions", SkillDefinitionViewSet, basename="skilldefinition"
+)
+router.register(
+    r"suggested-activities", SuggestedActivityViewSet, basename="suggestedactivity"
+)
+router.register(
+    r"activity-definitions", ActivityDefinitionViewSet, basename="activitydefinition"
+)
 
 urlpatterns = [
     # General urls

@@ -70,6 +70,8 @@ class PopulationCentreLabelFeatureSerializer(PointFeatureSerializer):
         return {
             "name": obj.name,
             "population_centre_id": obj.id,
+            "progress": obj.progress,
+            "state": obj.state,
         }
 
 
@@ -89,10 +91,17 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def get_point(self, obj):
         return obj.location.x, obj.location.y
 
-    def _primary_location_name(self, obj, role):
+    def _primary_location_type(self, obj, role):
+        # Building.name is a bookkeeping string (e.g. "House 2 of (Driftmoor
+        # village)" - see BuildingFeatureSerializer's docstring), not meant
+        # for display; building_type is what the frontend maps to a plain
+        # label ("House", "Bakery", ...) for the building's own tooltip
+        # (BUILDING_TYPE_LABELS in geojson.tsx) - exposing it here instead of
+        # the name keeps a character's home/work tooltip consistent with
+        # that.
         for location in obj.locations.all():
             if location.role == role and location.is_primary:
-                return location.location.name
+                return location.location.building_type
         return None
 
     def _active_journey(self, obj):
@@ -100,6 +109,21 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
         if journeys is not None:
             return journeys[0] if journeys else None
         return obj.journeys.filter(status="active").first()
+
+    def _current_activity_name(self, obj):
+        # current_activity_list is a Prefetch (see PopulationCentreMapView/
+        # MapViewportView) filtered to the one CharacterActivity active right
+        # now - falls back to Behaviour.get_current_activity()'s own query
+        # (e.g. for a single un-prefetched character) rather than requiring
+        # every caller to set it up. activity_definition.name is already a
+        # display string ("Sleeping", "General labour", ...), not a raw
+        # ActivityDefinition.Kind value - same idea as building_type below.
+        activities = getattr(obj, "current_activity_list", None)
+        if activities is not None:
+            activity = activities[0] if activities else None
+        else:
+            activity = obj.behaviour.get_current_activity()
+        return activity.name if activity else None
 
     def get_properties(self, obj):
         needs = getattr(obj, "needs", None)
@@ -116,9 +140,10 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
         return {
             "id": obj.id,
             "name": obj.name,
-            "home": self._primary_location_name(obj, CharacterLocation.Role.HOME),
-            "work": self._primary_location_name(obj, CharacterLocation.Role.WORK),
+            "home_type": self._primary_location_type(obj, CharacterLocation.Role.HOME),
+            "work_type": self._primary_location_type(obj, CharacterLocation.Role.WORK),
             "hunger_label": needs.hunger_label() if needs else None,
+            "current_activity": self._current_activity_name(obj),
             "effective_speed": obj.movement_speed,
             "path": path,
         }
@@ -257,6 +282,12 @@ class SubzoneFeatureSerializer(PolygonFeatureSerializer):
             "usage": obj.usage,
             "crop_stage": crop.stage if crop else None,
             "crop_progress": crop.growth_progress if crop else None,
+            # Lets the frontend scatter a field_shelter's idle workers across
+            # the crops Subzone(s) it serves instead of clustering them at the
+            # shelter's own (small, standalone) footprint - see
+            # generate_fields.py, which groups every crops Subzone in a
+            # population centre around one shared shelter Building.
+            "shelter_building_id": crop.shelter_building_id if crop else None,
         }
 
 

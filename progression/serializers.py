@@ -1,6 +1,8 @@
 # progression/serializers.py
 
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
+from django.utils.html import strip_tags
 from rest_framework import serializers
 
 from users.models import Player
@@ -8,15 +10,20 @@ from users.models import Player
 from .models import (
     Category,
     Role,
+    SkillGroup,
+    SkillDefinition,
+    CharacterRole,
     PlayerSkill,
     CharacterSkill,
+    Activity,
+    SuggestedActivity,
     PlayerActivity,
+    ActivityDefinition,
     CharacterActivity,
-    CharacterQuest,
     Project,
     Task,
+    Note,
 )
-
 
 #########################################
 #####      Base serializers
@@ -63,6 +70,8 @@ class SkillBaseSerializer(serializers.ModelSerializer):
 
 
 class TimeRecordBaseSerializer(serializers.ModelSerializer):
+    xp_gained = serializers.ReadOnlyField()
+
     class Meta:
         fields = [
             "id",
@@ -73,6 +82,7 @@ class TimeRecordBaseSerializer(serializers.ModelSerializer):
             "is_complete",
             "completed_at",
             "xp_gained",
+            "reward_breakdown",
             "created_at",
             "last_updated",
         ]
@@ -95,10 +105,37 @@ class CategorySerializer(GroupBaseSerializer):
         read_only_fields = ["player"]
 
 
-class RoleSerializer(GroupBaseSerializer):
-    class Meta(GroupBaseSerializer.Meta):
+class RoleSerializer(serializers.ModelSerializer):
+    class Meta:
         model = Role
-        fields = GroupBaseSerializer.Meta.fields + ["character"]
+        fields = ["id", "name", "description", "created_at", "last_updated"]
+
+
+class SkillGroupSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SkillGroup
+        fields = ["id", "role", "name", "description", "created_at", "last_updated"]
+
+
+class SkillDefinitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SkillDefinition
+        fields = [
+            "id",
+            "name",
+            "description",
+            "role",
+            "gate_group",
+            "min_proficiency",
+            "created_at",
+            "last_updated",
+        ]
+
+
+class CharacterRoleSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = CharacterRole
+        fields = ["id", "character", "role", "assigned_at"]
 
 
 #########################################
@@ -117,10 +154,23 @@ class PlayerSkillSerializer(SkillBaseSerializer):
         read_only_fields = ["player"]
 
 
-class CharacterSkillSerializer(SkillBaseSerializer):
-    class Meta(SkillBaseSerializer.Meta):
+class CharacterSkillSerializer(serializers.ModelSerializer):
+    total_time = serializers.IntegerField(read_only=True)
+    total_records = serializers.IntegerField(read_only=True)
+    total_xp = serializers.IntegerField(read_only=True)
+
+    class Meta:
         model = CharacterSkill
-        fields = SkillBaseSerializer.Meta.fields + ["character", "roles"]
+        fields = [
+            "id",
+            "character",
+            "skill_definition",
+            "created_at",
+            "last_updated",
+            "total_time",
+            "total_records",
+            "total_xp",
+        ]
 
 
 #########################################
@@ -128,36 +178,133 @@ class CharacterSkillSerializer(SkillBaseSerializer):
 #########################################
 
 
+class ActivityDefinitionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = ActivityDefinition
+        fields = [
+            "id",
+            "name",
+            "description",
+            "kind",
+            "skill",
+            "created_at",
+            "last_updated",
+        ]
+
+
+class ActivitySerializer(serializers.ModelSerializer):
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
+
+    class Meta:
+        model = Activity
+        fields = [
+            "id",
+            "player",
+            "name",
+            "description",
+            "created_at",
+            "last_updated",
+        ]
+        read_only_fields = ["player"]
+
+
+class SuggestedActivitySerializer(serializers.ModelSerializer):
+    class Meta:
+        model = SuggestedActivity
+        fields = ["id", "name", "description", "created_at", "last_updated"]
+
+
 class PlayerActivitySerializer(TimeRecordBaseSerializer):
     player: serializers.PrimaryKeyRelatedField[Player] = (
         serializers.PrimaryKeyRelatedField(read_only=True)
     )
-    group_key = serializers.CharField(read_only=True)
 
     class Meta(TimeRecordBaseSerializer.Meta):
         model = PlayerActivity
         fields = TimeRecordBaseSerializer.Meta.fields + [
             "player",
-            "group_key",
+            "activity",
             "is_private",
+            "origin",
             "skill",
             "project",
             "task",
         ]
-        read_only_fields = ["player"]
+        read_only_fields = ["player", "origin", "activity"]
 
 
-class CharacterActivitySerializer(TimeRecordBaseSerializer):
+class OfflineActivityLogSerializer(serializers.Serializer):
+    """
+    Validates a request to manually log a completed activity after the
+    fact (offline logging, issue #630). ``skill``/``task`` are scoped to
+    the requesting player to prevent referencing another player's records.
+    """
+
+    name = serializers.CharField(
+        max_length=255, required=False, allow_blank=True, default=""
+    )
+    description = serializers.CharField(
+        max_length=2000, required=False, allow_blank=True, default=""
+    )
+    skill = serializers.PrimaryKeyRelatedField(queryset=PlayerSkill.objects.none())
+    task = serializers.PrimaryKeyRelatedField(queryset=Task.objects.none())
+    started_at = serializers.DateTimeField()
+    completed_at = serializers.DateTimeField()
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        self.fields["skill"].queryset = (
+            PlayerSkill.objects.filter(player=player)
+            if player
+            else PlayerSkill.objects.none()
+        )
+        self.fields["skill"].required = False
+        self.fields["skill"].allow_null = True
+        self.fields["task"].queryset = (
+            Task.objects.filter(player=player) if player else Task.objects.none()
+        )
+        self.fields["task"].required = False
+        self.fields["task"].allow_null = True
+
+    def validate(self, attrs):
+        if not attrs.get("name") and not attrs.get("task"):
+            raise serializers.ValidationError(
+                "Provide a name (to create a new task) or an existing task to log against."
+            )
+        if attrs["completed_at"] <= attrs["started_at"]:
+            raise serializers.ValidationError("completed_at must be after started_at.")
+        return attrs
+
+
+class CharacterActivitySerializer(serializers.ModelSerializer):
+    name = serializers.ReadOnlyField()
+    kind = serializers.ReadOnlyField()
+    xp_gained = serializers.ReadOnlyField()
     status = serializers.SerializerMethodField()
 
-    class Meta(TimeRecordBaseSerializer.Meta):
+    class Meta:
         model = CharacterActivity
-        fields = TimeRecordBaseSerializer.Meta.fields + [
+        fields = [
+            "id",
             "character",
+            "activity_definition",
+            "name",
+            "kind",
+            "duration",
+            "started_at",
+            "is_complete",
+            "completed_at",
+            "xp_gained",
+            "reward_breakdown",
+            "created_at",
+            "last_updated",
             "scheduled_start",
             "scheduled_end",
             "status",
-            "kind",
         ]
 
     def get_status(self, obj) -> str:
@@ -170,20 +317,6 @@ class CharacterActivitySerializer(TimeRecordBaseSerializer):
             if now < obj.scheduled_start:
                 return "future"
         return "unknown"
-
-
-class CharacterQuestSerializer(TimeRecordBaseSerializer):
-    class Meta(TimeRecordBaseSerializer.Meta):
-        model = CharacterQuest
-        fields = TimeRecordBaseSerializer.Meta.fields + [
-            "character",
-            "skill",
-            "intro_text",
-            "outro_text",
-            "target_duration",
-            "stages",
-            "stages_fixed",
-        ]
 
 
 #########################################
@@ -221,6 +354,7 @@ class TaskSerializer(serializers.ModelSerializer):
     total_time = serializers.IntegerField(read_only=True)
     total_records = serializers.IntegerField(read_only=True)
     last_worked_on = serializers.DateTimeField(read_only=True)
+    subtask_count = serializers.IntegerField(source="subtasks.count", read_only=True)
 
     class Meta:
         model = Task
@@ -235,8 +369,79 @@ class TaskSerializer(serializers.ModelSerializer):
             "is_complete",
             "completed_at",
             "first_completed_at",
+            "due_at",
+            "parent",
+            "subtask_count",
             "total_time",
             "total_records",
             "last_worked_on",
         ]
         read_only_fields = ["player", "first_completed_at"]
+
+    def validate(self, attrs):
+        instance = self.instance
+        parent = attrs.get("parent", instance.parent if instance else None)
+
+        if instance:
+            player_id = instance.player_id
+        else:
+            request = self.context.get("request")
+            player_id = (
+                request.user.player.id
+                if request and getattr(request.user, "is_authenticated", False)
+                else None
+            )
+
+        candidate = Task(
+            id=instance.id if instance else None,
+            player_id=player_id,
+            parent=parent,
+        )
+        try:
+            candidate.clean()
+        except DjangoValidationError as exc:
+            raise serializers.ValidationError(exc.message_dict)
+        return attrs
+
+
+class NoteSerializer(serializers.ModelSerializer):
+    player: serializers.PrimaryKeyRelatedField[Player] = (
+        serializers.PrimaryKeyRelatedField(read_only=True)
+    )
+
+    class Meta:
+        model = Note
+        fields = [
+            "id",
+            "title",
+            "body",
+            "player",
+            "task",
+            "created_at",
+            "last_updated",
+        ]
+        read_only_fields = ["player"]
+
+    def validate_title(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_body(self, value: str) -> str:
+        return strip_tags(value).strip()
+
+    def validate_task(self, task: Task | None) -> Task | None:
+        if task is None:
+            return None
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        if player is None or task.player_id != player.id:
+            raise serializers.ValidationError(
+                "Task must belong to the requesting player."
+            )
+        existing = Note.objects.filter(task=task)
+        if self.instance is not None:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError(
+                "This task is already linked to another note."
+            )
+        return task

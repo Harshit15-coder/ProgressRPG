@@ -203,7 +203,9 @@ class WaitlistJoinAPIView(APIView):
         ).exists()
         if not already_waiting:
             try:
-                entry = Waitlist.objects.create(email=email, status=Waitlist.Status.WAITING)
+                entry = Waitlist.objects.create(
+                    email=email, status=Waitlist.Status.WAITING
+                )
             except IntegrityError:
                 pass  # race with a concurrent signup — treat as already-waiting
             else:
@@ -249,6 +251,19 @@ class IsOwnerCharacter(permissions.BasePermission):
             ).exists()
 
         return False
+
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    For authored/curated catalogs (roles, skill taxonomy, activity
+    definitions, suggested activities) - any authenticated player can read,
+    only staff can create/update/delete.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return bool(request.user and request.user.is_staff)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):
@@ -345,6 +360,27 @@ class MeViewSet(viewsets.ViewSet):
         return Response(
             CharacterSerializer(character, context={"request": request}).data
         )
+
+    @extend_schema(
+        responses=inline_serializer(
+            name="TodayPointsResponse",
+            fields={
+                "points_today": drf_serializers.IntegerField(allow_null=True),
+            },
+        )
+    )
+    @action(detail=False, methods=["get"])
+    def today_points(self, request):
+        """
+        Personal "points earned today" for the map view's badge (issue #673).
+        `points_today` is null - not zero - when the player has no active
+        PlayerCharacterLink, so the frontend can tell "no link" apart from
+        "linked but nothing earned yet today" and hide the badge entirely.
+        """
+        player = request.user.player
+        link = player.active_link
+
+        return Response({"points_today": link.points_today if link else None})
 
     @extend_schema(
         responses=inline_serializer(

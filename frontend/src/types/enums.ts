@@ -18,11 +18,13 @@ export type FeatureFlagKey =
   | "tasksFeature"
   | "categoriesFeature"
   | "skillsFeature"
+  | "notesFeature"
   | "projectsFeature"
   | "toastsFeature"
   | "announcements"
   | "onlinePlayerCount"
   | "unified_homepage"
+  | "results_mode"
   | "map";
 
 // ---------------------------------------------------------------------------
