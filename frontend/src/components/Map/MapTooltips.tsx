@@ -61,6 +61,7 @@ interface CharacterTooltipProps {
   home?: string | null;
   work?: string | null;
   currentActivity?: string | null;
+  isMoving?: boolean | null;
 }
 
 export function CharacterTooltipContent({
@@ -68,11 +69,14 @@ export function CharacterTooltipContent({
   home,
   work,
   currentActivity,
+  isMoving,
 }: CharacterTooltipProps) {
+  const activityLabel = isMoving ? "walking" : currentActivity;
+
   return (
     <div>
       <div>{name}</div>
-      {currentActivity && <div>Currently: {currentActivity}</div>}
+      {activityLabel && <div>Currently: {activityLabel}</div>}
       {home && <div>Lives at: {home}</div>}
       {work && <div>Works at: {work}</div>}
     </div>

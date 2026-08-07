@@ -37,6 +37,7 @@ class CharacterSerializer(serializers.ModelSerializer):
             "location",
             "current_node",
             "target_node",
+            "is_moving",
         ]
 
         read_only_fields = fields
