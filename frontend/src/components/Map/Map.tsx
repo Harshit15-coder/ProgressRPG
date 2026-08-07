@@ -24,6 +24,7 @@ import { CharacterTooltipContent, PopulationCentreTooltipContent } from "./MapTo
 import { scatterCharacters } from "./characters/placement";
 import {
   buildingFootprintRings,
+  buildingTypeLabel,
   polygonTooltipContent,
 } from "./geojson";
 import {
@@ -262,13 +263,19 @@ export default function PopulationCentreMap({
         const feature = e.features?.[0];
         if (!feature) return;
         e.originalEvent?.stopPropagation?.();
+        // home/work carry the building_type (e.g. "residential", "bakery"),
+        // not the building's bookkeeping name - resolved to the same plain
+        // label ("House", "Bakery") shown on that building's own tooltip,
+        // via buildingTypeLabel.
+        const homeType = feature.properties?.home_type as string | null | undefined;
+        const workType = feature.properties?.work_type as string | null | undefined;
         setTooltip({
           key: `character-${feature.id ?? JSON.stringify(feature.properties)}`,
           content: (
             <CharacterTooltipContent
               name={feature.properties?.name as string | undefined}
-              home={feature.properties?.home as string | null | undefined}
-              work={feature.properties?.work as string | null | undefined}
+              home={homeType ? buildingTypeLabel(homeType) : undefined}
+              work={workType ? buildingTypeLabel(workType) : undefined}
               hungerLabel={feature.properties?.hunger_label as string | null | undefined}
             />
           ),

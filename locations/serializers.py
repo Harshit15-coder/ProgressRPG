@@ -91,10 +91,17 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
     def get_point(self, obj):
         return obj.location.x, obj.location.y
 
-    def _primary_location_name(self, obj, role):
+    def _primary_location_type(self, obj, role):
+        # Building.name is a bookkeeping string (e.g. "House 2 of (Driftmoor
+        # village)" - see BuildingFeatureSerializer's docstring), not meant
+        # for display; building_type is what the frontend maps to a plain
+        # label ("House", "Bakery", ...) for the building's own tooltip
+        # (BUILDING_TYPE_LABELS in geojson.tsx) - exposing it here instead of
+        # the name keeps a character's home/work tooltip consistent with
+        # that.
         for location in obj.locations.all():
             if location.role == role and location.is_primary:
-                return location.location.name
+                return location.location.building_type
         return None
 
     def _active_journey(self, obj):
@@ -118,8 +125,8 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
         return {
             "id": obj.id,
             "name": obj.name,
-            "home": self._primary_location_name(obj, CharacterLocation.Role.HOME),
-            "work": self._primary_location_name(obj, CharacterLocation.Role.WORK),
+            "home_type": self._primary_location_type(obj, CharacterLocation.Role.HOME),
+            "work_type": self._primary_location_type(obj, CharacterLocation.Role.WORK),
             "hunger_label": needs.hunger_label() if needs else None,
             "effective_speed": obj.movement_speed,
             "path": path,

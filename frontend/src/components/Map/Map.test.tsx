@@ -663,8 +663,8 @@ describe('PopulationCentreMap', () => {
             feature_type: 'character',
             id: 1,
             name: 'Alice',
-            home: 'Rose Cottage',
-            work: 'Village Bakery',
+            home_type: 'residential',
+            work_type: 'bakery',
             hunger_label: 'Well fed',
           },
         },
@@ -679,8 +679,11 @@ describe('PopulationCentreMap', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
-    expect(tooltip).toHaveTextContent('Lives at: Rose Cottage');
-    expect(tooltip).toHaveTextContent('Works at: Village Bakery');
+    // home_type/work_type are the building_type ("residential"/"bakery"),
+    // not the building's bookkeeping name - resolved to the same plain
+    // label ("House"/"Bakery") shown on that building's own tooltip.
+    expect(tooltip).toHaveTextContent('Lives at: House');
+    expect(tooltip).toHaveTextContent('Works at: Bakery');
     expect(tooltip).toHaveTextContent('Well fed');
   });
 

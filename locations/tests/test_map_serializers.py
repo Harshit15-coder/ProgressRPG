@@ -101,10 +101,10 @@ class CharacterPointFeatureSerializerTest(TestCase):
 
     def test_no_home_or_work_assigned(self):
         props = self.properties()
-        self.assertIsNone(props["home"])
-        self.assertIsNone(props["work"])
+        self.assertIsNone(props["home_type"])
+        self.assertIsNone(props["work_type"])
 
-    def test_home_and_work_from_primary_locations_only(self):
+    def test_home_and_work_type_from_primary_locations_only(self):
         CharacterLocation.objects.create(
             character=self.character,
             location=self.home,
@@ -119,8 +119,11 @@ class CharacterPointFeatureSerializerTest(TestCase):
         )
 
         props = self.properties()
-        self.assertEqual(props["home"], "Rose Cottage")
-        self.assertEqual(props["work"], "Village Bakery")
+        # building_type, not the building's bookkeeping name (see
+        # _primary_location_type) - the frontend maps this to a plain label
+        # ("House", "Bakery", ...) the same way a building's own tooltip does.
+        self.assertEqual(props["home_type"], "residential")
+        self.assertEqual(props["work_type"], "bakery")
 
     def test_hunger_label_bands(self):
         self.character.needs.hunger = 0
@@ -218,12 +221,18 @@ class PopulationCentreLabelFeatureSerializerTest(TestCase):
         resident = Character.objects.create(
             first_name="Res", last_name="Ident", population_centre=self.centre
         )
-        user = CustomUser.objects.create_user(email="villager@example.com", password="x")
+        user = CustomUser.objects.create_user(
+            email="villager@example.com", password="x"
+        )
         # Deactivate the auto-assigned link/character so only `resident`
         # (with a controllable link_points via days_linked) counts here.
-        for link in PlayerCharacterLink.objects.filter(player=user.player, is_active=True):
+        for link in PlayerCharacterLink.objects.filter(
+            player=user.player, is_active=True
+        ):
             link.unlink()
-        link = PlayerCharacterLink.objects.create(player=user.player, character=resident)
+        link = PlayerCharacterLink.objects.create(
+            player=user.player, character=resident
+        )
         link.linked_at = timezone.now() - timezone.timedelta(days=10)
         link.save(update_fields=["linked_at"])
 

@@ -27,12 +27,21 @@ export const BUILDING_TYPE_LABELS: Record<string, string> = {
   field_shelter: "Field Shelter",
 };
 
+// Buildings carry full bookkeeping names (see BuildingFeatureSerializer's
+// docstring) that aren't meant for display - this is the single place that
+// turns a building_type into the plain label shown in both a building's own
+// tooltip below and a character's "Lives at:"/"Works at:" tooltip
+// (CharacterTooltipContent, populated in Map.tsx).
+export function buildingTypeLabel(buildingType: string | null | undefined): string {
+  return (buildingType && BUILDING_TYPE_LABELS[buildingType]) || "Building";
+}
+
 export function polygonTooltipContent(
   properties: GeoJSONFeatureProperties | null | undefined
 ): React.ReactNode | undefined {
   if (properties?.feature_type === "building") {
     const buildingType = properties?.building_type as string | undefined;
-    const label = (buildingType && BUILDING_TYPE_LABELS[buildingType]) || "Building";
+    const label = buildingTypeLabel(buildingType);
     return (
       <BuildingTooltipContent
         label={label}
