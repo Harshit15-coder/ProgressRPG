@@ -110,6 +110,21 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
             return journeys[0] if journeys else None
         return obj.journeys.filter(status="active").first()
 
+    def _current_activity_name(self, obj):
+        # current_activity_list is a Prefetch (see PopulationCentreMapView/
+        # MapViewportView) filtered to the one CharacterActivity active right
+        # now - falls back to Behaviour.get_current_activity()'s own query
+        # (e.g. for a single un-prefetched character) rather than requiring
+        # every caller to set it up. activity_definition.name is already a
+        # display string ("Sleeping", "General labour", ...), not a raw
+        # ActivityDefinition.Kind value - same idea as building_type below.
+        activities = getattr(obj, "current_activity_list", None)
+        if activities is not None:
+            activity = activities[0] if activities else None
+        else:
+            activity = obj.behaviour.get_current_activity()
+        return activity.name if activity else None
+
     def get_properties(self, obj):
         needs = getattr(obj, "needs", None)
         journey = self._active_journey(obj)
@@ -128,6 +143,7 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
             "home_type": self._primary_location_type(obj, CharacterLocation.Role.HOME),
             "work_type": self._primary_location_type(obj, CharacterLocation.Role.WORK),
             "hunger_label": needs.hunger_label() if needs else None,
+            "current_activity": self._current_activity_name(obj),
             "effective_speed": obj.movement_speed,
             "path": path,
         }

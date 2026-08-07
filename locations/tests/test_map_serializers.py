@@ -4,6 +4,7 @@ from django.utils import timezone
 
 from character.models import Character, CharacterLocation
 from economy.models import FieldCrop, GoodsStock
+from progression.models import ActivityDefinition, CharacterActivity
 
 from ..models import Building, LandArea, PopulationCentre, Subzone
 from ..serializers import (
@@ -124,6 +125,40 @@ class CharacterPointFeatureSerializerTest(TestCase):
         # ("House", "Bakery", ...) the same way a building's own tooltip does.
         self.assertEqual(props["home_type"], "residential")
         self.assertEqual(props["work_type"], "bakery")
+
+    def test_no_current_activity_scheduled(self):
+        props = self.properties()
+        self.assertIsNone(props["current_activity"])
+
+    def test_current_activity_from_scheduled_activity_definition_name(self):
+        activity_definition = ActivityDefinition.objects.create(
+            name="General labour", kind=ActivityDefinition.Kind.WORK
+        )
+        now = timezone.now()
+        CharacterActivity.objects.create(
+            character=self.character,
+            activity_definition=activity_definition,
+            scheduled_start=now - timezone.timedelta(minutes=30),
+            scheduled_end=now + timezone.timedelta(minutes=30),
+        )
+
+        # activity_definition.name, not its kind ("work") - the frontend
+        # shows this verbatim in the character's tooltip.
+        self.assertEqual(self.properties()["current_activity"], "General labour")
+
+    def test_current_activity_ignores_activities_outside_their_scheduled_window(self):
+        activity_definition = ActivityDefinition.objects.create(
+            name="Sleeping", kind=ActivityDefinition.Kind.SLEEP
+        )
+        now = timezone.now()
+        CharacterActivity.objects.create(
+            character=self.character,
+            activity_definition=activity_definition,
+            scheduled_start=now - timezone.timedelta(hours=10),
+            scheduled_end=now - timezone.timedelta(hours=8),
+        )
+
+        self.assertIsNone(self.properties()["current_activity"])
 
     def test_hunger_label_bands(self):
         self.character.needs.hunger = 0

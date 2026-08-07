@@ -294,6 +294,7 @@ export default function PopulationCentreMap({
               name={feature.properties?.name as string | undefined}
               home={homeType ? buildingTypeLabel(homeType) : undefined}
               work={workType ? buildingTypeLabel(workType) : undefined}
+              currentActivity={feature.properties?.current_activity as string | null | undefined}
               hungerLabel={feature.properties?.hunger_label as string | null | undefined}
             />
           ),

@@ -61,14 +61,22 @@ interface CharacterTooltipProps {
   home?: string | null;
   work?: string | null;
   hungerLabel?: string | null;
+  currentActivity?: string | null;
 }
 
-export function CharacterTooltipContent({ name, home, work, hungerLabel }: CharacterTooltipProps) {
+export function CharacterTooltipContent({
+  name,
+  home,
+  work,
+  hungerLabel,
+  currentActivity,
+}: CharacterTooltipProps) {
   return (
     <div>
       <div>{name}</div>
       {home && <div>Lives at: {home}</div>}
       {work && <div>Works at: {work}</div>}
+      {currentActivity && <div>{currentActivity}</div>}
       {hungerLabel && <div>{hungerLabel}</div>}
     </div>
   );
