@@ -40,6 +40,23 @@ export function useInitialMapCentre(pcId: number | null | undefined) {
   });
 }
 
+// Reads the same cache entry MapPage's prefetch effect primes for the
+// upcoming "find village" target (see the prefetchQuery call there) - while
+// the camera is mid-flight to that village, onViewportChange hasn't fired
+// yet (only fires on "moveend" + a debounce, see Map.tsx), so this fills the
+// gap with the prefetched village's data instead of showing stale content
+// from wherever the camera used to be. Resolves instantly from cache when
+// the prefetch already completed; only hits the network if it hasn't.
+export function useTargetCentreMap(centreId: number | null) {
+  return useQuery({
+    queryKey: ["map", "population-centre", "initial-centre", centreId],
+    queryFn: () => fetchPopulationCentreMap(centreId as number),
+    enabled: centreId != null,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
 // Cross-village map data bounded by the camera's current viewport. `bbox` is
 // a quantized "minx,miny,maxx,maxy" string (see quantizeBbox in
 // components/Map/utils.ts) so sub-pixel camera jitter doesn't churn the
