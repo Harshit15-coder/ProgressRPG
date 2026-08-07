@@ -40,20 +40,29 @@ from locations.models import Building, LandArea, Node, PopulationCentre, Subzone
 
 
 def _make_centre(name="Testville", resident_count=0):
+    """
+    Always patches PopulationCentre.resident_count to exactly
+    resident_count (including 0) rather than leaving it at the real
+    residents.count() when 0 is requested - patch.object patches the
+    *class* property, so any test that nests one _make_centre call inside
+    another test's still-active patch (e.g. a fresh "empty" centre created
+    inside a class whose setUp already patched resident_count for its own
+    centre) would otherwise silently inherit the outer patched value
+    instead of getting the 0 it asked for.
+
+    Callers must stop the returned patcher themselves via
+    self.addCleanup(patcher.stop) - this helper has no access to the
+    test's `self`.
+    """
     centre = PopulationCentre.objects.create(name=name, location=Point(0, 0, srid=3857))
-    if resident_count:
-        patcher = patch.object(
-            PopulationCentre,
-            "resident_count",
-            new_callable=PropertyMock,
-            return_value=resident_count,
-        )
-        patcher.start()
-        # No addCleanup here - callers are TestCase methods and stop it
-        # themselves via self.addCleanup(patcher.stop) at the call site,
-        # since this helper has no access to the test's `self`.
-        return centre, patcher
-    return centre, None
+    patcher = patch.object(
+        PopulationCentre,
+        "resident_count",
+        new_callable=PropertyMock,
+        return_value=resident_count,
+    )
+    patcher.start()
+    return centre, patcher
 
 
 def _make_building(centre, building_type, x):
@@ -101,7 +110,8 @@ class DailyDemandTests(TestCase):
     """
 
     def test_zero_residents_have_zero_demand(self):
-        centre, _ = _make_centre(resident_count=0)
+        centre, patcher = _make_centre(resident_count=0)
+        self.addCleanup(patcher.stop)
 
         self.assertEqual(daily_bread_demand(centre), 0.0)
         self.assertEqual(daily_flour_demand(centre), 0.0)
@@ -257,7 +267,8 @@ class PopulationCapacityReportTests(TestCase):
         # 0 capacity against 0 demand is a village that hasn't been built
         # out yet, not a shortfall - the zero/zero boundary shouldn't flag
         # red.
-        centre, _ = _make_centre(name="Blankville", resident_count=0)
+        centre, patcher = _make_centre(name="Blankville", resident_count=0)
+        self.addCleanup(patcher.stop)
 
         report = population_capacity_report(centre)
 
@@ -274,7 +285,8 @@ class SharedHelperTests(TestCase):
     """
 
     def test_workers_present_excludes_moving_characters(self):
-        centre, _ = _make_centre()
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
         bakery, node = _make_building(centre, "bakery", 10)
         _add_workers(bakery, node, count=2)
         Character.objects.create(
@@ -287,7 +299,8 @@ class SharedHelperTests(TestCase):
         self.assertEqual(workers_present(bakery), 2)
 
     def test_find_granary_mill_bakery_return_none_for_empty_centre(self):
-        centre, _ = _make_centre()
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
 
         self.assertIsNone(find_granary(centre))
         self.assertIsNone(find_mill(centre))
