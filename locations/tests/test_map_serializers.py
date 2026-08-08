@@ -9,10 +9,12 @@ from progression.models import ActivityDefinition, CharacterActivity
 from ..models import Building, LandArea, PopulationCentre, Subzone
 from ..serializers import (
     BuildingFeatureSerializer,
+    CharacterDetailSerializer,
     CharacterPointFeatureSerializer,
     PopulationCentreLabelFeatureSerializer,
     SubzoneFeatureSerializer,
 )
+from ..services import population_estimation
 
 SQUARE = Polygon(
     ((0, 0), (0, 10), (10, 10), (10, 0), (0, 0)),
@@ -67,6 +69,23 @@ class BuildingFeatureSerializerTest(TestCase):
         self.assertEqual(props["workers"], 1)
         self.assertEqual(props["residents"], 1)
 
+    def test_residential_capacity_is_zero_for_a_non_residential_building(self):
+        self.assertEqual(self.properties()["residential_capacity"], 0)
+
+    def test_residential_capacity_matches_the_service_for_a_residential_building(self):
+        house = Building.objects.create(
+            name="House", building_type="residential", footprint=SQUARE
+        )
+        house = Building.objects.prefetch_related(
+            "character_locations", "goods_stocks"
+        ).get(pk=house.pk)
+        props = BuildingFeatureSerializer(house).data["properties"]
+        self.assertEqual(
+            props["residential_capacity"],
+            population_estimation.residential_capacity(house),
+        )
+        self.assertGreater(props["residential_capacity"], 0)
+
     def test_goods_only_include_positive_stock_using_format_quantity(self):
         GoodsStock.objects.create(
             building=self.building, good_type="flour", quantity=21000
@@ -104,6 +123,17 @@ class CharacterPointFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertIsNone(props["home_type"])
         self.assertIsNone(props["work_type"])
+        self.assertIsNone(props["home_id"])
+
+    def test_home_id_matches_the_primary_home_building(self):
+        CharacterLocation.objects.create(
+            character=self.character,
+            location=self.home,
+            role=CharacterLocation.Role.HOME,
+            is_primary=True,
+        )
+
+        self.assertEqual(self.properties()["home_id"], self.home.id)
 
     def test_home_and_work_type_from_primary_locations_only(self):
         CharacterLocation.objects.create(
@@ -197,6 +227,65 @@ class CharacterPointFeatureSerializerTest(TestCase):
         self.character.needs.hunger = 50
         self.character.needs.save(update_fields=["hunger"])
         self.assertEqual(self.properties()["hunger_label"], "Hungry")
+
+
+class CharacterDetailSerializerTest(TestCase):
+    """
+    CharacterDetailSerializer builds on CharacterPointFeatureSerializer's
+    properties (home/work/activity - covered above), so these tests only
+    cover what it adds: age, sex, and relationships.
+    """
+
+    def setUp(self):
+        self.character = Character.objects.create(
+            given_name="Alice", sex="Female", location=Point(0, 0, srid=3857)
+        )
+
+    def properties(self):
+        character = (
+            Character.objects.select_related("needs")
+            .prefetch_related("locations__location")
+            .get(pk=self.character.pk)
+        )
+        return CharacterDetailSerializer(character).data
+
+    def test_includes_age_and_sex(self):
+        props = self.properties()
+        self.assertEqual(props["sex"], "Female")
+        self.assertIsInstance(props["age"], int)
+
+    def test_no_relationships_by_default(self):
+        self.assertEqual(self.properties()["relationships"], [])
+
+    def test_household_relationships_are_summarised(self):
+        from character.models import RelationshipRole, RelationshipType
+        from character.services import relationship_services
+
+        husband = Character.objects.create(given_name="Thomas", sex="Male")
+        relationship_services.relationship_create(
+            RelationshipType.MARRIAGE,
+            [
+                (self.character, RelationshipRole.SPOUSE),
+                (husband, RelationshipRole.SPOUSE),
+            ],
+        )
+        daughter = Character.objects.create(given_name="Emily", sex="Female")
+        relationship_services.relationship_create(
+            RelationshipType.PARENT_CHILD,
+            [
+                (self.character, RelationshipRole.PARENT),
+                (daughter, RelationshipRole.CHILD),
+            ],
+        )
+
+        relationships = self.properties()["relationships"]
+        self.assertCountEqual(
+            relationships,
+            [
+                {"character_id": husband.id, "name": "Thomas", "label": "husband"},
+                {"character_id": daughter.id, "name": "Emily", "label": "daughter"},
+            ],
+        )
 
 
 class SubzoneFeatureSerializerTest(TestCase):

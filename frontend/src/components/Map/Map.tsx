@@ -35,6 +35,9 @@ import {
   VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
+import DetailCard from "../DetailCard/DetailCard";
+import CharacterDetail from "../CharacterDetail/CharacterDetail";
+import BuildingDetail from "../BuildingDetail/BuildingDetail";
 import styles from "./Map.module.scss";
 
 // maplibre-gl loads its own tile-processing worker via a runtime
@@ -127,6 +130,14 @@ interface TooltipOverlayState {
   lngLat: [number, number];
 }
 
+// The map's second level of progressive disclosure (tooltip -> click "View
+// details" -> DetailCard). Only character/building are wired up yet
+// (population centres are a later follow-up - see the map entity detail
+// card issue).
+type DetailSelection =
+  | { type: "character"; id: number }
+  | { type: "building"; id: number };
+
 export default function PopulationCentreMap({
   geojson,
   onViewportChange,
@@ -163,6 +174,15 @@ export default function PopulationCentreMap({
   const [tooltip, setTooltip] = useState<TooltipOverlayState | null>(null);
   const tooltipRootRef = useRef<Root | null>(null);
   const tooltipHostRef = useRef<HTMLDivElement | null>(null);
+
+  const [detail, setDetail] = useState<DetailSelection | null>(null);
+  // Opening the richer detail card obscures the (unreachable, once the
+  // card's overlay covers it) floating tooltip behind it - close it rather
+  // than leave it lingering under the modal.
+  const openDetail = useCallback((selection: DetailSelection) => {
+    setTooltip(null);
+    setDetail(selection);
+  }, []);
 
   const buildingFootprints = useMemo(
     () => buildingFootprintRings(features),
@@ -287,6 +307,7 @@ export default function PopulationCentreMap({
         // via buildingTypeLabel.
         const homeType = feature.properties?.home_type as string | null | undefined;
         const workType = feature.properties?.work_type as string | null | undefined;
+        const characterId = Number(feature.properties?.id);
         setTooltip({
           key: `character-${feature.id ?? JSON.stringify(feature.properties)}`,
           content: (
@@ -296,6 +317,7 @@ export default function PopulationCentreMap({
               work={workType ? buildingTypeLabel(workType) : undefined}
               currentActivity={feature.properties?.current_activity as string | null | undefined}
               isMoving={feature.properties?.is_moving as boolean | null | undefined}
+              onViewDetails={() => openDetail({ type: "character", id: characterId })}
             />
           ),
           lngLat: [e.lngLat.lng, e.lngLat.lat],
@@ -370,8 +392,12 @@ export default function PopulationCentreMap({
             return;
           }
           e.originalEvent?.stopPropagation?.();
+          const buildingId = Number(feature.properties?.id);
           const content = polygonTooltipContent(
-            feature.properties as GeoJSONFeatureProperties
+            feature.properties as GeoJSONFeatureProperties,
+            feature.properties?.feature_type === "building"
+              ? () => openDetail({ type: "building", id: buildingId })
+              : undefined
           );
           if (!content) return;
           setTooltip({
@@ -419,7 +445,10 @@ export default function PopulationCentreMap({
       setMapReady(false);
       initialFitDoneRef.current = false;
     };
-  }, []);
+    // openDetail is a useCallback with its own `[]` deps, so it's
+    // referentially stable - listing it here satisfies exhaustive-deps
+    // without changing this effect's actual "run once on mount" behaviour.
+  }, [openDetail]);
 
   // Keeps the tooltip overlay anchored to its map-space point while panning,
   // and reprojects the initial position once opened.
@@ -569,11 +598,79 @@ export default function PopulationCentreMap({
     };
   }, []);
 
+  // Derived from data the map already has loaded (this village's features/
+  // characterFeatures) rather than a dedicated fetch - BuildingDetail's
+  // residents are every currently-loaded character feature whose home_id
+  // (see CharacterPointFeatureSerializer) matches the selected building.
+  const selectedBuildingFeature = useMemo(() => {
+    if (!detail || detail.type !== "building") return null;
+    return (
+      features.find(
+        (f) =>
+          f.properties?.feature_type === "building" &&
+          Number(f.properties?.id) === detail.id
+      ) ?? null
+    );
+  }, [detail, features]);
+
+  const selectedBuildingResidents = useMemo(() => {
+    if (!detail || detail.type !== "building") return [];
+    return characterFeatures
+      .filter((f) => f.properties?.home_id != null && Number(f.properties.home_id) === detail.id)
+      .map((f) => ({
+        id: Number(f.properties?.id),
+        name: (f.properties?.name as string | undefined) ?? "",
+        currentActivity: f.properties?.current_activity as string | null | undefined,
+        isMoving: f.properties?.is_moving as boolean | null | undefined,
+      }));
+  }, [detail, characterFeatures]);
+
+  const selectedCharacterName = useMemo(() => {
+    if (!detail || detail.type !== "character") return "Character";
+    const feature = characterFeatures.find(
+      (f) => Number(f.properties?.id) === detail.id
+    );
+    return (feature?.properties?.name as string | undefined) ?? "Character";
+  }, [detail, characterFeatures]);
+
   return (
     <div className={styles.mapWrapper}>
       <div ref={containerRef} className={styles.mapContainer} />
       <div ref={tooltipHostRef} className={styles.tooltipHost} />
       {children && <div className={styles.controlsOverlay}>{children}</div>}
+      {detail?.type === "character" && (
+        <DetailCard open title={selectedCharacterName} onClose={() => setDetail(null)}>
+          <CharacterDetail characterId={detail.id} />
+        </DetailCard>
+      )}
+      {detail?.type === "building" && selectedBuildingFeature && (
+        <DetailCard
+          open
+          title={buildingTypeLabel(
+            selectedBuildingFeature.properties?.building_type as string | undefined
+          )}
+          onClose={() => setDetail(null)}
+        >
+          <BuildingDetail
+            buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
+            residents={selectedBuildingResidents}
+            workerCount={selectedBuildingFeature.properties?.workers as number | null | undefined}
+            residentialCapacity={
+              selectedBuildingFeature.properties?.residential_capacity as
+                | number
+                | null
+                | undefined
+            }
+            goods={
+              selectedBuildingFeature.properties?.goods as
+                | { good_type?: string; display?: string }[]
+                | null
+                | undefined
+            }
+            onSelectResident={(characterId) => openDetail({ type: "character", id: characterId })}
+          />
+        </DetailCard>
+      )}
     </div>
   );
 }

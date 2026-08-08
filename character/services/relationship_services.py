@@ -106,6 +106,79 @@ def relationship_get_relationships_of_type(character, relationship_type):
     ).distinct()
 
 
+def relationship_get_household_members(character):
+    """
+    `character`'s MARRIAGE/PARENT_CHILD relationship partners (the types
+    household_services.create_household_relationships creates - see
+    locations/management/commands/generate_characters.py), each as a dict
+    with the other character, the relationship's type, and *their* role in
+    it - `household_relationship_label` needs their role (not `character`'s
+    own) to know whether e.g. a PARENT_CHILD relationship makes them a
+    parent or a child of `character`.
+    """
+    from character.models import CharacterRelationship, RelationshipType
+
+    relationships = (
+        CharacterRelationship.objects.filter(
+            relationship_type__in=[
+                RelationshipType.MARRIAGE,
+                RelationshipType.PARENT_CHILD,
+            ],
+            characters=character,
+        )
+        .prefetch_related("characterrelationshipmembership_set__character")
+        .distinct()
+    )
+
+    members = []
+    for relationship in relationships:
+        memberships = list(relationship.characterrelationshipmembership_set.all())
+        if not any(m.character_id == character.id for m in memberships):
+            continue
+        for membership in memberships:
+            if membership.character_id == character.id:
+                continue
+            members.append(
+                {
+                    "character": membership.character,
+                    "relationship_type": relationship.relationship_type,
+                    "other_role": membership.role,
+                }
+            )
+    return members
+
+
+# Gendered labels for the two relationship types household generation
+# actually produces - keyed by the *other* character's sex (Character.
+# SexChoices), since "husband"/"son" etc. describe them, not `character`.
+_MARRIAGE_LABELS = {"Male": "husband", "Female": "wife"}
+_PARENT_LABELS = {"Male": "father", "Female": "mother"}
+_CHILD_LABELS = {"Male": "son", "Female": "daughter"}
+
+
+def household_relationship_label(relationship_type, other_role, other_sex) -> str:
+    """
+    Human-readable label for the *other* member of one of `character`'s
+    household relationships (relationship_get_household_members above),
+    e.g. "husband"/"mother"/"daughter" - falls back to a generic word for a
+    sex of "Other" or any relationship_type/role combination not covered
+    (defensive only; the two types this is actually called for are always
+    MARRIAGE/SPOUSE or PARENT_CHILD/PARENT|CHILD).
+    """
+    from character.models import RelationshipRole, RelationshipType
+
+    if relationship_type == RelationshipType.MARRIAGE:
+        return _MARRIAGE_LABELS.get(other_sex, "spouse")
+
+    if relationship_type == RelationshipType.PARENT_CHILD:
+        if other_role == RelationshipRole.PARENT:
+            return _PARENT_LABELS.get(other_sex, "parent")
+        if other_role == RelationshipRole.CHILD:
+            return _CHILD_LABELS.get(other_sex, "child")
+
+    return str(relationship_type).replace("_", " ")
+
+
 def relationship_get_family_groups(characters):
     """
     Map each character's id to a group key such that characters connected via

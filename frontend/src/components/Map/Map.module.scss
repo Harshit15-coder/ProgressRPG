@@ -65,6 +65,11 @@
 }
 
 .floatingTooltip {
+  // .tooltipHost above is pointer-events: none so empty space around the
+  // tooltip doesn't block map drags/clicks - re-enable it here so its own
+  // content (e.g. the "View details" button opening the entity detail
+  // card) is actually clickable.
+  pointer-events: auto;
   transform: translate(-50%, calc(-100% - 12px));
   background: white;
   border: 1px solid #888;

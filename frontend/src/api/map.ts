@@ -57,6 +57,35 @@ export function fetchMapViewport(bbox: string): Promise<any> {
   return apiFetch(`/map/viewport/?bbox=${encodeURIComponent(bbox)}`);
 }
 
+export interface MapCharacterRelationship {
+  character_id: number;
+  name: string;
+  // Human-readable ("husband", "daughter", ...) - see
+  // character.services.relationship_services.household_relationship_label.
+  label: string;
+}
+
+export interface MapCharacterDetail {
+  id: number;
+  name: string;
+  age: number;
+  sex: string;
+  home_type: string | null;
+  home_id: number | null;
+  work_type: string | null;
+  current_activity: string | null;
+  is_moving: boolean;
+  relationships: MapCharacterRelationship[];
+}
+
+// On-demand detail for one character's map detail card (MapCharacterDetailView,
+// locations/views.py) - deliberately separate from the bulk per-poll map
+// viewport features, which only carry cheap tooltip-level data (see that
+// view's own docstring).
+export function fetchMapCharacterDetail(characterId: number): Promise<MapCharacterDetail> {
+  return apiFetch(`/map/characters/${characterId}/`);
+}
+
 interface MapWorldBoundsResponse {
   bbox: [number, number, number, number] | null;
 }
