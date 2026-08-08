@@ -9,12 +9,15 @@ const featureFlags: Record<FeatureFlagKey, FeatureFlagValue> = {
   tasksFeature: ['testers'],
   categoriesFeature: [],
   skillsFeature: [],
+  notesFeature: ['testers'],
   projectsFeature: [],
   toastsFeature: [],
   announcements: ['testers'],
   onlinePlayerCount: ['testers'],
   unified_homepage: [],
+  results_mode: [],
   map: ['testers'],
+  todayPointsBadge: ['all'],
 };
 
 export default featureFlags;

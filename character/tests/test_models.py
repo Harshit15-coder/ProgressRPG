@@ -1,6 +1,7 @@
 # character/tests.py
 
 from datetime import date, datetime, timedelta
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils.timezone import now
@@ -12,6 +13,9 @@ from character.models import (
     CharacterRelationship,
     CharacterRelationshipMembership,
     PlayerCharacterLink,
+    RelationshipRole,
+    RelationshipType,
+    RELATIONSHIP_SPECS,
 )
 
 from gameplay.models import QuestCompletion, Quest, QuestResults, QuestTimer
@@ -130,23 +134,85 @@ class CharacterRelationshipMembershipTests(TestCase):
     def test_create_membership(self):
         """Test creating relationship membership"""
         membership = CharacterRelationshipMembership.objects.create(
-            character=self.char, relationship=self.relationship, role="leader"
+            character=self.char,
+            relationship=self.relationship,
+            role=RelationshipRole.PARTICIPANT,
         )
 
         self.assertEqual(membership.character, self.char)
         self.assertEqual(membership.relationship, self.relationship)
-        self.assertEqual(membership.role, "leader")
+        self.assertEqual(membership.role, RelationshipRole.PARTICIPANT)
 
     def test_unique_together_constraint(self):
         """Test that character can't have duplicate memberships in same relationship"""
         CharacterRelationshipMembership.objects.create(
-            character=self.char, relationship=self.relationship
+            character=self.char,
+            relationship=self.relationship,
+            role=RelationshipRole.PARTICIPANT,
         )
 
-        with self.assertRaises(IntegrityError):
+        # clean() (run via save()) reports this as a friendlier ValidationError
+        # before it would ever reach the DB's unique_together constraint.
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=self.char,
+                relationship=self.relationship,
+                role=RelationshipRole.PARTICIPANT,
+            )
+
+    def test_role_must_be_valid_for_relationship_type(self):
+        """A role not in the type's spec is rejected."""
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=self.char,
+                relationship=self.relationship,
+                role=RelationshipRole.PARENT,
+            )
+
+    def test_role_required_for_typed_relationship(self):
+        """Relationship types with a spec require a role, unlike before."""
+        with self.assertRaises(ValidationError):
             CharacterRelationshipMembership.objects.create(
                 character=self.char, relationship=self.relationship
             )
+
+    def test_role_max_count_enforced(self):
+        """A role can't exceed its spec's max participant count."""
+        other = Character.objects.create(
+            first_name="Other", last_name="Character", sex="Male"
+        )
+        romantic = CharacterRelationship.objects.create(relationship_type="romantic")
+        CharacterRelationshipMembership.objects.create(
+            character=self.char,
+            relationship=romantic,
+            role=RelationshipRole.PARTICIPANT,
+        )
+        CharacterRelationshipMembership.objects.create(
+            character=other, relationship=romantic, role=RelationshipRole.PARTICIPANT
+        )
+
+        third = Character.objects.create(
+            first_name="Third", last_name="Character", sex="Female"
+        )
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=third,
+                relationship=romantic,
+                role=RelationshipRole.PARTICIPANT,
+            )
+
+    def test_variant_must_be_allowed_for_relationship_type(self):
+        """variant is validated against the type's allowed_variants."""
+        with self.assertRaises(ValidationError):
+            CharacterRelationship.objects.create(
+                relationship_type=RelationshipType.FRIEND, variant="biological"
+            )
+
+        # PARENT_CHILD allows it.
+        relationship = CharacterRelationship.objects.create(
+            relationship_type=RelationshipType.PARENT_CHILD, variant="biological"
+        )
+        self.assertEqual(relationship.variant, "biological")
 
 
 class LifeCycleMixinTests(TestCase):
@@ -254,8 +320,8 @@ class LifeCycleMixinTests(TestCase):
         # Not working properly! Fix later
         # self.assertEqual(child.sex, "Female")
         self.assertEqual(child.birth_date, now().date())
-        self.assertIn(self.character, child.parents.all())
-        self.assertIn(partner, child.parents.all())
+        self.assertIn(self.character, child.parents)
+        self.assertIn(partner, child.parents)
 
     def test_handle_miscarriage(self):
         """Test miscarriage handling"""
@@ -454,3 +520,65 @@ class CharacterNPCTests(TestCase):
         self.assertFalse(self.npc2.can_link)
 
         self.assertFalse(Character.has_available())
+
+
+class PlayerCharacterLinkPointsTodayTests(TestCase):
+    """Tests for PlayerCharacterLink.player_time_today/points_today (issue #673)."""
+
+    def setUp(self):
+        from users.models import CustomUser
+        from progression.models import PlayerActivity
+
+        self.PlayerActivity = PlayerActivity
+        self.user = CustomUser.objects.create_user(
+            email="today-points@example.com", password="pass12345"
+        )
+        self.player = self.user.player
+        character = Character.objects.create(first_name="Hero", last_name="Link")
+        self.link = PlayerCharacterLink.objects.create(
+            player=self.player, character=character
+        )
+        # Backdated well before "today" so player_time_today's max(start_of_day,
+        # linked_at) resolves to start_of_day in these tests, rather than to
+        # whatever moment setUp happened to run at.
+        self.link.linked_at = now() - timedelta(days=30)
+        self.link.save(update_fields=["linked_at"])
+
+    def _complete_activity(self, *, duration_seconds, completed_at):
+        return self.PlayerActivity.objects.create(
+            player=self.player,
+            is_complete=True,
+            duration=duration_seconds,
+            completed_at=completed_at,
+        )
+
+    def test_points_today_counts_only_activities_completed_today(self):
+        today_start = now().replace(hour=0, minute=0, second=0, microsecond=0)
+        self._complete_activity(
+            duration_seconds=1800, completed_at=today_start + timedelta(hours=2)
+        )  # 30 min today
+        self._complete_activity(
+            duration_seconds=3600, completed_at=today_start - timedelta(hours=1)
+        )  # 60 min yesterday - excluded
+
+        self.assertEqual(self.link.player_time_today, 30)
+        self.assertEqual(self.link.points_today, 3)
+
+    def test_points_today_excludes_activity_before_link_started(self):
+        today_start = now().replace(hour=0, minute=0, second=0, microsecond=0)
+        self.link.linked_at = today_start + timedelta(hours=5)
+        self.link.save(update_fields=["linked_at"])
+
+        self._complete_activity(
+            duration_seconds=1800, completed_at=today_start + timedelta(hours=1)
+        )  # today, but before the link started - excluded
+        self._complete_activity(
+            duration_seconds=600, completed_at=today_start + timedelta(hours=6)
+        )  # 10 min, after linked_at
+
+        self.assertEqual(self.link.player_time_today, 10)
+        self.assertEqual(self.link.points_today, 1)
+
+    def test_points_today_zero_with_no_activities(self):
+        self.assertEqual(self.link.player_time_today, 0)
+        self.assertEqual(self.link.points_today, 0)

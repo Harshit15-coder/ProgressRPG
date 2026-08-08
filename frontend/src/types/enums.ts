@@ -18,12 +18,15 @@ export type FeatureFlagKey =
   | "tasksFeature"
   | "categoriesFeature"
   | "skillsFeature"
+  | "notesFeature"
   | "projectsFeature"
   | "toastsFeature"
   | "announcements"
   | "onlinePlayerCount"
   | "unified_homepage"
-  | "map";
+  | "results_mode"
+  | "map"
+  | "todayPointsBadge";
 
 // ---------------------------------------------------------------------------
 // Timer statuses (Timer.STATUS_CHOICES in gameplay/models.py)

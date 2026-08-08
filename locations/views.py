@@ -1,12 +1,14 @@
 from django.contrib.gis.db.models import Extent
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from character.models import Character
+from progression.models import CharacterActivity
 from locations.models import (
     InteriorSpace,
     Building,
@@ -42,6 +44,21 @@ from .serializers import (
 ##########################################################
 ##### LOCATION VIEWS AND VIEWSETS
 ##########################################################
+
+
+def _current_activity_prefetch(now=None):
+    # Feeds CharacterPointFeatureSerializer._current_activity_name -
+    # prefetches just the one CharacterActivity (if any) active right now
+    # per character, same shape as the active_journey_list Prefetch below,
+    # so the map's tooltip doesn't trigger a query per character.
+    now = now or timezone.now()
+    return Prefetch(
+        "activities",
+        queryset=CharacterActivity.objects.filter(
+            scheduled_start__lte=now, scheduled_end__gt=now
+        ).select_related("activity_definition"),
+        to_attr="current_activity_list",
+    )
 
 
 class PopulationCentreMapView(APIView):
@@ -80,6 +97,7 @@ class PopulationCentreMapView(APIView):
                 queryset=Journey.objects.filter(status="active"),
                 to_attr="active_journey_list",
             ),
+            _current_activity_prefetch(),
         )
 
         features = []
@@ -173,6 +191,7 @@ class MapViewportView(APIView):
                     queryset=Journey.objects.filter(status="active"),
                     to_attr="active_journey_list",
                 ),
+                _current_activity_prefetch(),
             )
         )
 

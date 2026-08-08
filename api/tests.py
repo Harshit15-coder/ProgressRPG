@@ -13,7 +13,7 @@ from unittest.mock import patch, MagicMock
 from character.models import Character, PlayerCharacterLink
 from core.models import Announcement, PlayerAnnouncementState
 from gameplay.models import Quest
-from progression.models import CharacterQuest, PlayerActivity
+from progression.models import Activity, PlayerActivity
 from server_management.models import FeatureFlag
 from users.models import CustomUserManager, Player
 
@@ -195,6 +195,33 @@ class TestMeViewSet(APITestCase):
         player_for(self.user).refresh_from_db()
         self.assertTrue(player_for(self.user).onboarding_completed)
         self.assertEqual(res.data, {"onboarding_completed": True})
+
+    def test_today_points_null_when_no_active_link(self):
+        self.authenticate()
+        player = player_for(self.user)
+        self.assertIsNone(player.active_link)
+
+        res = self.client.get(reverse("me-today-points"))
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertIsNone(res.data["points_today"])
+
+    def test_today_points_reflects_todays_completed_activities(self):
+        self.authenticate()
+        player = player_for(self.user)
+        PlayerCharacterLink.objects.create(player=player, character=self.character)
+
+        PlayerActivity.objects.create(
+            player=player,
+            is_complete=True,
+            duration=1200,  # 20 minutes -> 2 points
+            completed_at=datetime.now(timezone.utc),
+        )
+
+        res = self.client.get(reverse("me-today-points"))
+
+        self.assertEqual(res.status_code, status.HTTP_200_OK)
+        self.assertEqual(res.data["points_today"], 2)
 
 
 class CustomTokenObtainPairViewTests(APITestCase):
@@ -403,7 +430,7 @@ class AppConfigViewTests(APITestCase):
         )
 
 
-class PlayerActivityGroupKeyAPITests(APITestCase):
+class PlayerActivityActivityLinkAPITests(APITestCase):
     def setUp(self):
         self.user = create_test_user(
             email="activity-groups@example.com",
@@ -412,16 +439,10 @@ class PlayerActivityGroupKeyAPITests(APITestCase):
         self.client.force_authenticate(user=self.user)
         self.url = reverse("playeractivity-list")
 
-    def test_create_reuses_dominant_exact_match_group_key(self):
-        PlayerActivity.objects.create(
+    def test_create_reuses_case_insensitive_matching_activity(self):
+        existing = PlayerActivity.objects.create(
             player=player_for(self.user),
             name="Morning planning",
-            group_key="morning-planning",
-        )
-        PlayerActivity.objects.create(
-            player=player_for(self.user),
-            name="morning planning",
-            group_key="morning-planning",
         )
 
         response = self.client.post(
@@ -432,6 +453,9 @@ class PlayerActivityGroupKeyAPITests(APITestCase):
 
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
         self.assertEqual(
-            response.data["activity"]["group_key"],
-            "morning-planning",
+            response.data["activity"]["activity"],
+            existing.activity_id,
+        )
+        self.assertEqual(
+            Activity.objects.filter(player=player_for(self.user)).count(), 1
         )

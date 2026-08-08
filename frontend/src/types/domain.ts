@@ -213,9 +213,26 @@ export interface Task {
   is_complete: boolean;
   completed_at: string | null;
   first_completed_at: string | null;
+  due_at: string | null;
+  parent: number | null;
+  subtask_count: number;
   total_time: number;
   total_records: number;
   last_worked_on: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// Note (progression/serializers.py — NoteSerializer)
+// ---------------------------------------------------------------------------
+
+export interface Note {
+  id: number;
+  title: string;
+  body: string;
+  player: number;
+  task: number | null;
+  created_at: string;
+  last_updated: string;
 }
 
 // ---------------------------------------------------------------------------
