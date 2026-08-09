@@ -10,7 +10,6 @@ Covers:
 
 from datetime import datetime, time, timedelta
 
-from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -25,7 +24,7 @@ from progression.services import (
     log_offline_activity,
 )
 
-User = get_user_model()
+from users.tests import user_factory
 
 
 def past_local_day_start(days_ago: int = 1):
@@ -41,9 +40,7 @@ def past_local_day_start(days_ago: int = 1):
 
 class OfflineLoggingTestBase(TestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="offline-log@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
     def grant_premium(self):
@@ -248,13 +245,9 @@ class LogOfflineActivityServiceTests(OfflineLoggingTestBase):
 
 class PlayerActivityLogOfflineApiTests(APITestCase):
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="offline-api@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
-        self.other_user = User.objects.create_user(
-            email="offline-intruder@example.com", password="testpass123"
-        )
+        self.other_user = user_factory(with_player=True)
         self.client.force_authenticate(user=self.user)
 
     def _log(self, **overrides):

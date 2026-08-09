@@ -18,6 +18,8 @@ from character.models import (
     RELATIONSHIP_SPECS,
 )
 
+from users.tests import user_factory
+
 
 class CharacterRelationshipTests(TestCase):
     def setUp(self):
@@ -423,9 +425,7 @@ class CharacterNPCTests(TestCase):
         # Create a player-linked character
         # When creating a user, signals automatically create a player and assign a character
         # We need to deactivate the auto-assigned link first
-        self.user = CustomUser.objects.create_user(
-            email="test@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
         # Deactivate any auto-assigned character links
@@ -489,11 +489,10 @@ class CharacterNPCTests(TestCase):
 
     def test_has_available_all_linked(self):
         """Test has_available returns False when all linkable characters are linked"""
-        from users.models import CustomUser
         from character.models import PlayerCharacterLink
 
-        user1 = CustomUser.objects.create_user(email="user1@test.com", password="pass")
-        user2 = CustomUser.objects.create_user(email="user2@test.com", password="pass")
+        user1 = user_factory(with_player=True)
+        user2 = user_factory(with_player=True)
 
         PlayerCharacterLink.assign_character(player=user1.player, character=self.npc1)
         PlayerCharacterLink.assign_character(player=user2.player, character=self.npc2)
@@ -511,13 +510,10 @@ class PlayerCharacterLinkPointsTodayTests(TestCase):
     """Tests for PlayerCharacterLink.player_time_today/points_today (issue #673)."""
 
     def setUp(self):
-        from users.models import CustomUser
         from progression.models import PlayerActivity
 
         self.PlayerActivity = PlayerActivity
-        self.user = CustomUser.objects.create_user(
-            email="today-points@example.com", password="pass12345"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         character = Character.objects.create(given_name="Hero")
         self.link = PlayerCharacterLink.objects.create(
