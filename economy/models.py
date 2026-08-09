@@ -127,6 +127,42 @@ class GoodsStock(models.Model):
         return round(storage_area * STORAGE_CAPACITY_PER_AREA_WEIGHT)
 
 
+class BuildingCapability(models.Model):
+    """
+    A production activity a `Building` is capable of - e.g. a `mill`
+    building has a `milling` capability, but a `communal` building could
+    hold both `milling` and `baking`. Additive alongside
+    `Building.building_type`, which keeps driving unrelated concerns
+    (working hours, flavor text, map/UI display) - see
+    .claude/plans/building-capabilities-plan.md.
+
+    Deliberately excludes storage (`granary`) and farming presence
+    (`field_shelter`, which already tracks its crop via
+    `FieldCrop.shelter_building` rather than a type lookup) - neither is a
+    labor-capped production activity a capability would add anything to.
+    """
+
+    class Activity(models.TextChoices):
+        MILLING = "milling", "Milling"
+        BAKING = "baking", "Baking"
+        FARMING = "farming", "Farming"
+
+    building = models.ForeignKey(
+        "locations.Building", on_delete=models.CASCADE, related_name="capabilities"
+    )
+    activity = models.CharField(max_length=20, choices=Activity.choices)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=["building", "activity"], name="uniq_capability_per_building"
+            ),
+        ]
+
+    def __str__(self):
+        return f"{self.activity} @ {self.building_id}"
+
+
 class GoodsConversionState(models.Model):
     """
     Per-building idempotency guard for a daily goods-conversion task (e.g.
