@@ -130,6 +130,14 @@ class CharacterPointFeatureSerializerTest(TestCase):
         props = self.properties()
         self.assertIsNone(props["current_activity"])
 
+    def test_is_moving_reflects_character_state(self):
+        self.assertFalse(self.properties()["is_moving"])
+
+        self.character.is_moving = True
+        self.character.save(update_fields=["is_moving"])
+
+        self.assertTrue(self.properties()["is_moving"])
+
     def test_current_activity_uses_present_tense_narrative(self):
         activity_definition = ActivityDefinition.objects.create(
             name="Deliver goods to neighbours",

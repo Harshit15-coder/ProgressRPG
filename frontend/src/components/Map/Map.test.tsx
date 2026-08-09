@@ -766,6 +766,34 @@ describe('PopulationCentreMap', () => {
     expect(tooltip).toHaveTextContent('delivering goods to neighbours');
   });
 
+  it('shows "walking" in a character tooltip when the character is moving, overriding their scheduled activity', async () => {
+    const geojsonWithMovingCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            current_activity: 'delivering goods to neighbours',
+            is_moving: true,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithMovingCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Currently: walking');
+    expect(tooltip).not.toHaveTextContent('delivering goods to neighbours');
+  });
+
   it('omits the current activity line when a character has none scheduled', async () => {
     const geojsonWithCharacter = {
       ...baseGeojson,

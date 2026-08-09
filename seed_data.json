@@ -25,7 +25,6 @@
     "model": "character.character",
     "pk": 1,
     "fields": {
-      "name": "Elrond",
       "xp": 0,
       "xp_next_level": 100,
       "xp_modifier": 1.0,
@@ -50,7 +49,6 @@
     "model": "character.character",
     "pk": 2,
     "fields": {
-      "name": "Gareth Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -75,7 +73,6 @@
     "model": "character.character",
     "pk": 3,
     "fields": {
-      "name": "Agnes Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -100,7 +97,6 @@
     "model": "character.character",
     "pk": 4,
     "fields": {
-      "name": "Tristan Holloway",
       "xp": 18,
       "xp_next_level": 200,
       "xp_modifier": 1.0,
@@ -125,7 +121,6 @@
     "model": "character.character",
     "pk": 5,
     "fields": {
-      "name": "Mira Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -150,7 +145,6 @@
     "model": "character.character",
     "pk": 6,
     "fields": {
-      "name": "Oswin Holloway",
       "xp": 18,
       "xp_next_level": 200,
       "xp_modifier": 1.0,
@@ -175,7 +169,6 @@
     "model": "character.character",
     "pk": 7,
     "fields": {
-      "name": "Callum Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -200,7 +193,6 @@
     "model": "character.character",
     "pk": 8,
     "fields": {
-      "name": "Eda Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -225,7 +217,6 @@
     "model": "character.character",
     "pk": 9,
     "fields": {
-      "name": "Nico Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -250,7 +241,6 @@
     "model": "character.character",
     "pk": 10,
     "fields": {
-      "name": "Aldwin Weaver",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -275,7 +265,6 @@
     "model": "character.character",
     "pk": 11,
     "fields": {
-      "name": "Rosalind Weaver",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -300,7 +289,6 @@
     "model": "character.character",
     "pk": 12,
     "fields": {
-      "name": "Edric Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -325,7 +313,6 @@
     "model": "character.character",
     "pk": 13,
     "fields": {
-      "name": "Elias Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -350,7 +337,6 @@
     "model": "character.character",
     "pk": 14,
     "fields": {
-      "name": "Freya Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -375,7 +361,6 @@
     "model": "character.character",
     "pk": 15,
     "fields": {
-      "name": "Viggo Stormvale",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -400,7 +385,6 @@
     "model": "character.character",
     "pk": 16,
     "fields": {
-      "name": "Ella Stormvale",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -425,7 +409,6 @@
     "model": "character.character",
     "pk": 17,
     "fields": {
-      "name": "Dain Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -450,7 +433,6 @@
     "model": "character.character",
     "pk": 18,
     "fields": {
-      "name": "Anwen Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -475,7 +457,6 @@
     "model": "character.character",
     "pk": 19,
     "fields": {
-      "name": "Ronan Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -500,7 +481,6 @@
     "model": "character.character",
     "pk": 20,
     "fields": {
-      "name": "Elena Fenwick",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -525,7 +505,6 @@
     "model": "character.character",
     "pk": 21,
     "fields": {
-      "name": "Ivy Fenwick",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -550,7 +529,6 @@
     "model": "character.character",
     "pk": 22,
     "fields": {
-      "name": "Ysabet Ashford",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -575,7 +553,6 @@
     "model": "character.character",
     "pk": 23,
     "fields": {
-      "name": "Rowenna Ashford",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -600,7 +577,6 @@
     "model": "character.character",
     "pk": 24,
     "fields": {
-      "name": "Loralei Dewhurst",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -625,7 +601,6 @@
     "model": "character.character",
     "pk": 25,
     "fields": {
-      "name": "Ronan Blackthorne",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -650,7 +625,6 @@
     "model": "character.character",
     "pk": 26,
     "fields": {
-      "name": "Marwen Brightwater",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -675,7 +649,6 @@
     "model": "character.character",
     "pk": 27,
     "fields": {
-      "name": "Theo Brightwater",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -700,7 +673,6 @@
     "model": "character.character",
     "pk": 28,
     "fields": {
-      "name": "Dain Ironhand",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -725,7 +697,6 @@
     "model": "character.character",
     "pk": 29,
     "fields": {
-      "name": "Sylvie Briarwood",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -750,7 +721,6 @@
     "model": "character.character",
     "pk": 30,
     "fields": {
-      "name": "Baldric Holt",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -775,7 +745,6 @@
     "model": "character.character",
     "pk": 31,
     "fields": {
-      "name": "Thea Lockwood",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,

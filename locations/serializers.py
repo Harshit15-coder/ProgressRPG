@@ -145,6 +145,7 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
             "work_type": self._primary_location_type(obj, CharacterLocation.Role.WORK),
             "hunger_label": needs.hunger_label() if needs else None,
             "current_activity": self._current_activity_name(obj),
+            "is_moving": obj.is_moving,
             "effective_speed": obj.movement_speed,
             "path": path,
         }

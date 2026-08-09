@@ -40,6 +40,13 @@ class Command(BaseCommand):
             self.stdout.write("=== Spawning villages ===")
             call_command("spawn_villages", num_centres=1)
 
+        self.stdout.write("=== Generating characters ===")
+        # Must run after buildings exist (residential capacity drives how
+        # many characters get generated) and before place_characters below,
+        # which also handles linked player characters and any characters
+        # left unhoused here.
+        call_command("generate_characters")
+
         self.stdout.write("=== Placing characters ===")
         call_command("place_characters")
 

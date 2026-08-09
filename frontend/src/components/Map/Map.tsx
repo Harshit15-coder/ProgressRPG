@@ -295,6 +295,7 @@ export default function PopulationCentreMap({
               home={homeType ? buildingTypeLabel(homeType) : undefined}
               work={workType ? buildingTypeLabel(workType) : undefined}
               currentActivity={feature.properties?.current_activity as string | null | undefined}
+              isMoving={feature.properties?.is_moving as boolean | null | undefined}
             />
           ),
           lngLat: [e.lngLat.lng, e.lngLat.lat],
