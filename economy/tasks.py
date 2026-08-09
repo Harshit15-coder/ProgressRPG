@@ -25,7 +25,7 @@ from .services.capacity_services import (
     find_bakery,
     find_granary,
     find_mill,
-    workers_present,
+    worker_capacity_present,
 )
 from locations.models import Building
 
@@ -99,7 +99,7 @@ def _harvest(crop):
         crop.stage = FieldCrop.Stage.FALLOW
         return
 
-    present = workers_present(crop.shelter_building)
+    present = worker_capacity_present(crop.shelter_building)
     today_yield = min(remaining, present * PER_WORKER_DAILY_CAPACITY)
     if today_yield <= 0:
         return
@@ -161,7 +161,7 @@ def advance_mill_economy_tick(today=None):
 
         granary = find_granary(mill.population_centre)
         if granary is not None:
-            present = workers_present(mill)
+            present = worker_capacity_present(mill)
             flour_buffer_target = (
                 daily_flour_demand(mill.population_centre) * FLOUR_BUFFER_DAYS
             )
@@ -214,7 +214,7 @@ def advance_bakery_economy_tick(today=None):
 
         mill = find_mill(bakery.population_centre)
         if mill is not None:
-            present = workers_present(bakery)
+            present = worker_capacity_present(bakery)
             demand = daily_bread_demand(bakery.population_centre)
             bread_stock = GoodsStock.objects.filter(
                 building=bakery, good_type=GoodsStock.GoodType.BREAD
