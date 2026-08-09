@@ -24,7 +24,7 @@ services:
   web:
     build:
       context: .
-      target: web
+      target: dev
     command: >
       sh -c "
       daphne -b 0.0.0.0 -p ${PORT:-8000} progress_rpg.asgi:application &
@@ -106,6 +106,8 @@ services:
       context: .
       target: celery
     command: celery -A progress_rpg worker --loglevel=info --concurrency=1 --prefetch-multiplier=1
+    volumes:
+      - .:/app
     depends_on:
       redis:
         condition: service_healthy
@@ -122,6 +124,8 @@ services:
     build:
       context: .
       target: celery-beat
+    volumes:
+      - .:/app
     depends_on:
       redis:
         condition: service_healthy
