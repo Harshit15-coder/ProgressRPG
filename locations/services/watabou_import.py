@@ -22,15 +22,20 @@ import_watabou_village's management command) rather than trying to derive
 walkable edges from arbitrary imported road geometry.
 """
 
+import logging
 from typing import cast
 
 from django.contrib.gis.geos import LineString, Point, Polygon
 from django.db import transaction
 
+from economy.services.planning_services import settlement_plan
 from locations.management.commands.spawn_villages import (
     compute_building_entrance_point,
 )
 from locations.models import Building, LandArea, Node, PopulationCentre, Road, Subzone
+from locations.services import population_estimation
+
+logger = logging.getLogger("general")
 
 # GEOS areas in this module are in SRID 3857 coordinates, which - per the
 # "just metres, no real georeferencing" convention described above - are
@@ -240,5 +245,24 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
 
     if fields_feature and fields_feature.get("type") == "MultiPolygon":
         _import_fields(fields_feature, population_centre, offset)
+
+    # Compute-and-log only for now (see population_estimation's module
+    # docstring and .claude/plans/village-capacity-sizing-plan.md step 3) -
+    # this doesn't yet change which buildings get created. It's here to
+    # validate the recommended plan against real imported village files
+    # before generation behaviour changes in a later step.
+    estimated_population = population_estimation.starting_population(population_centre)
+    recommended_plan = settlement_plan(population=estimated_population)
+    logger.info(
+        "%s: estimated starting population %s -> recommended plan "
+        "(granaries=%s, milling buildings=%s, baking buildings=%s, "
+        "farming buildings=%s)",
+        population_centre.name,
+        estimated_population,
+        recommended_plan.recommended_granaries,
+        recommended_plan.milling.recommended_buildings,
+        recommended_plan.baking.recommended_buildings,
+        recommended_plan.farming.recommended_buildings,
+    )
 
     return population_centre

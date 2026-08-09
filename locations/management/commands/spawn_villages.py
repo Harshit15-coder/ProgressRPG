@@ -2,7 +2,9 @@ import math
 import random
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import Point, Polygon, MultiPolygon
+from economy.services.planning_services import settlement_plan
 from locations.models import PopulationCentre, Building, InteriorSpace, Node, Path
+from locations.services import population_estimation
 from locations.utils import perturb_quad_corners, rotate_point
 from locations.village_names import VILLAGE_NAMES
 from math import sqrt
@@ -380,6 +382,22 @@ class Command(BaseCommand):
                         "location": entrance_point,
                     },
                 )
+
+            # Compute-and-log only for now (see population_estimation's
+            # module docstring and
+            # .claude/plans/village-capacity-sizing-plan.md step 3) - this
+            # doesn't yet change which buildings get created. It's here to
+            # validate the recommended plan against real generated villages
+            # before generation behaviour changes in a later step.
+            estimated_population = population_estimation.starting_population(centre)
+            recommended_plan = settlement_plan(population=estimated_population)
+            self.stdout.write(
+                f"  Estimated starting population {estimated_population} -> "
+                f"recommended plan (granaries={recommended_plan.recommended_granaries}, "
+                f"milling buildings={recommended_plan.milling.recommended_buildings}, "
+                f"baking buildings={recommended_plan.baking.recommended_buildings}, "
+                f"farming buildings={recommended_plan.farming.recommended_buildings})"
+            )
 
             if not existing_centre:
                 centres_positions.append(new_point)
