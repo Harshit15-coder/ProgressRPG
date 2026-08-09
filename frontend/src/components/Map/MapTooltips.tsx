@@ -81,6 +81,14 @@ interface CharacterTooltipProps {
   onViewDetails?: () => void;
 }
 
+// Tooltip location words read lower-case ("at bakery", "to the mill"), and
+// "house" reads as "home" here - a character's own residence, not a
+// building type label.
+function tooltipLocationWord(label: string): string {
+  const lower = label.toLowerCase();
+  return lower === "house" ? "home" : lower;
+}
+
 export function CharacterTooltipContent({
   name,
   currentActivity,
@@ -89,14 +97,16 @@ export function CharacterTooltipContent({
   destinationLabel,
   onViewDetails,
 }: CharacterTooltipProps) {
+  const activityLabel =
+    currentActivity && currentActivity.charAt(0).toUpperCase() + currentActivity.slice(1);
   const statusLine = isMoving
     ? destinationLabel
-      ? `Walking to ${destinationLabel}`
+      ? `Walking to ${tooltipLocationWord(destinationLabel)}`
       : "Walking outside"
-    : currentActivity &&
+    : activityLabel &&
       (currentLocationLabel
-        ? `${currentActivity} at ${currentLocationLabel}`
-        : `${currentActivity} outside`);
+        ? `${activityLabel} at ${tooltipLocationWord(currentLocationLabel)}`
+        : `${activityLabel} outside`);
 
   return (
     <div>

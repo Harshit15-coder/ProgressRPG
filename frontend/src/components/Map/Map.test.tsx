@@ -801,10 +801,10 @@ describe('PopulationCentreMap', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
-    // current_location_type is the building_type ("bakery"), not the
-    // building's bookkeeping name - resolved to the same plain label
-    // ("Bakery") shown on that building's own tooltip.
-    expect(tooltip).toHaveTextContent('delivering goods to neighbours at Bakery');
+    // current_location_type is the building_type ("bakery"), resolved to
+    // the plain label used elsewhere ("Bakery") - the activity gets an
+    // initial capital, the location word stays lower-case.
+    expect(tooltip).toHaveTextContent('Delivering goods to neighbours at bakery');
   });
 
   it('shows "outside" in a character tooltip when their current location has no building', async () => {
@@ -831,7 +831,7 @@ describe('PopulationCentreMap', () => {
     });
 
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent('foraging outside');
+    expect(tooltip).toHaveTextContent('Foraging outside');
   });
 
   it('shows "Walking to [destination]" in a character tooltip when the character is moving, instead of their scheduled activity', async () => {
@@ -859,8 +859,36 @@ describe('PopulationCentreMap', () => {
     });
 
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent('Walking to Bakery');
+    expect(tooltip).toHaveTextContent('Walking to bakery');
     expect(tooltip).not.toHaveTextContent('delivering goods to neighbours');
+  });
+
+  it('shows "home" instead of "house" when a character is at or walking to their residence', async () => {
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            current_activity: 'sleeping',
+            current_location_type: 'residential',
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Sleeping at home');
+    expect(tooltip).not.toHaveTextContent('house');
   });
 
   it('shows "Walking outside" when a moving character\'s destination has no building', async () => {
