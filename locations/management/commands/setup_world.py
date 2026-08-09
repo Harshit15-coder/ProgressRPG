@@ -85,4 +85,12 @@ class Command(BaseCommand):
         self.stdout.write("=== Assigning workers ===")
         call_command("assign_workers")
 
+        self.stdout.write("=== Generating character days ===")
+        try:
+            from character.tasks import generate_character_days
+
+            generate_character_days()
+        except ImportError as e:
+            self.stderr.write(f"Could not generate character days: {e}")
+
         self.stdout.write(self.style.SUCCESS("All setup tasks completed!"))
