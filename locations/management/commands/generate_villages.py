@@ -2,13 +2,26 @@ import math
 import random
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import Point, Polygon, MultiPolygon
+from economy.models import BuildingCapability
+from economy.services.planning_services import settlement_plan
 from locations.models import PopulationCentre, Building, InteriorSpace, Node, Path
+from locations.services import population_estimation
 from locations.utils import perturb_quad_corners, rotate_point
 from locations.village_names import VILLAGE_NAMES
 from math import sqrt
 
 
 SPECIAL_BUILDINGS = ["granary", "inn", "mill", "bakery", "communal"]
+# Which of SPECIAL_BUILDINGS get a BuildingCapability row - granary/inn/
+# communal aren't labor-capped production activities (see
+# economy.models.BuildingCapability's docstring); mill/bakery are, and
+# without this the mill/bakery buildings this command creates would be
+# invisible to capacity_services.find_mill/find_bakery, which look up
+# capabilities__activity rather than building_type.
+SPECIAL_BUILDING_CAPABILITIES = {
+    "mill": BuildingCapability.Activity.MILLING,
+    "bakery": BuildingCapability.Activity.BAKING,
+}
 RESIDENTIAL_PER_VILLAGE = 5
 IRREGULARITY = 0
 BUILDING_BUFFER = 2
@@ -331,6 +344,11 @@ class Command(BaseCommand):
                     footprint=footprint,
                     population_centre=None,
                 )
+                activity = SPECIAL_BUILDING_CAPABILITIES.get(building_type)
+                if activity:
+                    BuildingCapability.objects.create(
+                        building=building, activity=activity
+                    )
 
                 placed_building_points.append(building_point)
                 created_buildings.append(building)
@@ -380,6 +398,22 @@ class Command(BaseCommand):
                         "location": entrance_point,
                     },
                 )
+
+            # Compute-and-log only for now (see population_estimation's
+            # module docstring and
+            # .claude/plans/village-capacity-sizing-plan.md step 3) - this
+            # doesn't yet change which buildings get created. It's here to
+            # validate the recommended plan against real generated villages
+            # before generation behaviour changes in a later step.
+            estimated_population = population_estimation.starting_population(centre)
+            recommended_plan = settlement_plan(population=estimated_population)
+            self.stdout.write(
+                f"  Estimated starting population {estimated_population} -> "
+                f"recommended plan (granaries={recommended_plan.recommended_granaries}, "
+                f"milling buildings={recommended_plan.milling.recommended_buildings}, "
+                f"baking buildings={recommended_plan.baking.recommended_buildings}, "
+                f"farming buildings={recommended_plan.farming.recommended_buildings})"
+            )
 
             if not existing_centre:
                 centres_positions.append(new_point)

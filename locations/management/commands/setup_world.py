@@ -33,7 +33,7 @@ class Command(BaseCommand):
             call_command("import_villages")
         else:
             self.stdout.write("=== Spawning villages ===")
-            call_command("spawn_villages", num_centres=1)
+            call_command("generate_villages", num_centres=1)
 
         self.stdout.write("=== Generating characters ===")
         # Must run after buildings exist (residential capacity drives how
@@ -54,7 +54,7 @@ class Command(BaseCommand):
             self.stdout.write("=== Generating land areas ===")
             # Must run before generate_fields, which attaches each FieldCrop to
             # the "crops" Subzone this creates - only needs boundary/location/
-            # residents, all already set by spawn_villages.
+            # residents, all already set by generate_villages.
             call_command("generate_landarea")
 
         # Unlike generate_landarea, generate_fields is safe (and needed) for
