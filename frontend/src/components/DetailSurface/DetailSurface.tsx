@@ -23,6 +23,11 @@ interface DetailSurfaceProps {
    * Map) stays fully interactive - for a docked side panel, which is meant
    * to keep browsing alongside rather than block it. */
   modal?: boolean;
+  /** DOM node to portal into instead of document.body (Radix's default) -
+   * e.g. Map's own wrapper element, so a non-modal docked panel (see
+   * MapDetailCard) positions relative to the map rather than the
+   * viewport. */
+  container?: HTMLElement | null;
 }
 
 export default function DetailSurface({
@@ -31,10 +36,11 @@ export default function DetailSurface({
   title,
   children,
   modal = true,
+  container,
 }: DetailSurfaceProps) {
   return (
     <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={modal}>
-      <DialogPrimitive.Portal>
+      <DialogPrimitive.Portal container={container ?? undefined}>
         {modal && <DialogPrimitive.Overlay className={styles.overlay} />}
         <DialogPrimitive.Content
           className={styles.content}

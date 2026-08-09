@@ -9,28 +9,6 @@
   gap: sp.$spacing-md;
 }
 
-.facts {
-  display: flex;
-  flex-direction: column;
-  gap: sp.$spacing-sm;
-  margin: 0;
-}
-
-.fact {
-  display: flex;
-  justify-content: space-between;
-  gap: sp.$spacing-gap;
-
-  dt {
-    @include c.apply-text-tone(map.get(c.$text-tone, muted));
-  }
-
-  dd {
-    margin: 0;
-    text-align: right;
-  }
-}
-
 .section {
   display: flex;
   flex-direction: column;
@@ -41,6 +19,17 @@
   margin: 0;
   font-size: 0.95rem;
   @include c.apply-text-tone(map.get(c.$text-tone, muted));
+}
+
+.sectionHeadingRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: sp.$spacing-gap;
+}
+
+.sectionCount {
+  text-align: right;
 }
 
 .goodsList {

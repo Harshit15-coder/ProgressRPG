@@ -1,10 +1,8 @@
-from django.contrib.auth import get_user_model
-
 from progression.models import Activity, Category, PlayerActivity, PlayerSkill
 from users.models import Player
 from .base import BaseTestCase
 
-User = get_user_model()
+from users.tests import user_factory
 
 
 class ActivityModelTests(BaseTestCase):
@@ -79,7 +77,7 @@ class ActivityModelTests(BaseTestCase):
         self.assertEqual(session.activity_id, first.activity_id)
 
     def test_activities_are_not_shared_across_players(self):
-        other_user = User.objects.create_user(email="other@test.com", password="pass")
+        other_user = user_factory(with_player=True)
         other_player, _ = Player.objects.get_or_create(user=other_user)
 
         mine = PlayerActivity.objects.create(player=self.player, name="Deep Work")

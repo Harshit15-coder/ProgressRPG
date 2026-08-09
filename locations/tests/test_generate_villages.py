@@ -4,7 +4,7 @@ from django.contrib.gis.geos import Point
 from django.core.management import call_command
 from django.test import TestCase
 
-from locations.management.commands.spawn_villages import (
+from locations.management.commands.generate_villages import (
     BUILDING_ZONES,
     create_building_footprint,
 )
@@ -42,7 +42,7 @@ class BuildingFootprintRotationTest(TestCase):
 class SpawnVillagesZoneGroupingTest(TestCase):
     def test_same_zone_buildings_cluster_closer_than_different_zone_buildings(self):
         random.seed(42)
-        call_command("spawn_villages", num_centres=1, grid_size=5000, min_distance=3)
+        call_command("generate_villages", num_centres=1, grid_size=5000, min_distance=3)
 
         centre = PopulationCentre.objects.get()
         buildings = list(centre.buildings.all())

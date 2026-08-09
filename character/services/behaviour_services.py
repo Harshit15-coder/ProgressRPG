@@ -7,6 +7,7 @@ from django.db import transaction
 from django.utils import timezone
 
 from character.utils import window_for_date, work_activities_for
+from locations.services.schedule import work_hours_for
 from progression.models import ActivityDefinition, CharacterActivity
 
 _FIXED_KINDS = [
@@ -54,32 +55,39 @@ def generate_day(behaviour, date, replace_future=True):
     def jitter_minutes(base_dt, minutes):
         return base_dt + timedelta(minutes=rng.randint(-minutes, minutes))
 
-    sleep_start = aware(date, time(23, 0))
     wake = aware(date, time(7, 0))
     wake = jitter_minutes(wake, 15)
 
     morning_start = wake
     morning_end = morning_start + timedelta(hours=1)
 
-    work1_start = morning_end
-    work1_end = aware(date, time(12, 0))
+    # The work window comes from the character's actual assigned work
+    # building's hours (same source movement uses - see
+    # locations.services.schedule.target_role_for) rather than a fixed
+    # 8-17 assumption, so e.g. an inn open until 23:00 keeps its workers'
+    # scheduled activity as "working" that late instead of falling through
+    # to the fixed evening leisure block.
+    default_work_start, default_work_end = work_hours_for(behaviour.character)
+    work_start = max(morning_end, aware(date, default_work_start))
+    work_end = aware(date, default_work_end)
 
-    lunch_start = work1_end
-    lunch_start = jitter_minutes(lunch_start, 10)
+    lunch_midpoint = work_start + (work_end - work_start) / 2
+    lunch_start = jitter_minutes(lunch_midpoint, 10)
     lunch_end = lunch_start + timedelta(hours=1)
 
+    work1_start = work_start
+    work1_end = lunch_start
     work2_start = lunch_end
-    work2_end = aware(date, time(17, 0))
+    work2_end = work_end
 
-    dinner_start = aware(date, time(17, 30))
-    dinner_start = jitter_minutes(dinner_start, 10)
+    dinner_start = jitter_minutes(max(work_end, aware(date, time(17, 30))), 10)
     dinner_end = dinner_start + timedelta(hours=1)
 
     leisure_start = dinner_end
-    leisure_end = aware(date, time(22, 30))
+    leisure_end = max(leisure_start, aware(date, time(22, 30)))
 
     wind_start = leisure_end
-    wind_end = aware(date, time(23, 0))
+    wind_end = max(wind_start, aware(date, time(23, 0)))
 
     day_window(behaviour, date)
 
@@ -87,7 +95,7 @@ def generate_day(behaviour, date, replace_future=True):
     next_wake = aware(next_day, time(7, 0))
     next_wake = jitter_minutes(next_wake, 15)
 
-    sleep_start = aware(date, time(23, 0))
+    sleep_start = wind_end
     sleep_end = next_wake
 
     fixed = _fixed_activity_definitions()

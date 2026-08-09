@@ -90,12 +90,15 @@ class PopulationCentreMapView(APIView):
         )
         roads = population_centre.roads.all()
         characters = population_centre.residents.select_related(
-            "needs"
+            "needs", "current_node__building", "current_node__interior_space__building"
         ).prefetch_related(
             "locations__location",
             Prefetch(
                 "journeys",
-                queryset=Journey.objects.filter(status="active"),
+                queryset=Journey.objects.filter(status="active").select_related(
+                    "destination_node__building",
+                    "destination_node__interior_space__building",
+                ),
                 to_attr="active_journey_list",
             ),
             _current_activity_prefetch(),
@@ -184,12 +187,19 @@ class MapViewportView(APIView):
         roads = Road.objects.filter(geom__bboverlaps=bbox)
         characters = (
             Character.objects.filter(location__contained=bbox)
-            .select_related("needs")
+            .select_related(
+                "needs",
+                "current_node__building",
+                "current_node__interior_space__building",
+            )
             .prefetch_related(
                 "locations__location",
                 Prefetch(
                     "journeys",
-                    queryset=Journey.objects.filter(status="active"),
+                    queryset=Journey.objects.filter(status="active").select_related(
+                        "destination_node__building",
+                        "destination_node__interior_space__building",
+                    ),
                     to_attr="active_journey_list",
                 ),
                 _current_activity_prefetch(),
@@ -234,11 +244,18 @@ class MapCharacterDetailView(APIView):
 
     def get(self, request, pk):
         character = get_object_or_404(
-            Character.objects.select_related("needs").prefetch_related(
+            Character.objects.select_related(
+                "needs",
+                "current_node__building",
+                "current_node__interior_space__building",
+            ).prefetch_related(
                 "locations__location",
                 Prefetch(
                     "journeys",
-                    queryset=Journey.objects.filter(status="active"),
+                    queryset=Journey.objects.filter(status="active").select_related(
+                        "destination_node__building",
+                        "destination_node__interior_space__building",
+                    ),
                     to_attr="active_journey_list",
                 ),
                 _current_activity_prefetch(),

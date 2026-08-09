@@ -21,17 +21,16 @@ def _stagger_offset_seconds(character_id: int) -> int:
     return (character_id % span) - MAX_STAGGER_SECONDS
 
 
-def target_role_for(character, now=None) -> str:
-    """Which role (home/work) a character should currently be at.
-
-    The work window comes from the character's assigned work building's
-    open_time/close_time if set, else falls back to the fixed WORK_START/
-    WORK_END constants. A per-character stagger is applied to whichever
-    window is resolved, so the whole village doesn't flip in lockstep."""
+def work_hours_for(character) -> tuple[time, time]:
+    """The (open, close) window a character should be at work, from their
+    assigned work building's open_time/close_time if set, else the fixed
+    WORK_START/WORK_END constants. Shared by target_role_for (drives
+    physical movement) and behaviour_services.generate_day (drives the
+    scheduled CharacterActivity blocks), so a character's actual work
+    building's hours - e.g. an inn open until 23:00 - govern both rather
+    than generate_day assuming a fixed 8-17 workday that leaves late
+    building hours showing as an unrelated leisure/"Relaxing" block."""
     from character.models import CharacterLocation
-
-    now = now or timezone.localtime()
-    seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
 
     work_start, work_end = WORK_START, WORK_END
     work_location = (
@@ -45,6 +44,22 @@ def target_role_for(character, now=None) -> str:
         building = work_location.location
         if building.open_time is not None and building.close_time is not None:
             work_start, work_end = building.open_time, building.close_time
+    return work_start, work_end
+
+
+def target_role_for(character, now=None) -> str:
+    """Which role (home/work) a character should currently be at.
+
+    The work window comes from the character's assigned work building's
+    open_time/close_time if set, else falls back to the fixed WORK_START/
+    WORK_END constants. A per-character stagger is applied to whichever
+    window is resolved, so the whole village doesn't flip in lockstep."""
+    from character.models import CharacterLocation
+
+    now = now or timezone.localtime()
+    seconds_since_midnight = now.hour * 3600 + now.minute * 60 + now.second
+
+    work_start, work_end = work_hours_for(character)
 
     offset = _stagger_offset_seconds(character.id)
     work_start_seconds = work_start.hour * 3600 + work_start.minute * 60 + offset
