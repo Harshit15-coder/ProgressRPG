@@ -19,6 +19,9 @@ interface BuildingTooltipProps {
   workers?: number | null;
   residents?: number | null;
   goods?: GoodEntry[] | null;
+  /** Second level of progressive disclosure (issue: map entity detail card) -
+   * omit to render the tooltip with no "View details" affordance. */
+  onViewDetails?: () => void;
 }
 
 export function BuildingTooltipContent({
@@ -27,6 +30,7 @@ export function BuildingTooltipContent({
   workers,
   residents,
   goods,
+  onViewDetails,
 }: BuildingTooltipProps) {
   const stockedGoods = (goods ?? []).filter((g) => g.display);
   const isResidential = buildingType === "residential";
@@ -52,6 +56,11 @@ export function BuildingTooltipContent({
           </ul>
         </>
       )}
+      {onViewDetails && (
+        <button type="button" onClick={onViewDetails}>
+          View details
+        </button>
+      )}
     </div>
   );
 }
@@ -62,6 +71,9 @@ interface CharacterTooltipProps {
   work?: string | null;
   currentActivity?: string | null;
   isMoving?: boolean | null;
+  /** Second level of progressive disclosure (issue: map entity detail card) -
+   * omit to render the tooltip with no "View details" affordance. */
+  onViewDetails?: () => void;
 }
 
 export function CharacterTooltipContent({
@@ -70,6 +82,7 @@ export function CharacterTooltipContent({
   work,
   currentActivity,
   isMoving,
+  onViewDetails,
 }: CharacterTooltipProps) {
   const activityLabel = isMoving ? "walking" : currentActivity;
 
@@ -79,6 +92,11 @@ export function CharacterTooltipContent({
       {activityLabel && <div>Currently: {activityLabel}</div>}
       {home && <div>Lives at: {home}</div>}
       {work && <div>Works at: {work}</div>}
+      {onViewDetails && (
+        <button type="button" onClick={onViewDetails}>
+          View details
+        </button>
+      )}
     </div>
   );
 }

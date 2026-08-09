@@ -41,7 +41,12 @@ from progression.views import (
 from server_management.views import maintenance_status
 from users.views import PlayerViewSet
 
-from locations.views import PopulationCentreMapView, MapViewportView, MapWorldBoundsView
+from locations.views import (
+    PopulationCentreMapView,
+    MapCharacterDetailView,
+    MapViewportView,
+    MapWorldBoundsView,
+)
 
 
 class KeyConverter:
@@ -139,5 +144,10 @@ urlpatterns = [
         "map/world-bounds/",
         MapWorldBoundsView.as_view(),
         name="map-world-bounds",
+    ),
+    path(
+        "map/characters/<int:pk>/",
+        MapCharacterDetailView.as_view(),
+        name="map-character-detail",
     ),
 ]
