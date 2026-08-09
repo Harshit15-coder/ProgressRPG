@@ -44,18 +44,19 @@ export default function CharacterDetail({
   return (
     <div className={styles.root}>
       <dl className={styles.facts}>
-        <div className={styles.fact}>
-          <dt>Age</dt>
-          <dd>
-            {data.age}, {data.sex}
-          </dd>
-        </div>
         {activityLabel && (
           <div className={styles.fact}>
             <dt>Currently</dt>
             <dd>{activityLabel}</dd>
           </div>
         )}
+        <div className={styles.fact}>
+          <dt>Age</dt>
+          <dd>
+            {data.age}, {data.sex}
+          </dd>
+        </div>
+
         {home && (
           <div className={styles.fact}>
             <dt>Home</dt>
@@ -101,6 +102,7 @@ export default function CharacterDetail({
             items={relationshipItems}
             className={styles.relationshipsList}
             canSelect={Boolean(onSelectRelationship)}
+            canHover={Boolean(onSelectRelationship)}
             onSelect={(relationship) => onSelectRelationship?.(relationship.character_id)}
             renderItem={(relationship) => (
               <span>

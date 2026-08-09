@@ -295,6 +295,11 @@ class Journey(models.Model):
     finished_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(max_length=20, default="active")  # e.g., active, complete
 
+    # Transient, non-persisted cache of {node_id: Node}, set by callers that
+    # batch-fetch nodes across many journeys (e.g. move_characters_tick) to
+    # avoid a per-call query in _get_node. Not a model field.
+    _node_cache: dict[int, "Node"] | None = None
+
     @property
     def is_complete(self):
         return self.status == "complete"

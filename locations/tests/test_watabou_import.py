@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import Point, Polygon
 from django.test import TestCase
 
+from economy.models import BuildingCapability
 from locations.models import LandArea, Node, PopulationCentre, Road, Subzone
 from locations.services.watabou_import import import_watabou_village
 
@@ -19,6 +20,11 @@ MILL_WARD = {
 # Building coordinates are a list of rings (one ring each here), same shape
 # as watabou's own "buildings" feature - not a bare list of points.
 TRADE_BUILDING = [[[2, 2], [8, 2], [8, 8], [2, 8]]]
+# A much larger footprint than TRADE_BUILDING (100 sqm vs 36 sqm) - used
+# where a test needs population_estimation to produce a population above
+# SMALL_SETTLEMENT_POPULATION_THRESHOLD, since TRADE_BUILDING alone rounds
+# down to 0 estimated residents per building.
+LARGE_BUILDING = [[[0, 0], [10, 0], [10, 10], [0, 10]]]
 
 EARTH = {"coordinates": [[[-500, -500], [500, -500], [500, 500], [-500, 500]]]}
 
@@ -88,8 +94,12 @@ class WatabouImportBuildingTypeTest(TestCase):
         self.assertEqual(building.building_type, "residential")
 
     def test_roughly_three_quarters_residential_with_one_of_each_special(self):
-        # 8 buildings: 75% -> 6 residential, remaining 2 -> one each of the
-        # first two special types (granary, inn), in fixed order.
+        # 8 buildings: 75% -> 6 residential, remaining 2 -> granary plus one
+        # shared "communal" building packing both milling and baking (only
+        # one non-residential slot is left once granary takes the other),
+        # rather than a decorative "inn" - the always-present economy chain
+        # is guaranteed a slot ahead of decorative types (see
+        # _assign_building_types_and_capabilities).
         data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
         origin = Point(0, 0, srid=3857)
 
@@ -98,24 +108,108 @@ class WatabouImportBuildingTypeTest(TestCase):
         types = [b.building_type for b in centre.buildings.order_by("id")]
         self.assertEqual(types.count("residential"), 6)
         self.assertEqual(types.count("granary"), 1)
-        self.assertEqual(types.count("inn"), 1)
-        for untouched_type in ["mill", "bakery", "market", "hall", "communal"]:
+        self.assertEqual(types.count("communal"), 1)
+        for untouched_type in ["inn", "mill", "bakery", "market", "hall"]:
             self.assertEqual(types.count(untouched_type), 0)
 
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
+
     def test_leftover_after_every_special_type_falls_back_to_residential(self):
-        # 30 buildings: 75% -> 22 residential (Python's round-half-to-even),
-        # remaining 8 -> one each of all six special types, and the 2 slots
-        # left over after that fold back into residential (no catch-all).
+        # 30 small (TRADE_BUILDING) buildings: 75% -> 22 residential
+        # (Python's round-half-to-even), remaining 8. TRADE_BUILDING's tiny
+        # footprint rounds down to 0 estimated residents per building, so
+        # the settlement is well under SMALL_SETTLEMENT_POPULATION_THRESHOLD
+        # and milling+baking still share one communal building even though
+        # there'd be enough slots for two dedicated ones - granary and
+        # communal take 2 of the 8 remaining slots, inn/market/hall take
+        # the next 3, and the final 3 fold back into residential (no
+        # catch-all).
         data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 30)
         origin = Point(0, 0, srid=3857)
 
         centre = import_watabou_village(data, name="Thirty Buildings", origin=origin)
 
         types = [b.building_type for b in centre.buildings.order_by("id")]
-        self.assertEqual(types.count("residential"), 24)
-        for special_type in ["granary", "inn", "mill", "bakery", "market", "hall"]:
+        self.assertEqual(types.count("residential"), 25)
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("communal"), 1)
+        for special_type in ["inn", "market", "hall"]:
             self.assertEqual(types.count(special_type), 1)
+        for untouched_type in ["mill", "bakery"]:
+            self.assertEqual(types.count(untouched_type), 0)
+
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
+
+    def test_large_population_gets_dedicated_mill_and_bakery(self):
+        # 24 large (LARGE_BUILDING) buildings: 75% -> 18 residential,
+        # remaining 6. LARGE_BUILDING's footprint is big enough that the
+        # estimated population clears SMALL_SETTLEMENT_POPULATION_THRESHOLD,
+        # so milling and baking get dedicated buildings rather than sharing
+        # a communal one, even though sharing would also fit.
+        data = _make_export(districts=None, buildings=[LARGE_BUILDING] * 24)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Large Village", origin=origin)
+
+        types = [b.building_type for b in centre.buildings.order_by("id")]
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("mill"), 1)
+        self.assertEqual(types.count("bakery"), 1)
         self.assertEqual(types.count("communal"), 0)
+
+        mill = centre.buildings.get(building_type="mill")
+        bakery = centre.buildings.get(building_type="bakery")
+        self.assertEqual(
+            list(mill.capabilities.values_list("activity", flat=True)), ["milling"]
+        )
+        self.assertEqual(
+            list(bakery.capabilities.values_list("activity", flat=True)), ["baking"]
+        )
+
+    def test_small_village_packs_milling_and_baking_onto_one_communal_building(self):
+        # 6 buildings: 75% -> 4 residential, remaining 2 - not enough for a
+        # granary plus one dedicated building per role, so milling and
+        # baking share a single "communal" building instead of one losing
+        # out to a fixed allocation order (the original Ashenford bug: a
+        # small village silently missing a bakery).
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 6)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Small Village", origin=origin)
+
+        types = [b.building_type for b in centre.buildings.order_by("id")]
+        self.assertEqual(types.count("residential"), 4)
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("communal"), 1)
+        for untouched_type in ["inn", "mill", "bakery", "market", "hall"]:
+            self.assertEqual(types.count(untouched_type), 0)
+
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
+
+
+class WatabouImportPopulationPlanLoggingTest(TestCase):
+    """
+    Step 3 of .claude/plans/village-capacity-sizing-plan.md: import logs the
+    population-estimation-driven settlement_plan recommendation, but doesn't
+    yet act on it - no building/capability assignment changes here. This
+    just checks the compute-and-log call doesn't crash and reports a
+    sensible number, not any generation-behaviour change.
+    """
+
+    def test_import_logs_recommended_settlement_plan(self):
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
+        origin = Point(0, 0, srid=3857)
+
+        with self.assertLogs("general", level="INFO") as logs:
+            import_watabou_village(data, name="Logged Village", origin=origin)
+
+        self.assertTrue(any("recommended plan" in message for message in logs.output))
 
 
 class WatabouImportGraphTest(TestCase):
@@ -141,6 +235,26 @@ class WatabouImportGraphTest(TestCase):
             Node.objects.filter(
                 building=building, kind=Node.Kind.BUILDING_ENTRANCE
             ).exists()
+        )
+
+    def test_granary_has_no_entrance_node_but_other_buildings_do(self):
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Granary Entrances", origin=origin)
+
+        granary = centre.buildings.get(building_type="granary")
+        self.assertFalse(
+            Node.objects.filter(
+                building=granary, kind=Node.Kind.BUILDING_ENTRANCE
+            ).exists()
+        )
+
+        self.assertEqual(
+            centre.buildings.exclude(building_type="granary")
+            .exclude(nodes__kind=Node.Kind.BUILDING_ENTRANCE)
+            .count(),
+            0,
         )
 
     def test_imports_roads_with_width_fallback(self):

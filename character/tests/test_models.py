@@ -18,6 +18,8 @@ from character.models import (
     RELATIONSHIP_SPECS,
 )
 
+from users.tests import user_factory
+
 
 class CharacterRelationshipTests(TestCase):
     def setUp(self):
@@ -423,9 +425,7 @@ class CharacterNPCTests(TestCase):
         # Create a player-linked character
         # When creating a user, signals automatically create a player and assign a character
         # We need to deactivate the auto-assigned link first
-        self.user = CustomUser.objects.create_user(
-            email="test@example.com", password="testpass123"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
 
         # Deactivate any auto-assigned character links
@@ -489,11 +489,10 @@ class CharacterNPCTests(TestCase):
 
     def test_has_available_all_linked(self):
         """Test has_available returns False when all linkable characters are linked"""
-        from users.models import CustomUser
         from character.models import PlayerCharacterLink
 
-        user1 = CustomUser.objects.create_user(email="user1@test.com", password="pass")
-        user2 = CustomUser.objects.create_user(email="user2@test.com", password="pass")
+        user1 = user_factory(with_player=True)
+        user2 = user_factory(with_player=True)
 
         PlayerCharacterLink.assign_character(player=user1.player, character=self.npc1)
         PlayerCharacterLink.assign_character(player=user2.player, character=self.npc2)
@@ -511,13 +510,10 @@ class PlayerCharacterLinkPointsTodayTests(TestCase):
     """Tests for PlayerCharacterLink.player_time_today/points_today (issue #673)."""
 
     def setUp(self):
-        from users.models import CustomUser
         from progression.models import PlayerActivity
 
         self.PlayerActivity = PlayerActivity
-        self.user = CustomUser.objects.create_user(
-            email="today-points@example.com", password="pass12345"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
         character = Character.objects.create(given_name="Hero")
         self.link = PlayerCharacterLink.objects.create(
@@ -567,3 +563,49 @@ class PlayerCharacterLinkPointsTodayTests(TestCase):
     def test_points_today_zero_with_no_activities(self):
         self.assertEqual(self.link.player_time_today, 0)
         self.assertEqual(self.link.points_today, 0)
+
+
+class CharacterTotalLinkPointsTests(TestCase):
+    """Tests for Character.total_link_points (the character-side counterpart
+    to Player.total_link_points)."""
+
+    def setUp(self):
+        from users.tests.factories import user_factory
+
+        self.character = Character.objects.create(given_name="Hero")
+        # DecimalField's string default isn't coerced to Decimal until a real
+        # DB round-trip, so refresh before any test computes link_points
+        # directly (as opposed to via the DB-backed total_link_points query).
+        self.character.refresh_from_db()
+        self.user1 = user_factory(with_player=True)
+        self.user1.player.refresh_from_db()
+        self.user2 = user_factory(with_player=True)
+        self.user2.player.refresh_from_db()
+
+    def _make_link(self, player, *, days_linked, unlinked=False):
+        linked_at = now() - timedelta(days=days_linked)
+        link = PlayerCharacterLink.objects.create(
+            player=player, character=self.character, linked_at=linked_at
+        )
+        if unlinked:
+            link.unlinked_at = now()
+            link.is_active = False
+            link.save(update_fields=["unlinked_at", "is_active"])
+        return link
+
+    def test_zero_for_a_never_linked_character(self):
+        never_linked = Character.objects.create(given_name="Loner")
+        self.assertEqual(never_linked.total_link_points, 0)
+
+    def test_sums_a_single_active_link(self):
+        link = self._make_link(self.user1.player, days_linked=3)
+        self.assertEqual(self.character.total_link_points, link.link_points)
+
+    def test_sums_across_historical_and_active_links(self):
+        old_link = self._make_link(self.user1.player, days_linked=10, unlinked=True)
+        current_link = self._make_link(self.user2.player, days_linked=2)
+
+        self.assertEqual(
+            self.character.total_link_points,
+            old_link.link_points + current_link.link_points,
+        )

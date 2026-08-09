@@ -25,6 +25,21 @@ class FormatQuantityTest(SimpleTestCase):
         self.assertEqual(format_quantity("flour", -500, signed=True), "-0.5kg")
         self.assertEqual(format_quantity("bread", 2000, signed=True), "+2.0kg")
 
+    def test_wheat_over_threshold_displays_as_tonnes(self):
+        # Exactly at the threshold still switches - TONNE_DISPLAY_THRESHOLD_KG
+        # is inclusive.
+        self.assertEqual(format_quantity("wheat", 1_000_000), "1.0t")
+        self.assertEqual(format_quantity("wheat", 2_500_000), "2.5t")
+
+    def test_wheat_under_threshold_stays_in_kg(self):
+        self.assertEqual(format_quantity("wheat", 999_000), "999.0kg")
+
+    def test_wheat_signed_deltas_never_switch_to_tonnes(self):
+        self.assertEqual(format_quantity("wheat", 2_500_000, signed=True), "+2,500.0kg")
+
+    def test_bread_never_switches_to_tonnes_regardless_of_size(self):
+        self.assertEqual(format_quantity("bread", 5_000_000), "5,000.0 loaves")
+
 
 class FormatRateTest(SimpleTestCase):
     """
@@ -47,3 +62,9 @@ class FormatRateTest(SimpleTestCase):
     def test_signed_surplus_shows_sign(self):
         self.assertEqual(format_rate("flour", -12500, signed=True), "-12.5kg")
         self.assertEqual(format_rate("bread", 5000, signed=True), "+5.0kg")
+
+    def test_flour_rate_over_threshold_displays_as_tonnes(self):
+        self.assertEqual(format_rate("flour", 1_500_000), "1.5t")
+
+    def test_bread_rate_never_switches_to_tonnes_regardless_of_size(self):
+        self.assertEqual(format_rate("bread", 5_000_000), "5,000.0kg")

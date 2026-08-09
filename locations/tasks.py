@@ -187,8 +187,8 @@ def commute_tick():
 
 
 @shared_task
-def spawn_villages_task():
-    call_command("spawn_villages")
+def generate_villages_task():
+    call_command("generate_villages")
 
 
 @shared_task

@@ -26,16 +26,25 @@ import {
   buildingFootprintRings,
   buildingTypeLabel,
   cropSubzoneRingsByShelterBuilding,
+  polygonAnchorLngLat,
   polygonTooltipContent,
 } from "./geojson";
 import {
   addCharacterImage,
   addVillageLayers,
+  BUILDINGS_FILL_LAYER,
   CLICKABLE_LAYERS,
+  HOVER_BUILDING_OUTLINE_LAYER,
+  HOVER_CHARACTER_HIGHLIGHT_LAYER,
+  HOVER_OPACITY,
+  SELECTED_BUILDING_OUTLINE_LAYER,
+  SELECTED_CHARACTER_HIGHLIGHT_LAYER,
+  setFilterWithFade,
+  TOOLTIP_ONLY_SELECTION_OPACITY,
   VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
-import DetailCard from "../DetailCard/DetailCard";
+import MapDetailCard from "../MapDetailCard/MapDetailCard";
 import CharacterDetail from "../CharacterDetail/CharacterDetail";
 import BuildingDetail from "../BuildingDetail/BuildingDetail";
 import styles from "./Map.module.scss";
@@ -124,12 +133,6 @@ const VIEWPORT_DEBOUNCE_MS = 400;
 // regardless of how far apart the two villages are.
 const FLY_TO_DURATION_MS = 1200;
 
-interface TooltipOverlayState {
-  key: string;
-  content: React.ReactNode;
-  lngLat: [number, number];
-}
-
 // The map's second level of progressive disclosure (tooltip -> click "View
 // details" -> DetailCard). Only character/building are wired up yet
 // (population centres are a later follow-up - see the map entity detail
@@ -137,6 +140,16 @@ interface TooltipOverlayState {
 type DetailSelection =
   | { type: "character"; id: number }
   | { type: "building"; id: number };
+
+interface TooltipOverlayState {
+  key: string;
+  content: React.ReactNode;
+  lngLat: [number, number];
+  // Which building/character (if any) this tooltip belongs to, so the
+  // selection-outline effect below can show a lower-intensity preview of
+  // the outline while just the tooltip - not the full DetailCard - is open.
+  entity?: DetailSelection;
+}
 
 export default function PopulationCentreMap({
   geojson,
@@ -151,10 +164,20 @@ export default function PopulationCentreMap({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Passed to MapDetailCard as DetailSurface's portal `container` so the
+  // docked detail panel positions relative to the map itself, not the
+  // viewport (see MapDetailCard.module.scss). State (not a plain ref) so
+  // the value is available for render once the wrapper mounts.
+  const [mapWrapperEl, setMapWrapperEl] = useState<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const sourceRef = useRef<GeoJSONSource | null>(null);
   const [mapReady, setMapReady] = useState(false);
   const initialFitDoneRef = useRef(false);
+  // Tracks which building/character the pointer is currently over, so the
+  // mousemove handlers below only call setFilterWithFade on an actual
+  // change rather than on every pointer movement within the same feature.
+  const hoveredBuildingIdRef = useRef<number | null>(null);
+  const hoveredCharacterIdRef = useRef<number | null>(null);
 
   useImperativeHandle(
     ref,
@@ -301,26 +324,42 @@ export default function PopulationCentreMap({
         const feature = e.features?.[0];
         if (!feature) return;
         e.originalEvent?.stopPropagation?.();
-        // home/work carry the building_type (e.g. "residential", "bakery"),
-        // not the building's bookkeeping name - resolved to the same plain
-        // label ("House", "Bakery") shown on that building's own tooltip,
-        // via buildingTypeLabel.
-        const homeType = feature.properties?.home_type as string | null | undefined;
-        const workType = feature.properties?.work_type as string | null | undefined;
+        // current_location_type/destination_location_type carry the
+        // building_type (e.g. "residential", "bakery") of where the
+        // character currently is / is walking to, not a bookkeeping name -
+        // resolved to the same plain label ("House", "Bakery") shown on
+        // that building's own tooltip, via buildingTypeLabel. null means
+        // that spot isn't inside a building at all ("outside").
+        const currentLocationType = feature.properties?.current_location_type as
+          | string
+          | null
+          | undefined;
+        const destinationType = feature.properties?.destination_location_type as
+          | string
+          | null
+          | undefined;
         const characterId = Number(feature.properties?.id);
         setTooltip({
           key: `character-${feature.id ?? JSON.stringify(feature.properties)}`,
           content: (
             <CharacterTooltipContent
               name={feature.properties?.name as string | undefined}
-              home={homeType ? buildingTypeLabel(homeType) : undefined}
-              work={workType ? buildingTypeLabel(workType) : undefined}
               currentActivity={feature.properties?.current_activity as string | null | undefined}
               isMoving={feature.properties?.is_moving as boolean | null | undefined}
+              currentLocationLabel={
+                currentLocationType ? buildingTypeLabel(currentLocationType) : null
+              }
+              destinationLabel={destinationType ? buildingTypeLabel(destinationType) : null}
               onViewDetails={() => openDetail({ type: "character", id: characterId })}
             />
           ),
-          lngLat: [e.lngLat.lng, e.lngLat.lat],
+          // Anchored to the character's own point, not the click position -
+          // MapLibre's hit-testing for icon layers uses the full image
+          // bounding box (see createCharacterIcon's comment in layers.ts),
+          // so a click near an edge of a large (zoomed-in) icon would
+          // otherwise leave the tooltip's fixed offset still overlapping it.
+          lngLat: feature.geometry.coordinates as [number, number],
+          entity: { type: "character", id: characterId },
         });
       });
       map.on("mouseenter", "characters", () => {
@@ -328,7 +367,37 @@ export default function PopulationCentreMap({
       });
       map.on("mouseleave", "characters", () => {
         map.getCanvas().style.cursor = "";
+        if (hoveredCharacterIdRef.current === null) return;
+        hoveredCharacterIdRef.current = null;
+        setFilterWithFade(
+          map,
+          HOVER_CHARACTER_HIGHLIGHT_LAYER,
+          "circle-stroke-opacity",
+          ["all", ["==", ["get", "feature_type"], "character"], ["==", ["get", "id"], -1]],
+          HOVER_OPACITY
+        );
       });
+      map.on(
+        "mousemove",
+        "characters",
+        (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
+          const feature = e.features?.[0];
+          const characterId = feature ? Number(feature.properties?.id) : null;
+          if (characterId === hoveredCharacterIdRef.current) return;
+          hoveredCharacterIdRef.current = characterId;
+          setFilterWithFade(
+            map,
+            HOVER_CHARACTER_HIGHLIGHT_LAYER,
+            "circle-stroke-opacity",
+            [
+              "all",
+              ["==", ["get", "feature_type"], "character"],
+              ["==", ["get", "id"], characterId ?? -1],
+            ],
+            HOVER_OPACITY
+          );
+        }
+      );
 
       // Tapping/selecting a village's name label expands it into its
       // progress bar + state (issue #673) - the label itself is coloured by
@@ -403,7 +472,11 @@ export default function PopulationCentreMap({
           setTooltip({
             key: `${layerId}-${feature.id ?? JSON.stringify(feature.properties)}`,
             content,
-            lngLat: [e.lngLat.lng, e.lngLat.lat],
+            lngLat: polygonAnchorLngLat(feature.geometry),
+            entity:
+              feature.properties?.feature_type === "building"
+                ? { type: "building", id: buildingId }
+                : undefined,
           });
         });
         map.on("mouseenter", layerId, () => {
@@ -411,7 +484,52 @@ export default function PopulationCentreMap({
         });
         map.on("mouseleave", layerId, () => {
           map.getCanvas().style.cursor = "";
+          if (layerId !== BUILDINGS_FILL_LAYER) return;
+          if (hoveredBuildingIdRef.current === null) return;
+          hoveredBuildingIdRef.current = null;
+          setFilterWithFade(
+            map,
+            HOVER_BUILDING_OUTLINE_LAYER,
+            "line-opacity",
+            ["all", ["==", ["get", "feature_type"], "building"], ["==", ["get", "id"], -1]],
+            HOVER_OPACITY
+          );
         });
+        if (layerId === BUILDINGS_FILL_LAYER) {
+          map.on(
+            "mousemove",
+            layerId,
+            (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
+              // A character standing inside a building still sits over its
+              // fill layer, so this mousemove keeps firing alongside the
+              // "characters" layer's own hover handler - the character's
+              // hover outline should take priority rather than showing
+              // both at once (mirrors the click-priority check above).
+              const overCharacter =
+                map.queryRenderedFeatures(e.point, { layers: ["characters"] }).length >
+                0;
+              const feature = e.features?.[0];
+              const buildingId = overCharacter
+                ? null
+                : feature
+                  ? Number(feature.properties?.id)
+                  : null;
+              if (buildingId === hoveredBuildingIdRef.current) return;
+              hoveredBuildingIdRef.current = buildingId;
+              setFilterWithFade(
+                map,
+                HOVER_BUILDING_OUTLINE_LAYER,
+                "line-opacity",
+                [
+                  "all",
+                  ["==", ["get", "feature_type"], "building"],
+                  ["==", ["get", "id"], buildingId ?? -1],
+                ],
+                HOVER_OPACITY
+              );
+            }
+          );
+        }
       });
 
       map.on("click", (e: MapMouseEvent) => {
@@ -584,6 +702,41 @@ export default function PopulationCentreMap({
     return () => window.clearInterval(intervalId);
   }, [mapReady, refreshVillageSource]);
 
+  // Outlines whichever building/character the detail card currently has
+  // open (see SELECTED_BUILDING_OUTLINE_LAYER/SELECTED_CHARACTER_HIGHLIGHT_LAYER
+  // in layers.ts) - driven off `detail` rather than a per-feature style
+  // expression, since only one selection ever exists at a time. A tooltip
+  // alone (without the detail card open) shows the same outline at reduced
+  // intensity, as a preview of the same affordance.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    const active = detail ?? tooltip?.entity ?? null;
+    const opacity = detail ? 1 : TOOLTIP_ONLY_SELECTION_OPACITY;
+    setFilterWithFade(
+      map,
+      SELECTED_BUILDING_OUTLINE_LAYER,
+      "line-opacity",
+      [
+        "all",
+        ["==", ["get", "feature_type"], "building"],
+        ["==", ["get", "id"], active?.type === "building" ? active.id : -1],
+      ],
+      opacity
+    );
+    setFilterWithFade(
+      map,
+      SELECTED_CHARACTER_HIGHLIGHT_LAYER,
+      "circle-stroke-opacity",
+      [
+        "all",
+        ["==", ["get", "feature_type"], "character"],
+        ["==", ["get", "id"], active?.type === "character" ? active.id : -1],
+      ],
+      opacity
+    );
+  }, [detail, tooltip, mapReady]);
+
   // Unmount cleanup for the tooltip root when the whole component goes away.
   useEffect(() => {
     return () => {
@@ -646,33 +799,68 @@ export default function PopulationCentreMap({
     return (feature?.properties?.name as string | undefined) ?? "Character";
   }, [detail, characterFeatures]);
 
+  // Detail card's "fly to" header button - reuses the same flyTo call as the
+  // imperative flyToPoint handle, but resolves the point from whichever
+  // entity is currently selected rather than a caller-supplied one.
+  // idleCharacterPositions gives the exact scattered dot for a stationary
+  // character; a walking character falls back to their last known raw node
+  // position (close enough to their building - not worth reaching into the
+  // walker animation ref for a "fly near" convenience button).
+  const handleFlyToDetail = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !detail) return;
+    let rawPoint: [number, number] | null = null;
+    if (detail.type === "character") {
+      const feature = characterFeatures.find((f) => Number(f.properties?.id) === detail.id);
+      if (feature) {
+        rawPoint =
+          idleCharacterPositions.get(String(detail.id)) ??
+          (feature.geometry.coordinates as [number, number]);
+      }
+    } else if (detail.type === "building" && selectedBuildingFeature) {
+      rawPoint = polygonAnchorLngLat(selectedBuildingFeature.geometry);
+    }
+    if (!rawPoint) return;
+    map.flyTo({
+      center: toLngLat(rawPoint),
+      zoom: 14,
+      duration: FLY_TO_DURATION_MS,
+      essential: true,
+    });
+  }, [detail, characterFeatures, idleCharacterPositions, selectedBuildingFeature]);
+
   return (
-    <div className={styles.mapWrapper}>
+    <div ref={setMapWrapperEl} className={styles.mapWrapper}>
       <div ref={containerRef} className={styles.mapContainer} />
       <div ref={tooltipHostRef} className={styles.tooltipHost} />
       {children && <div className={styles.controlsOverlay}>{children}</div>}
       {detail?.type === "character" && (
-        <DetailCard
+        <MapDetailCard
           open
-          placement="right"
           title={selectedCharacterName}
           onClose={() => setDetail(null)}
+          onFlyTo={handleFlyToDetail}
+          container={mapWrapperEl}
         >
           <CharacterDetail
             characterId={detail.id}
             onSelectBuilding={(buildingId) => openDetail({ type: "building", id: buildingId })}
             onSelectRelationship={(characterId) => openDetail({ type: "character", id: characterId })}
           />
-        </DetailCard>
+        </MapDetailCard>
       )}
       {detail?.type === "building" && selectedBuildingFeature && (
-        <DetailCard
+        <MapDetailCard
           open
-          placement="right"
-          title={buildingTypeLabel(
-            selectedBuildingFeature.properties?.building_type as string | undefined
-          )}
+          title={
+            (selectedBuildingFeature.properties?.name as string | undefined) ??
+            buildingTypeLabel(
+              selectedBuildingFeature.properties?.building_type as string | undefined
+            )
+          }
           onClose={() => setDetail(null)}
+          onFlyTo={handleFlyToDetail}
+          container={mapWrapperEl}
         >
           <BuildingDetail
             buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
@@ -694,7 +882,7 @@ export default function PopulationCentreMap({
             onSelectResident={(characterId) => openDetail({ type: "character", id: characterId })}
             onSelectWorker={(characterId) => openDetail({ type: "character", id: characterId })}
           />
-        </DetailCard>
+        </MapDetailCard>
       )}
     </div>
   );

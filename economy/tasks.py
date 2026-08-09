@@ -25,7 +25,7 @@ from .services.capacity_services import (
     find_bakery,
     find_granary,
     find_mill,
-    workers_present,
+    worker_capacity_present,
 )
 from locations.models import Building
 
@@ -99,7 +99,7 @@ def _harvest(crop):
         crop.stage = FieldCrop.Stage.FALLOW
         return
 
-    present = workers_present(crop.shelter_building)
+    present = worker_capacity_present(crop.shelter_building)
     today_yield = min(remaining, present * PER_WORKER_DAILY_CAPACITY)
     if today_yield <= 0:
         return
@@ -150,16 +150,18 @@ def advance_mill_economy_tick(today=None):
     """
     today = today or timezone.localdate()
 
-    for mill in Building.objects.filter(building_type="mill").select_related(
-        "population_centre"
-    ):
-        state, _ = GoodsConversionState.objects.get_or_create(building=mill)
+    for mill in Building.objects.filter(
+        capabilities__activity="milling"
+    ).select_related("population_centre"):
+        state, _ = GoodsConversionState.objects.get_or_create(
+            building=mill, activity="milling"
+        )
         if state.last_processed_on == today:
             continue
 
         granary = find_granary(mill.population_centre)
         if granary is not None:
-            present = workers_present(mill)
+            present = worker_capacity_present(mill)
             flour_buffer_target = (
                 daily_flour_demand(mill.population_centre) * FLOUR_BUFFER_DAYS
             )
@@ -201,16 +203,18 @@ def advance_bakery_economy_tick(today=None):
     """
     today = today or timezone.localdate()
 
-    for bakery in Building.objects.filter(building_type="bakery").select_related(
-        "population_centre"
-    ):
-        state, _ = GoodsConversionState.objects.get_or_create(building=bakery)
+    for bakery in Building.objects.filter(
+        capabilities__activity="baking"
+    ).select_related("population_centre"):
+        state, _ = GoodsConversionState.objects.get_or_create(
+            building=bakery, activity="baking"
+        )
         if state.last_processed_on == today:
             continue
 
         mill = find_mill(bakery.population_centre)
         if mill is not None:
-            present = workers_present(bakery)
+            present = worker_capacity_present(bakery)
             demand = daily_bread_demand(bakery.population_centre)
             bread_stock = GoodsStock.objects.filter(
                 building=bakery, good_type=GoodsStock.GoodType.BREAD

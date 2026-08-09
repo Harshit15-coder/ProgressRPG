@@ -57,7 +57,7 @@ def work_activities_for(character):
         for activity in ActivityDefinition.objects.filter(
             kind=ActivityDefinition.Kind.WORK
         ).select_related("skill", "skill__role")
-        if activity.skill_id is None
+        if activity.skill is None
         or (
             (activity.skill.role_id is None or activity.skill.role_id in held_role_ids)
             and activity.skill.is_unlocked_for(character)

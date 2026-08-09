@@ -2,6 +2,7 @@
 // of Map.tsx since the trigger elements (polygons/glyphs) already carry a
 // lot of pan/zoom/rendering logic.
 import ProgressBar from "../ProgressBar/ProgressBar";
+import Button from "../Button/Button";
 import { VILLAGE_STATE_PROGRESS_COLORS } from "./layers";
 
 interface GoodEntry {
@@ -57,9 +58,9 @@ export function BuildingTooltipContent({
         </>
       )}
       {onViewDetails && (
-        <button type="button" onClick={onViewDetails}>
+        <Button variant="secondary" size="small" onClick={onViewDetails}>
           View details
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -67,35 +68,55 @@ export function BuildingTooltipContent({
 
 interface CharacterTooltipProps {
   name?: string;
-  home?: string | null;
-  work?: string | null;
   currentActivity?: string | null;
   isMoving?: boolean | null;
+  /** Plain label ("House", "Bakery") for the building the character is
+   * currently in, or null/undefined if they're not inside a building. */
+  currentLocationLabel?: string | null;
+  /** Plain label for the building the character is walking to, or
+   * null/undefined if their destination isn't inside a building. Only
+   * relevant while isMoving. */
+  destinationLabel?: string | null;
   /** Second level of progressive disclosure (issue: map entity detail card) -
    * omit to render the tooltip with no "View details" affordance. */
   onViewDetails?: () => void;
 }
 
+// Tooltip location words read lower-case ("at bakery", "to the mill"), and
+// "house" reads as "home" here - a character's own residence, not a
+// building type label.
+function tooltipLocationWord(label: string): string {
+  const lower = label.toLowerCase();
+  return lower === "house" ? "home" : lower;
+}
+
 export function CharacterTooltipContent({
   name,
-  home,
-  work,
   currentActivity,
   isMoving,
+  currentLocationLabel,
+  destinationLabel,
   onViewDetails,
 }: CharacterTooltipProps) {
-  const activityLabel = isMoving ? "walking" : currentActivity;
+  const activityLabel =
+    currentActivity && currentActivity.charAt(0).toUpperCase() + currentActivity.slice(1);
+  const statusLine = isMoving
+    ? destinationLabel
+      ? `Walking to ${tooltipLocationWord(destinationLabel)}`
+      : "Walking outside"
+    : activityLabel &&
+      (currentLocationLabel
+        ? `${activityLabel} at ${tooltipLocationWord(currentLocationLabel)}`
+        : `${activityLabel} outside`);
 
   return (
     <div>
       <div>{name}</div>
-      {activityLabel && <div>Currently: {activityLabel}</div>}
-      {home && <div>Lives at: {home}</div>}
-      {work && <div>Works at: {work}</div>}
+      {statusLine && <div>{statusLine}</div>}
       {onViewDetails && (
-        <button type="button" onClick={onViewDetails}>
+        <Button variant="secondary" size="small" onClick={onViewDetails}>
           View details
-        </button>
+        </Button>
       )}
     </div>
   );

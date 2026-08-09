@@ -105,6 +105,21 @@ class SettlementPlanFromPopulationTests(SimpleTestCase):
         # shelter recommended.
         self.assertEqual(plan.farming.recommended_buildings, 0)
 
+    def test_combine_milling_and_baking_at_and_below_threshold(self):
+        from economy.constants import SMALL_SETTLEMENT_POPULATION_THRESHOLD
+
+        at_threshold = settlement_plan(population=SMALL_SETTLEMENT_POPULATION_THRESHOLD)
+        below_threshold = settlement_plan(
+            population=SMALL_SETTLEMENT_POPULATION_THRESHOLD - 1
+        )
+        above_threshold = settlement_plan(
+            population=SMALL_SETTLEMENT_POPULATION_THRESHOLD + 1
+        )
+
+        self.assertTrue(at_threshold.combine_milling_and_baking)
+        self.assertTrue(below_threshold.combine_milling_and_baking)
+        self.assertFalse(above_threshold.combine_milling_and_baking)
+
     def test_farming_recommended_once_workers_are_needed(self):
         plan = settlement_plan(population=5000)
 

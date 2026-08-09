@@ -47,11 +47,10 @@ class Command(BaseCommand):
             self.stdout.write("No population centres found.")
             return
 
-        buildings_by_centre = {}
+        buildings_by_centre: dict[int | None, list[Building]] = {}
         buildings = (
             Building.objects.filter(population_centre__in=centres)
-            .select_related("conversion_state")
-            .prefetch_related("goods_stocks")
+            .prefetch_related("goods_stocks", "conversion_states")
             .order_by("building_type", "name")
         )
         for building in buildings:
@@ -81,9 +80,10 @@ class Command(BaseCommand):
         else:
             self.stdout.write("    (no goods stored)")
 
-        state = getattr(building, "conversion_state", None)
-        if state is not None:
-            self.stdout.write(f"    last processed: {state.last_processed_on}")
+        for state in building.conversion_states.all():
+            self.stdout.write(
+                f"    {state.activity} last processed: {state.last_processed_on}"
+            )
 
     def _print_population_capacity(self, centre):
         """

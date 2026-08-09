@@ -1,11 +1,13 @@
-from datetime import date
+from datetime import date, datetime, time
 
 from django.contrib.gis.geos import Point
 from django.test import TestCase
+from django.utils import timezone
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from character.services.behaviour_services import _FIXED_KINDS
 from character.utils import work_activities_for
+from locations.models import Building
 from progression.models import (
     ActivityDefinition,
     CharacterActivity,
@@ -128,6 +130,34 @@ class GenerateDayWorkActivityTests(TestCase):
         )
 
         self.assertEqual(first_ids, second_ids)
+
+    def test_late_building_hours_extend_the_work_block_past_the_default_workday(self):
+        # Inn hours run 06:00-23:00 (see Building.BUILDING_TYPE_HOURS) - well
+        # past generate_day's old fixed 17:00 work cutoff. An inn worker
+        # should still be scheduled as "working" in the evening instead of
+        # falling through to the fixed leisure block (issue: characters
+        # assigned to the inn showed as "Relaxing" during their shift).
+        inn = Building.objects.create(
+            name="The Tipsy Griffin",
+            building_type="inn",
+            location=Point(0, 0, srid=3857),
+        )
+        CharacterLocation.objects.create(
+            character=self.character,
+            location=inn,
+            role=CharacterLocation.Role.WORK,
+            is_primary=True,
+        )
+
+        self.character.behaviour.generate_day(date(2026, 1, 5))
+
+        evening = timezone.make_aware(datetime.combine(date(2026, 1, 5), time(21, 0)))
+        activity_at_evening = CharacterActivity.objects.get(
+            character=self.character,
+            scheduled_start__lte=evening,
+            scheduled_end__gt=evening,
+        )
+        self.assertEqual(activity_at_evening.activity_definition.kind, "work")
 
 
 class DeleteDayTests(TestCase):
