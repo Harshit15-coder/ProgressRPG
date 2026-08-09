@@ -18,6 +18,14 @@ export const CLICKABLE_LAYERS = [
 
 const CHARACTERS_LAYER = "characters";
 
+// Outlines whichever building/character the detail card (DetailSurface, via
+// DetailCard) currently has open, so it's clear which map object an open
+// card refers to. Filters start matching nothing (id -1 never occurs) and
+// are updated by Map.tsx's own effect via map.setFilter as `detail` changes,
+// rather than being rebuilt as regular data layers on every selection.
+export const SELECTED_BUILDING_OUTLINE_LAYER = "selected-building-outline";
+export const SELECTED_CHARACTER_HIGHLIGHT_LAYER = "selected-character-highlight";
+
 // Village name-label colour per PopulationCentre.state (see
 // locations/models.py) - a placeholder palette (issue #673 explicitly leaves
 // the exact colour set as an open design question). Mirrors
@@ -122,6 +130,20 @@ export function addVillageLayers(map: MapLibreMap): void {
 		paint: { "fill-color": ["get", "fillColor"], "fill-outline-color": "#333" },
 	});
 	map.addLayer({
+		id: SELECTED_BUILDING_OUTLINE_LAYER,
+		type: "line",
+		source: "village",
+		filter: [
+			"all",
+			["==", ["get", "feature_type"], "building"],
+			["==", ["get", "id"], -1],
+		],
+		paint: {
+			"line-color": "#ffb703",
+			"line-width": 3,
+		},
+	});
+	map.addLayer({
 		id: PATHS_LINE_LAYER,
 		type: "line",
 		source: "village",
@@ -207,6 +229,30 @@ export function addVillageLayers(map: MapLibreMap): void {
 				15, 1,
 				16, 0,
 			],
+		},
+	});
+	map.addLayer({
+		id: SELECTED_CHARACTER_HIGHLIGHT_LAYER,
+		type: "circle",
+		source: "village",
+		// Added before CHARACTERS_LAYER so the highlight ring sits beneath the
+		// character icon rather than covering it.
+		filter: [
+			"all",
+			["==", ["get", "feature_type"], "character"],
+			["==", ["get", "id"], -1],
+		],
+		paint: {
+			"circle-radius": [
+				"interpolate",
+				["linear"],
+				["zoom"],
+				12, 8,
+				16, 26,
+			],
+			"circle-color": "transparent",
+			"circle-stroke-color": "#ffb703",
+			"circle-stroke-width": 3,
 		},
 	});
 	map.addLayer({

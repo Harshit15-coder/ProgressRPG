@@ -301,13 +301,25 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
         building_coordinates
     )
 
+    residential_index = 0
     for i, (polygon_coords, building_type) in enumerate(
         zip(building_coordinates, building_types)
     ):
         footprint = _translate_polygon(polygon_coords, offset)
 
+        # Mirrors generate_villages' naming (residential buildings numbered,
+        # every other type unique per village so its capitalized type name
+        # alone is unambiguous) - see BUILDING_TYPE_LABELS in geojson.tsx,
+        # which the frontend used to derive this same label from
+        # building_type before this became the stored name directly.
+        if building_type == "residential":
+            residential_index += 1
+            building_name = f"House {residential_index}"
+        else:
+            building_name = building_type.capitalize()
+
         building = Building.objects.create(
-            name=f"Building {i + 1} of ({name})",
+            name=building_name,
             building_type=building_type,
             location=footprint.centroid,
             footprint=footprint,

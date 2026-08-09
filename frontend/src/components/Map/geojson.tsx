@@ -66,13 +66,39 @@ export function buildingTypeLabel(buildingType: string | null | undefined): stri
   return (buildingType && BUILDING_TYPE_LABELS[buildingType]) || "Building";
 }
 
+// Anchors a polygon/multipolygon feature's tooltip to the top-center of its
+// bounding box rather than wherever inside the shape it was clicked -
+// otherwise a click near the middle of a large building/subzone footprint
+// would leave the tooltip's own fixed offset (see .floatingTooltip in
+// Map.module.scss) still overlapping the shape's own top edge.
+export function polygonAnchorLngLat(geometry: {
+  type: string;
+  coordinates: unknown;
+}): [number, number] {
+  const rings: number[][][] =
+    geometry.type === "MultiPolygon"
+      ? (geometry.coordinates as number[][][][]).flat()
+      : (geometry.coordinates as number[][][]);
+  let minLng = Infinity;
+  let maxLng = -Infinity;
+  let maxLat = -Infinity;
+  for (const ring of rings) {
+    for (const [lng, lat] of ring) {
+      if (lng < minLng) minLng = lng;
+      if (lng > maxLng) maxLng = lng;
+      if (lat > maxLat) maxLat = lat;
+    }
+  }
+  return [(minLng + maxLng) / 2, maxLat];
+}
+
 export function polygonTooltipContent(
   properties: GeoJSONFeatureProperties | null | undefined,
   onViewDetails?: () => void
 ): React.ReactNode | undefined {
   if (properties?.feature_type === "building") {
     const buildingType = properties?.building_type as string | undefined;
-    const label = buildingTypeLabel(buildingType);
+    const label = (properties?.name as string | undefined) ?? buildingTypeLabel(buildingType);
     return (
       <BuildingTooltipContent
         label={label}

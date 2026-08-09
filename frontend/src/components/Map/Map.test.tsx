@@ -68,6 +68,11 @@ class FakeMap {
     this.layers.push(layer);
   }
 
+  setFilterCalls: { layerId: string; filter: unknown }[] = [];
+  setFilter(layerId: string, filter: unknown) {
+    this.setFilterCalls.push({ layerId, filter });
+  }
+
   on(event: string, a: string | ((e?: unknown) => void), b?: (e?: unknown) => void) {
     const layerId = typeof a === 'string' ? a : undefined;
     const handler = typeof a === 'string' ? (b as (e?: unknown) => void) : a;
@@ -541,7 +546,7 @@ describe('PopulationCentreMap', () => {
           geometry: { type: 'Polygon', coordinates: [[[50, 50], [50, 60], [60, 60], [60, 50], [50, 50]]] },
           properties: {
             feature_type: 'building',
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
           },
         },
@@ -646,7 +651,7 @@ describe('PopulationCentreMap', () => {
           geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
           properties: {
             feature_type: 'building',
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
           },
         },
@@ -680,7 +685,7 @@ describe('PopulationCentreMap', () => {
           geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
           properties: {
             feature_type: 'building',
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
           },
         },
@@ -741,7 +746,7 @@ describe('PopulationCentreMap', () => {
           geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
           properties: {
             feature_type: 'building',
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
             workers: 0,
             residents: 3,
@@ -1038,7 +1043,7 @@ describe('PopulationCentreMap entity detail card', () => {
           properties: {
             feature_type: 'building',
             id: 42,
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
             residents: 1,
             residential_capacity: 4,
@@ -1066,7 +1071,7 @@ describe('PopulationCentreMap entity detail card', () => {
 
     await user.click(screen.getByRole('button', { name: 'View details' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'House' });
+    const dialog = await screen.findByRole('dialog', { name: 'House 2' });
     expect(dialog).toHaveTextContent('1 / 4');
     expect(dialog).toHaveTextContent('Alice');
     expect(dialog).toHaveTextContent('idle');
@@ -1082,7 +1087,7 @@ describe('PopulationCentreMap entity detail card', () => {
           properties: {
             feature_type: 'building',
             id: 42,
-            name: 'House 2 of (Driftmoor village)',
+            name: 'House 2',
             building_type: 'residential',
             residents: 1,
           },
@@ -1101,7 +1106,7 @@ describe('PopulationCentreMap entity detail card', () => {
     });
     await screen.findByRole('tooltip');
     await user.click(screen.getByRole('button', { name: 'View details' }));
-    await screen.findByRole('dialog', { name: 'House' });
+    await screen.findByRole('dialog', { name: 'House 2' });
 
     await user.click(screen.getByText('Alice'));
 
@@ -1133,6 +1138,79 @@ describe('PopulationCentreMap entity detail card', () => {
     await user.click(screen.getByRole('button', { name: 'Close' }));
 
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+  });
+
+  it('outlines the selected building on the map while its detail card is open', async () => {
+    const user = userEvent.setup();
+    const geojsonWithHouse = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: { feature_type: 'building', id: 42, name: 'House', building_type: 'residential' },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithHouse });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'buildings-fill');
+    });
+    await screen.findByRole('tooltip');
+    await user.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByRole('dialog', { name: 'House' });
+
+    const buildingCalls = currentMap().setFilterCalls.filter(
+      (c) => c.layerId === 'selected-building-outline'
+    );
+    expect(buildingCalls.at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'building'],
+      ['==', ['get', 'id'], 42],
+    ]);
+
+    await user.click(screen.getByRole('button', { name: 'Close' }));
+
+    const afterClose = currentMap().setFilterCalls.filter(
+      (c) => c.layerId === 'selected-building-outline'
+    );
+    expect(afterClose.at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'building'],
+      ['==', ['get', 'id'], -1],
+    ]);
+  });
+
+  it('highlights the selected character on the map while its detail card is open', async () => {
+    const user = userEvent.setup();
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: { feature_type: 'character', id: 1, name: 'Alice' },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+    await screen.findByRole('tooltip');
+    await user.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByRole('dialog', { name: 'Alice' });
+
+    const characterCalls = currentMap().setFilterCalls.filter(
+      (c) => c.layerId === 'selected-character-highlight'
+    );
+    expect(characterCalls.at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'character'],
+      ['==', ['get', 'id'], 1],
+    ]);
   });
 });
 

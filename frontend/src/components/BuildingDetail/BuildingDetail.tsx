@@ -54,27 +54,6 @@ export default function BuildingDetail({
 
   return (
     <div className={styles.root}>
-      <dl className={styles.facts}>
-        {isResidential ? (
-          <div className={styles.fact}>
-            <dt>Residents</dt>
-            <dd>
-              {residents.length}
-              {residentialCapacity != null && residentialCapacity > 0
-                ? ` / ${residentialCapacity}`
-                : ""}
-            </dd>
-          </div>
-        ) : (
-          workerCount != null && (
-            <div className={styles.fact}>
-              <dt>Workers</dt>
-              <dd>{workerCount}</dd>
-            </div>
-          )
-        )}
-      </dl>
-
       {stockedGoods.length > 0 && (
         <section className={styles.section}>
           <h3 className={styles.sectionHeading}>Inventory</h3>
@@ -88,30 +67,45 @@ export default function BuildingDetail({
         </section>
       )}
 
-      {isResidential && residents.length > 0 && (
+      {isResidential ? (
         <section className={styles.section}>
-          <h3 className={styles.sectionHeading}>Residents</h3>
-          <List<BuildingDetailResident>
-            items={residents}
-            className={styles.residentsList}
-            canSelect={Boolean(onSelectResident)}
-            onSelect={(resident) => onSelectResident?.(resident.id)}
-            renderItem={(resident) => <span>{residentLine(resident)}</span>}
-          />
+          <div className={styles.sectionHeadingRow}>
+            <h3 className={styles.sectionHeading}>Residents</h3>
+            <span className={styles.sectionCount}>
+              {residents.length}
+              {residentialCapacity != null && residentialCapacity > 0
+                ? ` / ${residentialCapacity}`
+                : ""}
+            </span>
+          </div>
+          {residents.length > 0 && (
+            <List<BuildingDetailResident>
+              items={residents}
+              className={styles.residentsList}
+              canSelect={Boolean(onSelectResident)}
+              onSelect={(resident) => onSelectResident?.(resident.id)}
+              renderItem={(resident) => <span>{residentLine(resident)}</span>}
+            />
+          )}
         </section>
-      )}
-
-      {!isResidential && workers.length > 0 && (
-        <section className={styles.section}>
-          <h3 className={styles.sectionHeading}>Workers</h3>
-          <List<BuildingDetailResident>
-            items={workers}
-            className={styles.residentsList}
-            canSelect={Boolean(onSelectWorker)}
-            onSelect={(worker) => onSelectWorker?.(worker.id)}
-            renderItem={(worker) => <span>{residentLine(worker)}</span>}
-          />
-        </section>
+      ) : (
+        workerCount != null && (
+          <section className={styles.section}>
+            <div className={styles.sectionHeadingRow}>
+              <h3 className={styles.sectionHeading}>Workers</h3>
+              <span className={styles.sectionCount}>{workerCount}</span>
+            </div>
+            {workers.length > 0 && (
+              <List<BuildingDetailResident>
+                items={workers}
+                className={styles.residentsList}
+                canSelect={Boolean(onSelectWorker)}
+                onSelect={(worker) => onSelectWorker?.(worker.id)}
+                renderItem={(worker) => <span>{residentLine(worker)}</span>}
+              />
+            )}
+          </section>
+        )
       )}
     </div>
   );

@@ -26,12 +26,15 @@ import {
   buildingFootprintRings,
   buildingTypeLabel,
   cropSubzoneRingsByShelterBuilding,
+  polygonAnchorLngLat,
   polygonTooltipContent,
 } from "./geojson";
 import {
   addCharacterImage,
   addVillageLayers,
   CLICKABLE_LAYERS,
+  SELECTED_BUILDING_OUTLINE_LAYER,
+  SELECTED_CHARACTER_HIGHLIGHT_LAYER,
   VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
@@ -320,7 +323,12 @@ export default function PopulationCentreMap({
               onViewDetails={() => openDetail({ type: "character", id: characterId })}
             />
           ),
-          lngLat: [e.lngLat.lng, e.lngLat.lat],
+          // Anchored to the character's own point, not the click position -
+          // MapLibre's hit-testing for icon layers uses the full image
+          // bounding box (see createCharacterIcon's comment in layers.ts),
+          // so a click near an edge of a large (zoomed-in) icon would
+          // otherwise leave the tooltip's fixed offset still overlapping it.
+          lngLat: feature.geometry.coordinates as [number, number],
         });
       });
       map.on("mouseenter", "characters", () => {
@@ -403,7 +411,7 @@ export default function PopulationCentreMap({
           setTooltip({
             key: `${layerId}-${feature.id ?? JSON.stringify(feature.properties)}`,
             content,
-            lngLat: [e.lngLat.lng, e.lngLat.lat],
+            lngLat: polygonAnchorLngLat(feature.geometry),
           });
         });
         map.on("mouseenter", layerId, () => {
@@ -584,6 +592,25 @@ export default function PopulationCentreMap({
     return () => window.clearInterval(intervalId);
   }, [mapReady, refreshVillageSource]);
 
+  // Outlines whichever building/character the detail card currently has
+  // open (see SELECTED_BUILDING_OUTLINE_LAYER/SELECTED_CHARACTER_HIGHLIGHT_LAYER
+  // in layers.ts) - driven off `detail` rather than a per-feature style
+  // expression, since only one selection ever exists at a time.
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || !mapReady) return;
+    map.setFilter(SELECTED_BUILDING_OUTLINE_LAYER, [
+      "all",
+      ["==", ["get", "feature_type"], "building"],
+      ["==", ["get", "id"], detail?.type === "building" ? detail.id : -1],
+    ]);
+    map.setFilter(SELECTED_CHARACTER_HIGHLIGHT_LAYER, [
+      "all",
+      ["==", ["get", "feature_type"], "character"],
+      ["==", ["get", "id"], detail?.type === "character" ? detail.id : -1],
+    ]);
+  }, [detail, mapReady]);
+
   // Unmount cleanup for the tooltip root when the whole component goes away.
   useEffect(() => {
     return () => {
@@ -669,9 +696,12 @@ export default function PopulationCentreMap({
         <DetailCard
           open
           placement="right"
-          title={buildingTypeLabel(
-            selectedBuildingFeature.properties?.building_type as string | undefined
-          )}
+          title={
+            (selectedBuildingFeature.properties?.name as string | undefined) ??
+            buildingTypeLabel(
+              selectedBuildingFeature.properties?.building_type as string | undefined
+            )
+          }
           onClose={() => setDetail(null)}
         >
           <BuildingDetail
