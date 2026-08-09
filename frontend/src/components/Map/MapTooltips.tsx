@@ -2,6 +2,7 @@
 // of Map.tsx since the trigger elements (polygons/glyphs) already carry a
 // lot of pan/zoom/rendering logic.
 import ProgressBar from "../ProgressBar/ProgressBar";
+import Button from "../Button/Button";
 import { VILLAGE_STATE_PROGRESS_COLORS } from "./layers";
 
 interface GoodEntry {
@@ -57,9 +58,9 @@ export function BuildingTooltipContent({
         </>
       )}
       {onViewDetails && (
-        <button type="button" onClick={onViewDetails}>
+        <Button variant="secondary" size="small" onClick={onViewDetails}>
           View details
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -113,9 +114,9 @@ export function CharacterTooltipContent({
       <div>{name}</div>
       {statusLine && <div>{statusLine}</div>}
       {onViewDetails && (
-        <button type="button" onClick={onViewDetails}>
+        <Button variant="secondary" size="small" onClick={onViewDetails}>
           View details
-        </button>
+        </Button>
       )}
     </div>
   );

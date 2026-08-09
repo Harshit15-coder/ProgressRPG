@@ -794,6 +794,36 @@ export default function PopulationCentreMap({
     return (feature?.properties?.name as string | undefined) ?? "Character";
   }, [detail, characterFeatures]);
 
+  // Detail card's "fly to" header button - reuses the same flyTo call as the
+  // imperative flyToPoint handle, but resolves the point from whichever
+  // entity is currently selected rather than a caller-supplied one.
+  // idleCharacterPositions gives the exact scattered dot for a stationary
+  // character; a walking character falls back to their last known raw node
+  // position (close enough to their building - not worth reaching into the
+  // walker animation ref for a "fly near" convenience button).
+  const handleFlyToDetail = useCallback(() => {
+    const map = mapRef.current;
+    if (!map || !detail) return;
+    let rawPoint: [number, number] | null = null;
+    if (detail.type === "character") {
+      const feature = characterFeatures.find((f) => Number(f.properties?.id) === detail.id);
+      if (feature) {
+        rawPoint =
+          idleCharacterPositions.get(String(detail.id)) ??
+          (feature.geometry.coordinates as [number, number]);
+      }
+    } else if (detail.type === "building" && selectedBuildingFeature) {
+      rawPoint = polygonAnchorLngLat(selectedBuildingFeature.geometry);
+    }
+    if (!rawPoint) return;
+    map.flyTo({
+      center: toLngLat(rawPoint),
+      zoom: 14,
+      duration: FLY_TO_DURATION_MS,
+      essential: true,
+    });
+  }, [detail, characterFeatures, idleCharacterPositions, selectedBuildingFeature]);
+
   return (
     <div className={styles.mapWrapper}>
       <div ref={containerRef} className={styles.mapContainer} />
@@ -805,6 +835,7 @@ export default function PopulationCentreMap({
           placement="right"
           title={selectedCharacterName}
           onClose={() => setDetail(null)}
+          onFlyTo={handleFlyToDetail}
         >
           <CharacterDetail
             characterId={detail.id}
@@ -824,6 +855,7 @@ export default function PopulationCentreMap({
             )
           }
           onClose={() => setDetail(null)}
+          onFlyTo={handleFlyToDetail}
         >
           <BuildingDetail
             buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
