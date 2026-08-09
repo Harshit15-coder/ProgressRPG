@@ -456,6 +456,17 @@ class Building(models.Model):
     parent_for_navigation = "population_centre"
 
     @property
+    def residents(self):
+        """Characters whose primary home is this building."""
+        from character.models import Character, CharacterLocation
+
+        return Character.objects.filter(
+            locations__location=self,
+            locations__role=CharacterLocation.Role.HOME,
+            locations__is_primary=True,
+        )
+
+    @property
     def open_time(self):
         if self.open_time_override is not None:
             return self.open_time_override

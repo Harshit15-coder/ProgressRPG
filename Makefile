@@ -24,7 +24,7 @@ ps:
 ds:
 	docker compose exec db psql -U progress -d progress
 
-dt:
+t:
 	docker compose exec web python manage.py test $(t) --keepdb --buffer
 
 vt:

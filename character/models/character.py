@@ -4,19 +4,17 @@ from decimal import Decimal
 from django.contrib.gis.geos import Point
 from django.contrib.gis.db.models.functions import Distance
 from django.core.exceptions import ValidationError
-from django.db import models, transaction, IntegrityError
+from django.db import models, IntegrityError
 from django.db.models import Sum
 from django.utils import timezone
 from dataclasses import dataclass, field
-from typing import TYPE_CHECKING, Optional, Dict, Any, cast
+from typing import Optional, Dict, Any, cast
 import logging
 import math
 
-from users.models import Person, Player
+from users.models import Player
 
-from gameplay.models import Currency, CurrencyAccountBase, QuestCompletion, Quest
-from gameplay.serializers import QuestResultSerializer
-from progress_rpg.exceptions import QuestError
+from gameplay.models import Currency, CurrencyAccountBase
 
 from character.services import (
     character_services,
@@ -25,9 +23,7 @@ from character.services import (
     relationship_services,
 )
 from locations.models import Movable, Node, Building
-
-if TYPE_CHECKING:
-    from gameplay.models import QuestTimer
+from progression.mixins import LevelProgressionMixin
 
 logger = logging.getLogger("general")
 logger_errors = logging.getLogger("errors")
@@ -313,28 +309,20 @@ class LifeCycleMixin(models.Model):
 ########################################################################
 
 
-class Character(Person, LifeCycleMixin, Movable):
-    quest_completions = models.ManyToManyField(
-        "gameplay.Quest",
-        through="gameplay.QuestCompletion",
-        related_name="completed_by",
-    )
-
+class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     class SexChoices(models.TextChoices):
         MALE = "Male", "Male"
         FEMALE = "Female", "Female"
         OTHER = "Other", "Other"
 
-    first_name = models.CharField(max_length=50, default="")
-    last_name = models.CharField(max_length=50, default="", null=True, blank=True)
+    xp = models.PositiveIntegerField(default=0)
+    xp_next_level = models.PositiveIntegerField(default=100)
+    xp_modifier = models.FloatField(default=1)
+    level = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    given_name = models.CharField(max_length=50, default="")
     backstory = models.TextField(default="")
-    building = models.ForeignKey(
-        "locations.Building",
-        related_name="residents",
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-    )
     population_centre = models.ForeignKey(
         "locations.PopulationCentre",
         null=True,
@@ -351,7 +339,6 @@ class Character(Person, LifeCycleMixin, Movable):
     link_points_multiplier = models.DecimalField(
         max_digits=5, decimal_places=2, default="1.00"
     )
-    # quest_timer = Optional["QuestTimer"]
 
     @property
     def is_npc(self):
@@ -361,16 +348,16 @@ class Character(Person, LifeCycleMixin, Movable):
         return not self.links.filter(is_active=True).exists()
 
     def __str__(self):
-        return f"{self.first_name} {self.last_name}"
+        return self.name
 
     @property
-    def total_quests(self):
-        return (
-            QuestCompletion.objects.filter(character=self).aggregate(
-                total=Sum("times_completed")
-            )["total"]
-            or 0
-        )
+    def name(self):
+        """
+        Canonical display name - currently just given_name, but will later
+        combine given_name with other components. Callers should read
+        `.name`, never reconstruct it from `.given_name` themselves.
+        """
+        return self.given_name
 
     @property
     def total_activities(self):
@@ -384,10 +371,6 @@ class Character(Person, LifeCycleMixin, Movable):
             or 0
         )
         return live_count + archived_count
-
-    @property
-    def full_name(self):
-        return f"{self.first_name} {self.last_name}"
 
     @property
     def active_link(self):
@@ -404,6 +387,16 @@ class Character(Person, LifeCycleMixin, Movable):
         """
         link = self.active_link
         return link.player if link else None
+
+    @property
+    def home(self):
+        """The Building from this character's primary HOME CharacterLocation, if any."""
+        from character.models.location import CharacterLocation
+
+        home_location = self.locations.filter(
+            role=CharacterLocation.Role.HOME, is_primary=True
+        ).first()
+        return home_location.location if home_location else None
 
     @property
     def parents(self):
@@ -448,22 +441,6 @@ class Character(Person, LifeCycleMixin, Movable):
 
     def assign_work(self, building: Building):
         return character_services.character_assign_work(self, building)
-
-    @transaction.atomic
-    def complete_quest(self, xp_gained):
-        """
-        Complete the character's active quest and apply rewards.
-        """
-        return character_services.character_complete_quest(self, xp_gained)
-
-    @transaction.atomic
-    def apply_quest_results(self, quest):
-        """
-        Apply the rewards associated with a character quest to the character, including
-        coins, xp, and dynamic rewards.
-
-        """
-        return character_services.character_apply_quest_results(self, quest)
 
     @classmethod
     def has_available(cls):

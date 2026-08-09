@@ -11,10 +11,8 @@ from unittest import skip
 from unittest.mock import patch, MagicMock
 
 from character.models import Character, PlayerCharacterLink
-from core.models import Announcement, PlayerAnnouncementState
-from gameplay.models import Quest
+from core.models import Announcement, FeatureFlag, PlayerAnnouncementState
 from progression.models import Activity, PlayerActivity
-from server_management.models import FeatureFlag
 from users.models import CustomUserManager, Player
 
 User = get_user_model()
@@ -34,7 +32,7 @@ def player_for(user) -> Player:
 
 class TestMeViewSet(APITestCase):
     def setUp(self):
-        self.character = Character.objects.create(name="Hero", can_link=True)
+        self.character = Character.objects.create(given_name="Hero", can_link=True)
         self.user = create_test_user(
             email="duncan@example.com",
             password="pass12345",

@@ -10,7 +10,7 @@ from progression.models import CharacterActivity
 class GenerateCharacterDaysTaskTests(TestCase):
     def test_generates_activities_for_characters_with_behaviour(self):
         character = Character.objects.create(
-            first_name="Genny", location=Point(0, 0, srid=3857)
+            given_name="Genny", location=Point(0, 0, srid=3857)
         )
         create_activity_catalog()
 
@@ -22,7 +22,7 @@ class GenerateCharacterDaysTaskTests(TestCase):
 
     def test_skips_characters_without_behaviour(self):
         character = Character.objects.create(
-            first_name="NoBehaviour", location=Point(0, 0, srid=3857)
+            given_name="NoBehaviour", location=Point(0, 0, srid=3857)
         )
         character.behaviour.delete()
 

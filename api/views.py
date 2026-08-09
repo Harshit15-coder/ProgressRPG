@@ -92,7 +92,7 @@ from users.utils import send_email_to_users
 from progress_rpg.settings.utils import get_build_number
 
 from metrics.utils import track_user_session
-from server_management.models import FeatureFlag
+from core.models import FeatureFlag
 
 import logging
 

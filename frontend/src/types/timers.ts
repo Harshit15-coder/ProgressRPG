@@ -32,22 +32,6 @@ export interface ActivityCompleteResponse {
 }
 
 // ---------------------------------------------------------------------------
-// Quest timer API shape (QuestTimerSerializer)
-// ---------------------------------------------------------------------------
-
-export interface QuestTimerApiData {
-  id: number;
-  status: TimerStatus;
-  elapsed_time: number;
-  created_at: string;
-  last_updated: string;
-  quest: import("./domain").Quest | null;
-  duration: number;
-  remaining_time: number;
-  character: number;
-}
-
-// ---------------------------------------------------------------------------
 // useActivityTimer hook state and return value
 // ---------------------------------------------------------------------------
 
@@ -62,8 +46,14 @@ export interface CurrentActivity {
   text?: string;
   /** Optional task ID the activity is logged against */
   taskId?: number | null;
-  /** Server-assigned id once confirmed */
+  /** Server-assigned id once confirmed (this timed session's PlayerActivity id) */
   id?: number;
+  /**
+   * FK to the reusable Activity "type" (catalog entry) this session resolved
+   * to — stable across separate start/stop cycles of the same-named,
+   * task-less activity, unlike `id` above.
+   */
+  activity?: number | null;
 }
 
 /**

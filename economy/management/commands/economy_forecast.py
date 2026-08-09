@@ -418,24 +418,30 @@ class Command(BaseCommand):
         )
 
         self.stdout.write(self.style.MIGRATE_HEADING("Quick analytic estimate"))
-        self.stdout.write(f"  Total registered field area: {total_field_area:.1f} m^2")
-        self.stdout.write(f"  Population (characters with a home): {population}")
         self.stdout.write(
-            f"  Theoretical annual bread yield (full chain, no labor cap): "
-            f"{format_quantity('bread', annual_bread_potential)}"
+            "  These figures are aggregated across all villages in the current world."
         )
         self.stdout.write(
-            f"  Annual bread demand: {format_quantity('bread', annual_demand)}"
+            f"  Total registered field area across all villages: {total_field_area:.1f} m^2"
+        )
+        self.stdout.write(f"  Population with a home across all villages: {population}")
+        self.stdout.write(
+            f"  Theoretical annual bread yield across all villages "
+            f"(full chain, no labor cap): {format_quantity('bread', annual_bread_potential)}"
+        )
+        self.stdout.write(
+            f"  Annual bread demand across all villages: "
+            f"{format_quantity('bread', annual_demand)}"
         )
         verdict = "surplus" if annual_bread_potential >= annual_demand else "DEFICIT"
         self.stdout.write(f"  -> {verdict}")
         self.stdout.write(
-            f"  Suggested starting wheat seed to bridge the {ramp_days}-day growth "
+            f"  Suggested starting wheat seed per granary to bridge the {ramp_days}-day growth "
             f"window (best case, ignores labor caps): "
             f"{format_quantity('wheat', bridge_wheat)}"
         )
         self.stdout.write(
             "  This is a lower bound - real throughput is capped by workers present "
-            "at the mill/bakery. Use --seed-wheat with the simulation below to check "
+            "at the mill/bakery in each village. Use --seed-wheat with the simulation below to check "
             "whether a given amount actually survives the ramp-up.\n"
         )

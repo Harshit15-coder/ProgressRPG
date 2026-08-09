@@ -36,6 +36,7 @@ from .serializers import (
     BoundaryFeatureSerializer,
     FeatureCollectionSerializer,
     PopulationCentreLabelFeatureSerializer,
+    CharacterDetailSerializer,
     CharacterPointFeatureSerializer,
     BuildingFeatureSerializer,
     SubzoneFeatureSerializer,
@@ -216,6 +217,35 @@ class MapViewportView(APIView):
                 features, bbox=list(bbox.extent), meta=meta
             ).data
         )
+
+
+class MapCharacterDetailView(APIView):
+    """
+    On-demand detail for one character's map detail card (progressive
+    disclosure past its tooltip - see the frontend's DetailCard/
+    CharacterDetail). Deliberately separate from PopulationCentreMapView/
+    MapViewportView's bulk per-poll character features: age/sex/
+    relationships involve extra queries per character, so they're only
+    fetched once, when a player actually opens that one character's card,
+    rather than for every character on every map poll.
+    """
+
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, pk):
+        character = get_object_or_404(
+            Character.objects.select_related("needs").prefetch_related(
+                "locations__location",
+                Prefetch(
+                    "journeys",
+                    queryset=Journey.objects.filter(status="active"),
+                    to_attr="active_journey_list",
+                ),
+                _current_activity_prefetch(),
+            ),
+            pk=pk,
+        )
+        return Response(CharacterDetailSerializer(character).data)
 
 
 class MapWorldBoundsView(APIView):

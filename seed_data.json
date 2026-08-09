@@ -1,5 +1,13 @@
 [
   {
+    "model": "auth.group",
+    "pk": 1,
+    "fields": {
+      "name": "Testers",
+      "permissions": []
+    }
+  },
+  {
     "model": "payments.subscriptionplan",
     "pk": 2,
     "fields": {
@@ -25,7 +33,6 @@
     "model": "character.character",
     "pk": 1,
     "fields": {
-      "name": "Elrond",
       "xp": 0,
       "xp_next_level": 100,
       "xp_modifier": 1.0,
@@ -39,19 +46,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Elrond",
-      "last_name": "Bob",
       "backstory": "This is the story of Elrond.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Elrond"
     }
   },
   {
     "model": "character.character",
     "pk": 2,
     "fields": {
-      "name": "Gareth Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -65,19 +70,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Gareth",
-      "last_name": "Holloway",
       "backstory": "Farmer, former mercenary, settled into rural life.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Gareth"
     }
   },
   {
     "model": "character.character",
     "pk": 3,
     "fields": {
-      "name": "Agnes Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -91,19 +94,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Agnes",
-      "last_name": "Holloway",
       "backstory": "Gareth’s wife, keeps the household running.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Agnes"
     }
   },
   {
     "model": "character.character",
     "pk": 4,
     "fields": {
-      "name": "Tristan Holloway",
       "xp": 18,
       "xp_next_level": 200,
       "xp_modifier": 1.0,
@@ -117,19 +118,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Tristan",
-      "last_name": "Holloway",
       "backstory": "Agnes and Gareth's son, dreams of something beyond farming.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Tristan"
     }
   },
   {
     "model": "character.character",
     "pk": 5,
     "fields": {
-      "name": "Mira Holloway",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -143,19 +142,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Mira",
-      "last_name": "Holloway",
       "backstory": "Helps with the animals, dislikes farm work.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Mira"
     }
   },
   {
     "model": "character.character",
     "pk": 6,
     "fields": {
-      "name": "Oswin Holloway",
       "xp": 18,
       "xp_next_level": 200,
       "xp_modifier": 1.0,
@@ -169,19 +166,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Oswin",
-      "last_name": "Holloway",
       "backstory": "Youngest child, eager to learn his father’s trade.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Oswin"
     }
   },
   {
     "model": "character.character",
     "pk": 7,
     "fields": {
-      "name": "Callum Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -195,19 +190,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Callum",
-      "last_name": "Drake",
       "backstory": "Shepherd, spends most of his time in the hills.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Callum"
     }
   },
   {
     "model": "character.character",
     "pk": 8,
     "fields": {
-      "name": "Eda Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -221,19 +214,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Eda",
-      "last_name": "Drake",
       "backstory": "Dairy and spinner. Callum's wife.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Eda"
     }
   },
   {
     "model": "character.character",
     "pk": 9,
     "fields": {
-      "name": "Nico Drake",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -247,19 +238,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Nico",
-      "last_name": "Drake",
       "backstory": "Callum and Eda's son, recently discovered as illegitimate.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Nico"
     }
   },
   {
     "model": "character.character",
     "pk": 10,
     "fields": {
-      "name": "Aldwin Weaver",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -273,19 +262,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Aldwin",
-      "last_name": "Weaver",
       "backstory": "Tavern owner, grew up as a farmer before changing trade.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Aldwin"
     }
   },
   {
     "model": "character.character",
     "pk": 11,
     "fields": {
-      "name": "Rosalind Weaver",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -299,19 +286,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Rosalind",
-      "last_name": "Weaver",
       "backstory": "Aldwin’s daughter, newlywed to a soldier, currently pregnant.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Rosalind"
     }
   },
   {
     "model": "character.character",
     "pk": 12,
     "fields": {
-      "name": "Edric Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -325,19 +310,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Edric",
-      "last_name": "Thornbrook",
       "backstory": "Retired blacksmith, owns a small farm.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Edric"
     }
   },
   {
     "model": "character.character",
     "pk": 13,
     "fields": {
-      "name": "Elias Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -351,19 +334,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Elias",
-      "last_name": "Thornbrook",
       "backstory": "Freya and Edric's son; runs the forge but helps on the farm.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Elias"
     }
   },
   {
     "model": "character.character",
     "pk": 14,
     "fields": {
-      "name": "Freya Thornbrook",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -377,19 +358,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Freya",
-      "last_name": "Thornbrook",
       "backstory": "Edric's daughter, more interested in farming than smithing.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Freya"
     }
   },
   {
     "model": "character.character",
     "pk": 15,
     "fields": {
-      "name": "Viggo Stormvale",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -403,19 +382,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Viggo",
-      "last_name": "Stormvale",
       "backstory": "Former soldier, now working land for a noble.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Viggo"
     }
   },
   {
     "model": "character.character",
     "pk": 16,
     "fields": {
-      "name": "Ella Stormvale",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -429,19 +406,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Ella",
-      "last_name": "Stormvale",
       "backstory": "Viggo’s orphaned niece, raised by him.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Ella"
     }
   },
   {
     "model": "character.character",
     "pk": 17,
     "fields": {
-      "name": "Dain Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -455,19 +430,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Dain",
-      "last_name": "Mossgrove",
       "backstory": "Goatherd, known for his stubbornness. Anwen's husband.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Dain"
     }
   },
   {
     "model": "character.character",
     "pk": 18,
     "fields": {
-      "name": "Anwen Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -481,19 +454,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Anwen",
-      "last_name": "Mossgrove",
       "backstory": "Cheesemaker. Dain's wife.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Anwen"
     }
   },
   {
     "model": "character.character",
     "pk": 19,
     "fields": {
-      "name": "Ronan Mossgrove",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -507,19 +478,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Ronan",
-      "last_name": "Mossgrove",
       "backstory": "Their son, a struggling market trader",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Ronan"
     }
   },
   {
     "model": "character.character",
     "pk": 20,
     "fields": {
-      "name": "Elena Fenwick",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -533,19 +502,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Elena",
-      "last_name": "Fenwick",
       "backstory": "Widow, struggling to raise crops on a poor strip of land",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Elena"
     }
   },
   {
     "model": "character.character",
     "pk": 21,
     "fields": {
-      "name": "Ivy Fenwick",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -559,19 +526,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Ivy",
-      "last_name": "Fenwick",
       "backstory": "Elena's daughter, more interested in plants than farmwork.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Ivy"
     }
   },
   {
     "model": "character.character",
     "pk": 22,
     "fields": {
-      "name": "Ysabet Ashford",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -585,19 +550,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Ysabet",
-      "last_name": "Ashford",
       "backstory": "Seamstress, formerly a noble worker, now living with farmers.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Ysabet"
     }
   },
   {
     "model": "character.character",
     "pk": 23,
     "fields": {
-      "name": "Rowenna Ashford",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -611,19 +574,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Rowenna",
-      "last_name": "Ashford",
       "backstory": "Ysabet's daughter, works fields for a local landowner.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Rowenna"
     }
   },
   {
     "model": "character.character",
     "pk": 24,
     "fields": {
-      "name": "Loralei Dewhurst",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -637,19 +598,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Loralei",
-      "last_name": "Dewhurst",
       "backstory": "Ranger, hunts for game and protects woodland.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Loralei"
     }
   },
   {
     "model": "character.character",
     "pk": 25,
     "fields": {
-      "name": "Ronan Blackthorne",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -663,19 +622,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Ronan",
-      "last_name": "Blackthorne",
       "backstory": "Former rogue, now a merchant.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Ronan"
     }
   },
   {
     "model": "character.character",
     "pk": 26,
     "fields": {
-      "name": "Marwen Brightwater",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -689,19 +646,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Marwen",
-      "last_name": "Brightwater",
       "backstory": "Herbalist, grows medicinal plants.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Marwen"
     }
   },
   {
     "model": "character.character",
     "pk": 27,
     "fields": {
-      "name": "Theo Brightwater",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -715,19 +670,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Theo",
-      "last_name": "Brightwater",
       "backstory": "Marwen's grandson, helps with the chickens.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Theo"
     }
   },
   {
     "model": "character.character",
     "pk": 28,
     "fields": {
-      "name": "Dain Ironhand",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -741,19 +694,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Dain",
-      "last_name": "Ironhand",
       "backstory": "Stonemason, lives in a farming village.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Dain"
     }
   },
   {
     "model": "character.character",
     "pk": 29,
     "fields": {
-      "name": "Sylvie Briarwood",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -767,19 +718,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Sylvie",
-      "last_name": "Briarwood",
       "backstory": "Orphan raised by monks, training as a scribe.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Sylvie"
     }
   },
   {
     "model": "character.character",
     "pk": 30,
     "fields": {
-      "name": "Baldric Holt",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -793,19 +742,17 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Baldric",
-      "last_name": "Holt",
       "backstory": "Aspiring knight, former farmhand.",
       "sex": "Male",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Baldric"
     }
   },
   {
     "model": "character.character",
     "pk": 31,
     "fields": {
-      "name": "Thea Lockwood",
       "xp": 0,
       "xp_next_level": 0,
       "xp_modifier": 1.0,
@@ -819,12 +766,11 @@
       "is_pregnant": false,
       "pregnancy_start_date": null,
       "pregnancy_due_date": null,
-      "first_name": "Thea",
-      "last_name": "Lockwood",
       "backstory": "Tavern owner, daughter of farmers.",
       "sex": "Female",
       "reputation": 0,
-      "can_link": true
+      "can_link": true,
+      "given_name": "Thea"
     }
   },
   {
@@ -1123,6 +1069,7 @@
     "pk": 1,
     "fields": {
       "name": "General labour",
+      "present_tense": "doing odd jobs around the village",
       "description": "Odd jobs and errands - a fallback work block for characters without an assigned role yet.",
       "kind": "work",
       "skill": null,
@@ -1135,6 +1082,7 @@
     "pk": 2,
     "fields": {
       "name": "Helping around the village",
+      "present_tense": "helping around the village",
       "description": "Pitching in on whatever chores need doing - a second fallback so generate_day always has at least two work options to sample from.",
       "kind": "work",
       "skill": null,
@@ -1147,6 +1095,7 @@
     "pk": 3,
     "fields": {
       "name": "Sleeping",
+      "present_tense": "sleeping",
       "description": "The night's rest.",
       "kind": "sleep",
       "skill": null,
@@ -1159,6 +1108,7 @@
     "pk": 4,
     "fields": {
       "name": "Morning routine",
+      "present_tense": "going through their morning routine",
       "description": "Washing, dressing, and getting ready for the day.",
       "kind": "morning",
       "skill": null,
@@ -1171,6 +1121,7 @@
     "pk": 5,
     "fields": {
       "name": "Mealtime",
+      "present_tense": "eating",
       "description": "Sitting down to eat.",
       "kind": "meal",
       "skill": null,
@@ -1183,6 +1134,7 @@
     "pk": 6,
     "fields": {
       "name": "Leisure time",
+      "present_tense": "relaxing",
       "description": "Resting, socialising, or otherwise unwinding.",
       "kind": "leisure",
       "skill": null,
@@ -1195,6 +1147,7 @@
     "pk": 7,
     "fields": {
       "name": "Winding down",
+      "present_tense": "winding down for the night",
       "description": "Settling in for the night before sleep.",
       "kind": "wind_down",
       "skill": null,

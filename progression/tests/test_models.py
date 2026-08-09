@@ -1,4 +1,5 @@
 from progression.models import (
+    ActivityDefinition,
     Category,
     Role,
     SkillGroup,
@@ -26,6 +27,24 @@ class GroupModelTests(BaseTestCase):
         category.refresh_from_db()
 
         self.assertEqual(category.name, "New Name")
+
+
+class ActivityDefinitionModelTests(BaseTestCase):
+    def test_narrative_uses_authored_present_tense(self):
+        definition = ActivityDefinition.objects.create(
+            name="Deliver goods to neighbours",
+            present_tense="delivering goods to neighbours",
+            kind=ActivityDefinition.Kind.WORK,
+        )
+
+        self.assertEqual(definition.narrative, "delivering goods to neighbours")
+
+    def test_narrative_falls_back_to_lowercased_name(self):
+        definition = ActivityDefinition.objects.create(
+            name="General labour", kind=ActivityDefinition.Kind.WORK
+        )
+
+        self.assertEqual(definition.narrative, "general labour")
 
 
 class SkillModelTests(BaseTestCase):

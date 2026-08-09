@@ -700,6 +700,15 @@ class ActivityDefinition(models.Model):
         IDLE = "idle", "Idling"
 
     name = models.CharField(max_length=255)
+    present_tense = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text=(
+            "Narrative verb phrase for 'X is ___' sentences, e.g. "
+            "'delivering goods to neighbours' for the label 'Deliver goods "
+            "to neighbours'. Falls back to a lowercased name when blank."
+        ),
+    )
     description = models.TextField(max_length=2000, blank=True)
     kind = models.CharField(max_length=50, choices=Kind.choices)
     skill = models.ForeignKey(
@@ -714,6 +723,14 @@ class ActivityDefinition(models.Model):
 
     def __str__(self):
         return self.name
+
+    @property
+    def narrative(self) -> str:
+        """The verb-phrase form used in "X is ___" sentences - see
+        present_tense's help_text. Falls back to a lowercased name so
+        definitions authored before this field existed still read
+        sensibly, just less naturally (e.g. "is general labour")."""
+        return self.present_tense or (self.name[:1].lower() + self.name[1:])
 
 
 class OfflineActivityLedger(models.Model):
@@ -780,6 +797,10 @@ class CharacterActivity(TimeRecord):
     @property
     def name(self) -> str:
         return self.activity_definition.name
+
+    @property
+    def narrative(self) -> str:
+        return self.activity_definition.narrative
 
     @property
     def kind(self) -> str:
@@ -864,7 +885,7 @@ class CharacterActivity(TimeRecord):
             village_state = getattr(self.character.population_centre, "state", "Stable")
             phrase = generate_phrase(village_state, self.kind, self.character)
             activity_name = (self.name or "activity").lower()
-            message = f"{self.character.first_name} completed {activity_name}. {phrase}"
+            message = f"{self.character.name} completed {activity_name}. {phrase}"
 
             ServerMessage = apps.get_model("gameplay", "ServerMessage")
             ServerMessage.objects.create(
@@ -991,10 +1012,30 @@ class Note(PlayerOwnedMixin):
         null=True,
         blank=True,
     )
+    # Links a note to a reusable activity "type" (see Activity) rather than
+    # a single timed session, so the note persists across separate
+    # start/stop cycles of the same ad-hoc/unlabelled activity.
+    activity = models.OneToOneField(
+        "progression.Activity",
+        on_delete=models.SET_NULL,
+        related_name="note",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255, blank=True)
     body = models.TextField(max_length=10000, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(task__isnull=True) | models.Q(activity__isnull=True)
+                ),
+                name="note_task_or_activity_not_both",
+            )
+        ]
 
     def __str__(self):
         return self.title or f"Note ({self.player.name})"

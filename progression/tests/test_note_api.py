@@ -5,7 +5,7 @@ from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
-from progression.models import Note, Task
+from progression.models import Activity, Note, Task
 
 User = get_user_model()
 
@@ -111,6 +111,65 @@ class NoteViewSetTests(APITestCase):
 
         response = self.client.patch(
             reverse("notes-detail", args=[other_note.id]), {"task": task.id}
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_can_link_note_to_own_activity(self):
+        activity = Activity.objects.create(player=self.player, name="Washing dishes")
+
+        response = self.client.post(
+            reverse("notes-list"),
+            {"title": "Plan", "body": "", "activity": activity.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_201_CREATED)
+        note = Note.objects.get(pk=response.data["id"])
+        self.assertEqual(note.activity, activity)
+
+    def test_cannot_link_note_to_another_players_activity(self):
+        other_activity = Activity.objects.create(
+            player=self.other_user.player, name="Theirs"
+        )
+
+        response = self.client.post(
+            reverse("notes-list"),
+            {"title": "Plan", "body": "", "activity": other_activity.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_cannot_link_note_to_already_linked_activity(self):
+        activity = Activity.objects.create(player=self.player, name="Washing dishes")
+        Note.objects.create(player=self.player, title="First", activity=activity)
+
+        response = self.client.post(
+            reverse("notes-list"),
+            {"title": "Second", "body": "", "activity": activity.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
+
+    def test_can_keep_own_existing_activity_link_on_update(self):
+        activity = Activity.objects.create(player=self.player, name="Washing dishes")
+        note = Note.objects.create(player=self.player, title="Plan", activity=activity)
+
+        response = self.client.patch(
+            reverse("notes-detail", args=[note.id]),
+            {"title": "Plan v2", "activity": activity.id},
+        )
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        note.refresh_from_db()
+        self.assertEqual(note.activity, activity)
+
+    def test_cannot_steal_another_notes_linked_activity_on_update(self):
+        activity = Activity.objects.create(player=self.player, name="Washing dishes")
+        Note.objects.create(player=self.player, title="First", activity=activity)
+        other_note = Note.objects.create(player=self.player, title="Second")
+
+        response = self.client.patch(
+            reverse("notes-detail", args=[other_note.id]), {"activity": activity.id}
         )
 
         self.assertEqual(response.status_code, status.HTTP_400_BAD_REQUEST)
