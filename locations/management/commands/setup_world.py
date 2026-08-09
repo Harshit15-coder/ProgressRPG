@@ -27,15 +27,10 @@ class Command(BaseCommand):
 
         if village_files:
             self.stdout.write("=== Importing villages ===")
-            for village_file in village_files:
-                # No --name: import_village auto-picks an unused name from
-                # village_names.VILLAGE_NAMES, same as spawn_villages does.
-                call_command(
-                    "import_village",
-                    str(village_file),
-                    overwrite=True,
-                    interactive=False,
-                )
+            # Places each file at a fixed village_layout.VILLAGE_LAYOUT slot
+            # and names it from village_names.VILLAGE_NAMES, both in sorted
+            # filename order - deterministic across runs.
+            call_command("import_villages")
         else:
             self.stdout.write("=== Spawning villages ===")
             call_command("spawn_villages", num_centres=1)
