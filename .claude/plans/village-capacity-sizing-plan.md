@@ -64,10 +64,10 @@ residents exist) via `population_estimation.population_capacity()` /
 `estimate_population_from_footprint_areas()`, so building/capability
 counts are sized to the settlement's actual scale instead of the
 generator's current fixed lists (`SPECIAL_BUILDINGS` in
-`spawn_villages.py`, `SPECIAL_BUILDING_TYPES` in `watabou_import.py`).
+`generate_villages.py`, `SPECIAL_BUILDING_TYPES` in `watabou_import.py`).
 
 **C. Generate `BuildingCapability` rows from the plan, not a fixed type
-list.** `spawn_villages.py`/`watabou_import.py` stop hardcoding "one
+list.** `generate_villages.py`/`watabou_import.py` stop hardcoding "one
 granary, one inn, one mill, one bakery" and instead ask
 `settlement_plan()` how many milling/baking/farming-supporting buildings
 are recommended, assigning capabilities accordingly - including packing
@@ -107,12 +107,12 @@ by luck of import ordering.
 - `locations/services/watabou_import.py` - **existing**.
   `_assign_building_types`/`SPECIAL_BUILDING_TYPES` replaced by
   capability-aware sizing from `settlement_plan`.
-- `locations/management/commands/spawn_villages.py` - **existing**.
+- `locations/management/commands/generate_villages.py` - **existing**.
   `SPECIAL_BUILDINGS` fixed list replaced the same way.
 - New tests: `economy/tests/test_capacity_services.py` (productivity
   weighting), `character/tests/*` (`total_link_points`),
   `locations/tests/test_watabou_import.py` /
-  `test_spawn_villages.py`-equivalent (capability-aware generation).
+  `test_generate_villages.py`-equivalent (capability-aware generation).
 
 ---
 
@@ -130,7 +130,7 @@ Independent, sequential PRs:
    changes yet - this alone makes existing villages' capacity respond to
    linked characters playing.
 3. **Wire population into settlement_plan at generation time.** Add a
-   call path from `spawn_villages.py`/`watabou_import.py` to
+   call path from `generate_villages.py`/`watabou_import.py` to
    `population_estimation` + `settlement_plan`, without yet changing what
    buildings get created - just compute and log/print the recommended
    plan, to validate the numbers against real village files before
@@ -244,7 +244,7 @@ that caused the Ashenford gap in the first place.
   (few buildings) ends up with both milling and baking capabilities on
   one building rather than missing one; a larger village gets dedicated
   buildings per role, matching `recommended_buildings` from the plan.
-- **Modify**: existing `spawn_villages`/`watabou_import` tests
+- **Modify**: existing `generate_villages`/`watabou_import` tests
   (`test_watabou_import.py`'s `test_leftover_after_every_special_type_
   falls_back_to_residential` etc.) will need to change or be replaced,
   since the fixed-order special-type allocation they test is exactly
