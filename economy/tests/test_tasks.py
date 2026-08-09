@@ -18,7 +18,12 @@ from economy.constants import (
     WHEAT_TO_FLOUR_RATIO,
     YIELD_PER_AREA,
 )
-from economy.models import FieldCrop, GoodsConversionState, GoodsStock
+from economy.models import (
+    BuildingCapability,
+    FieldCrop,
+    GoodsConversionState,
+    GoodsStock,
+)
 from economy.tasks import (
     advance_bakery_economy_tick,
     advance_bread_consumption_tick,
@@ -131,6 +136,7 @@ def _make_mill(centre, grain_area=1000.0, flour_area=1000.0):
         footprint=_square(80, 0, 5),
         population_centre=centre,
     )
+    BuildingCapability.objects.create(building=mill, activity="milling")
     mill_node = Node.objects.create(
         name=f"Node for {mill.name}",
         location=mill.location,
@@ -156,6 +162,7 @@ def _make_bakery(centre, storage_area=1000.0):
         footprint=_square(60, 0, 5),
         population_centre=centre,
     )
+    BuildingCapability.objects.create(building=bakery, activity="baking")
     bakery_node = Node.objects.create(
         name=f"Node for {bakery.name}",
         location=bakery.location,
@@ -453,6 +460,7 @@ class AdvanceMillEconomyTickTests(TestCase):
             footprint=_square(70, 0, 5),
             population_centre=centre,
         )
+        BuildingCapability.objects.create(building=mill_b_building, activity="milling")
         node_b = Node.objects.create(
             name="Node for Second Mill",
             location=mill_b_building.location,
@@ -591,6 +599,7 @@ class AdvanceBakeryEconomyTickTests(TestCase):
             footprint=_square(50, 0, 5),
             population_centre=centre,
         )
+        BuildingCapability.objects.create(building=bakery_b, activity="baking")
         node_b = Node.objects.create(
             name="Node for Second Bakery",
             location=bakery_b.location,

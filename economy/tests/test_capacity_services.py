@@ -25,7 +25,7 @@ from economy.constants import (
     PER_WORKER_DAILY_MILLING_CAPACITY,
     WHEAT_TO_FLOUR_RATIO,
 )
-from economy.models import FieldCrop
+from economy.models import BuildingCapability, FieldCrop
 from economy.services.capacity_services import (
     daily_bread_demand,
     daily_flour_demand,
@@ -65,6 +65,9 @@ def _make_centre(name="Testville", resident_count=0):
     return centre, patcher
 
 
+BUILDING_TYPE_TO_ACTIVITY = {"mill": "milling", "bakery": "baking"}
+
+
 def _make_building(centre, building_type, x):
     building = Building.objects.create(
         name=f"{building_type} at {x}",
@@ -72,6 +75,9 @@ def _make_building(centre, building_type, x):
         location=Point(x, 0, srid=3857),
         population_centre=centre,
     )
+    activity = BUILDING_TYPE_TO_ACTIVITY.get(building_type)
+    if activity:
+        BuildingCapability.objects.create(building=building, activity=activity)
     node = Node.objects.create(
         name=f"Node for {building.name}",
         location=building.location,
