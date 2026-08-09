@@ -47,7 +47,7 @@ class Command(BaseCommand):
             self.stdout.write("No population centres found.")
             return
 
-        buildings_by_centre = {}
+        buildings_by_centre: dict[int | None, list[Building]] = {}
         buildings = (
             Building.objects.filter(population_centre__in=centres)
             .select_related("conversion_state")

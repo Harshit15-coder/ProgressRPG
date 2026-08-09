@@ -69,8 +69,19 @@ class LevelProgressionMixin(models.Model):
     that up to the instance's own state and persistence.
     """
 
+    # Declared here (not as model fields) so mypy knows the types provided
+    # by concrete subclasses (Player, Character) - this mixin is abstract
+    # and never instantiated directly.
+    level: int
+    xp: int
+    xp_next_level: int
+
     class Meta:
         abstract = True
+
+    @property
+    def name(self) -> str | None:
+        raise NotImplementedError
 
     def add_xp(self, amount: int):
         """

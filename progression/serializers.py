@@ -1,5 +1,7 @@
 # progression/serializers.py
 
+from typing import cast
+
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.utils import timezone
 from django.utils.html import strip_tags
@@ -258,18 +260,20 @@ class OfflineActivityLogSerializer(serializers.Serializer):
         super().__init__(*args, **kwargs)
         request = self.context.get("request")
         player = getattr(getattr(request, "user", None), "player", None)
-        self.fields["skill"].queryset = (
+        skill_field = cast(serializers.PrimaryKeyRelatedField, self.fields["skill"])
+        skill_field.queryset = (
             PlayerSkill.objects.filter(player=player)
             if player
             else PlayerSkill.objects.none()
         )
-        self.fields["skill"].required = False
-        self.fields["skill"].allow_null = True
-        self.fields["task"].queryset = (
+        skill_field.required = False
+        skill_field.allow_null = True
+        task_field = cast(serializers.PrimaryKeyRelatedField, self.fields["task"])
+        task_field.queryset = (
             Task.objects.filter(player=player) if player else Task.objects.none()
         )
-        self.fields["task"].required = False
-        self.fields["task"].allow_null = True
+        task_field.required = False
+        task_field.allow_null = True
 
     def validate(self, attrs):
         if not attrs.get("name") and not attrs.get("task"):
