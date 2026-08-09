@@ -319,22 +319,32 @@ export default function PopulationCentreMap({
         const feature = e.features?.[0];
         if (!feature) return;
         e.originalEvent?.stopPropagation?.();
-        // home/work carry the building_type (e.g. "residential", "bakery"),
-        // not the building's bookkeeping name - resolved to the same plain
-        // label ("House", "Bakery") shown on that building's own tooltip,
-        // via buildingTypeLabel.
-        const homeType = feature.properties?.home_type as string | null | undefined;
-        const workType = feature.properties?.work_type as string | null | undefined;
+        // current_location_type/destination_location_type carry the
+        // building_type (e.g. "residential", "bakery") of where the
+        // character currently is / is walking to, not a bookkeeping name -
+        // resolved to the same plain label ("House", "Bakery") shown on
+        // that building's own tooltip, via buildingTypeLabel. null means
+        // that spot isn't inside a building at all ("outside").
+        const currentLocationType = feature.properties?.current_location_type as
+          | string
+          | null
+          | undefined;
+        const destinationType = feature.properties?.destination_location_type as
+          | string
+          | null
+          | undefined;
         const characterId = Number(feature.properties?.id);
         setTooltip({
           key: `character-${feature.id ?? JSON.stringify(feature.properties)}`,
           content: (
             <CharacterTooltipContent
               name={feature.properties?.name as string | undefined}
-              home={homeType ? buildingTypeLabel(homeType) : undefined}
-              work={workType ? buildingTypeLabel(workType) : undefined}
               currentActivity={feature.properties?.current_activity as string | null | undefined}
               isMoving={feature.properties?.is_moving as boolean | null | undefined}
+              currentLocationLabel={
+                currentLocationType ? buildingTypeLabel(currentLocationType) : null
+              }
+              destinationLabel={destinationType ? buildingTypeLabel(destinationType) : null}
               onViewDetails={() => openDetail({ type: "character", id: characterId })}
             />
           ),
@@ -485,8 +495,20 @@ export default function PopulationCentreMap({
             "mousemove",
             layerId,
             (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
+              // A character standing inside a building still sits over its
+              // fill layer, so this mousemove keeps firing alongside the
+              // "characters" layer's own hover handler - the character's
+              // hover outline should take priority rather than showing
+              // both at once (mirrors the click-priority check above).
+              const overCharacter =
+                map.queryRenderedFeatures(e.point, { layers: ["characters"] }).length >
+                0;
               const feature = e.features?.[0];
-              const buildingId = feature ? Number(feature.properties?.id) : null;
+              const buildingId = overCharacter
+                ? null
+                : feature
+                  ? Number(feature.properties?.id)
+                  : null;
               if (buildingId === hoveredBuildingIdRef.current) return;
               hoveredBuildingIdRef.current = buildingId;
               setFilterWithFade(

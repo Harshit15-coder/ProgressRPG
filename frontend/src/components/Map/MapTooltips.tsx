@@ -67,10 +67,15 @@ export function BuildingTooltipContent({
 
 interface CharacterTooltipProps {
   name?: string;
-  home?: string | null;
-  work?: string | null;
   currentActivity?: string | null;
   isMoving?: boolean | null;
+  /** Plain label ("House", "Bakery") for the building the character is
+   * currently in, or null/undefined if they're not inside a building. */
+  currentLocationLabel?: string | null;
+  /** Plain label for the building the character is walking to, or
+   * null/undefined if their destination isn't inside a building. Only
+   * relevant while isMoving. */
+  destinationLabel?: string | null;
   /** Second level of progressive disclosure (issue: map entity detail card) -
    * omit to render the tooltip with no "View details" affordance. */
   onViewDetails?: () => void;
@@ -78,20 +83,25 @@ interface CharacterTooltipProps {
 
 export function CharacterTooltipContent({
   name,
-  home,
-  work,
   currentActivity,
   isMoving,
+  currentLocationLabel,
+  destinationLabel,
   onViewDetails,
 }: CharacterTooltipProps) {
-  const activityLabel = isMoving ? "walking" : currentActivity;
+  const statusLine = isMoving
+    ? destinationLabel
+      ? `Walking to ${destinationLabel}`
+      : "Walking outside"
+    : currentActivity &&
+      (currentLocationLabel
+        ? `${currentActivity} at ${currentLocationLabel}`
+        : `${currentActivity} outside`);
 
   return (
     <div>
       <div>{name}</div>
-      {activityLabel && <div>Currently: {activityLabel}</div>}
-      {home && <div>Lives at: {home}</div>}
-      {work && <div>Works at: {work}</div>}
+      {statusLine && <div>{statusLine}</div>}
       {onViewDetails && (
         <button type="button" onClick={onViewDetails}>
           View details

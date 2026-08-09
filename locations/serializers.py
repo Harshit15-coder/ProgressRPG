@@ -124,6 +124,18 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
             return journeys[0] if journeys else None
         return obj.journeys.filter(status="active").first()
 
+    def _building_for_node(self, node):
+        # Node.building and Node.interior_space are mutually exclusive (see
+        # the node_building_or_interior constraint) - an indoor node (kind
+        # INTERIOR) only sets interior_space, so building alone misses it.
+        # InteriorSpace.building is required, so this is the full building
+        # for any node the character could actually be standing at.
+        if node is None:
+            return None
+        return node.building or (
+            node.interior_space.building if node.interior_space else None
+        )
+
     def _current_activity_name(self, obj):
         # current_activity_list is a Prefetch (see PopulationCentreMapView/
         # MapViewportView) filtered to the one CharacterActivity active right
@@ -152,6 +164,16 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
                 )
             ]
 
+        # current_building/destination building_type feed the map tooltip's
+        # "[Activity] at [building]" / "Walking to [building]" copy - None
+        # means the node has no building (tooltip reads "outside" instead).
+        current_building = self._building_for_node(obj.current_node)
+        destination_building = (
+            self._building_for_node(journey.destination_node)
+            if journey is not None
+            else None
+        )
+
         return {
             "id": obj.id,
             "name": obj.name,
@@ -164,6 +186,12 @@ class CharacterPointFeatureSerializer(PointFeatureSerializer):
             "is_moving": obj.is_moving,
             "effective_speed": obj.movement_speed,
             "path": path,
+            "current_location_type": (
+                current_building.building_type if current_building else None
+            ),
+            "destination_location_type": (
+                destination_building.building_type if destination_building else None
+            ),
         }
 
 

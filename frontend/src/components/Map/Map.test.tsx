@@ -124,8 +124,12 @@ class FakeMap {
     return { style: {} as CSSStyleDeclaration };
   }
 
+  // Tests that need queryRenderedFeatures to report a hit (e.g. simulating
+  // the cursor being over a character standing inside a building) set this
+  // directly rather than modelling real spatial hit-testing.
+  queryRenderedFeaturesResult: unknown[] = [];
   queryRenderedFeatures() {
-    return [];
+    return this.queryRenderedFeaturesResult;
   }
 
   project([lng, lat]: [number, number]) {
@@ -772,7 +776,7 @@ describe('PopulationCentreMap', () => {
     expect(tooltip).not.toHaveTextContent('Workers');
   });
 
-  it('shows home, workplace, and current activity in a character tooltip', async () => {
+  it('shows the current activity and location in a character tooltip', async () => {
     const geojsonWithCharacter = {
       ...baseGeojson,
       features: [
@@ -782,9 +786,8 @@ describe('PopulationCentreMap', () => {
             feature_type: 'character',
             id: 1,
             name: 'Alice',
-            home_type: 'residential',
-            work_type: 'bakery',
             current_activity: 'delivering goods to neighbours',
+            current_location_type: 'bakery',
           },
         },
       ],
@@ -798,15 +801,40 @@ describe('PopulationCentreMap', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
-    // home_type/work_type are the building_type ("residential"/"bakery"),
-    // not the building's bookkeeping name - resolved to the same plain
-    // label ("House"/"Bakery") shown on that building's own tooltip.
-    expect(tooltip).toHaveTextContent('Lives at: House');
-    expect(tooltip).toHaveTextContent('Works at: Bakery');
-    expect(tooltip).toHaveTextContent('delivering goods to neighbours');
+    // current_location_type is the building_type ("bakery"), not the
+    // building's bookkeeping name - resolved to the same plain label
+    // ("Bakery") shown on that building's own tooltip.
+    expect(tooltip).toHaveTextContent('delivering goods to neighbours at Bakery');
   });
 
-  it('shows "walking" in a character tooltip when the character is moving, overriding their scheduled activity', async () => {
+  it('shows "outside" in a character tooltip when their current location has no building', async () => {
+    const geojsonWithCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            current_activity: 'foraging',
+            current_location_type: null,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('foraging outside');
+  });
+
+  it('shows "Walking to [destination]" in a character tooltip when the character is moving, instead of their scheduled activity', async () => {
     const geojsonWithMovingCharacter = {
       ...baseGeojson,
       features: [
@@ -818,6 +846,7 @@ describe('PopulationCentreMap', () => {
             name: 'Alice',
             current_activity: 'delivering goods to neighbours',
             is_moving: true,
+            destination_location_type: 'bakery',
           },
         },
       ],
@@ -830,11 +859,38 @@ describe('PopulationCentreMap', () => {
     });
 
     const tooltip = await screen.findByRole('tooltip');
-    expect(tooltip).toHaveTextContent('Currently: walking');
+    expect(tooltip).toHaveTextContent('Walking to Bakery');
     expect(tooltip).not.toHaveTextContent('delivering goods to neighbours');
   });
 
-  it('omits the current activity line when a character has none scheduled', async () => {
+  it('shows "Walking outside" when a moving character\'s destination has no building', async () => {
+    const geojsonWithMovingCharacter = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Point', coordinates: [10, 10] },
+          properties: {
+            feature_type: 'character',
+            id: 1,
+            name: 'Alice',
+            is_moving: true,
+            destination_location_type: null,
+          },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithMovingCharacter });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'character');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 10, lat: 10 } }, 'characters');
+    });
+
+    const tooltip = await screen.findByRole('tooltip');
+    expect(tooltip).toHaveTextContent('Walking outside');
+  });
+
+  it('omits the status line when a character has no activity or destination', async () => {
     const geojsonWithCharacter = {
       ...baseGeojson,
       features: [
@@ -858,7 +914,8 @@ describe('PopulationCentreMap', () => {
 
     const tooltip = await screen.findByRole('tooltip');
     expect(tooltip).toHaveTextContent('Alice');
-    expect(tooltip).not.toHaveTextContent('Currently:');
+    expect(tooltip).not.toHaveTextContent(' at ');
+    expect(tooltip).not.toHaveTextContent('Walking to');
   });
 
   it('shows the crop stage in a field tooltip instead of the literal word "Crops"', async () => {
@@ -1231,6 +1288,46 @@ describe('PopulationCentreMap entity detail card', () => {
       );
       expect(opacityCalls.at(-1)?.value).toBe(1);
     });
+  });
+
+  it('does not show the building hover outline when the cursor is over a character standing inside it', async () => {
+    const geojsonWithHouse = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: { feature_type: 'building', id: 42, name: 'House', building_type: 'residential' },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithHouse });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
+
+    // First move over the building with nothing else under the cursor, so
+    // its hover outline is showing (establishes a non-null baseline).
+    act(() => {
+      currentMap().trigger('mousemove', { features: [feature], point: { x: 0, y: 0 } }, 'buildings-fill');
+    });
+    const hoverCalls = () =>
+      currentMap().setFilterCalls.filter((c) => c.layerId === 'hover-building-outline');
+    expect(hoverCalls().at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'building'],
+      ['==', ['get', 'id'], 42],
+    ]);
+
+    // Now simulate the cursor also hitting the "characters" layer at this
+    // point, as it would when a character is standing inside the building.
+    currentMap().queryRenderedFeaturesResult = [{ properties: { id: 7 } }];
+    act(() => {
+      currentMap().trigger('mousemove', { features: [feature], point: { x: 0, y: 0 } }, 'buildings-fill');
+    });
+
+    expect(hoverCalls().at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'building'],
+      ['==', ['get', 'id'], -1],
+    ]);
   });
 
   it('highlights the selected character on the map while its detail card is open', async () => {
