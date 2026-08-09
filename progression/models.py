@@ -233,7 +233,7 @@ class SkillDefinition(models.Model):
         return self.name
 
     def is_unlocked_for(self, character) -> bool:
-        if self.gate_group_id is None or self.min_proficiency is None:
+        if self.gate_group is None or self.min_proficiency is None:
             return True
         return self.gate_group.proficiency_for(character) >= self.min_proficiency
 
@@ -1074,6 +1074,8 @@ class Task(PlayerOwnedMixin):
             return
         if self.parent_id == self.id:
             raise ValidationError({"parent": "A task cannot be its own parent."})
+        if self.parent is None:
+            return
         if self.parent.parent_id is not None:
             raise ValidationError({"parent": "Cannot nest more than one level deep."})
         if self.parent.player_id != self.player_id:

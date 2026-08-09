@@ -70,7 +70,7 @@ class Command(BaseCommand):
         # character; group_population_centre records, per family group, the
         # population centre its first-placed member landed in.
         family_groups = relationship_services.relationship_get_family_groups(characters)
-        group_population_centre = {}
+        group_population_centre: dict[int, int] = {}
 
         for char in characters:
             available = [b for b in buildings if occupancy[b.id] < max_per_building]

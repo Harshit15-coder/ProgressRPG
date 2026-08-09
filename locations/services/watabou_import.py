@@ -22,6 +22,8 @@ import_watabou_village's management command) rather than trying to derive
 walkable edges from arbitrary imported road geometry.
 """
 
+from typing import cast
+
 from django.contrib.gis.geos import LineString, Point, Polygon
 from django.db import transaction
 
@@ -113,8 +115,12 @@ def _import_fields(
 
     combined = polygons[0]
     for polygon in polygons[1:]:
-        combined = combined.union(polygon)
-    boundary = combined if combined.geom_type == "Polygon" else combined.convex_hull
+        combined = cast(Polygon, combined.union(polygon))
+    boundary = (
+        combined
+        if combined.geom_type == "Polygon"
+        else cast(Polygon, combined.convex_hull)
+    )
 
     land_area = LandArea.objects.create(
         name=f"Fields of ({population_centre.name})",
@@ -162,11 +168,11 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
     if district_polygons:
         raw_boundary = district_polygons[0]
         for polygon in district_polygons[1:]:
-            raw_boundary = raw_boundary.union(polygon)
+            raw_boundary = cast(Polygon, raw_boundary.union(polygon))
         if raw_boundary.geom_type != "Polygon":
             # Districts aren't guaranteed to touch - fall back to their
             # convex hull so the boundary stays a single Polygon.
-            raw_boundary = raw_boundary.convex_hull
+            raw_boundary = cast(Polygon, raw_boundary.convex_hull)
     elif earth_feature:
         raw_boundary = Polygon(_close_ring(earth_feature["coordinates"][0]))
     else:

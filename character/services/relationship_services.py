@@ -37,7 +37,7 @@ def relationship_create(relationship_type, members, variant=""):
         relationship_type=relationship_type, variant=variant
     )
 
-    counts = {}
+    counts: dict[RelationshipRole, int] = {}
     for character, role in members:
         role = RelationshipRole(role)
         CharacterRelationshipMembership.objects.create(
