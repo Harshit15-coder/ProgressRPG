@@ -28,6 +28,7 @@ from typing import cast
 from django.contrib.gis.geos import LineString, Point, Polygon
 from django.db import transaction
 
+from economy.models import BuildingCapability
 from economy.services.planning_services import settlement_plan
 from locations.management.commands.generate_villages import (
     compute_building_entrance_point,
@@ -49,28 +50,111 @@ SQUARE_METRES_PER_HECTARE = 10_000
 DEFAULT_ROAD_WIDTH = 6.0
 
 # watabou doesn't tag buildings with a structured type, so one is assigned
-# per import: ~75% of buildings become "residential", then one each of the
-# "special" (work) types below is assigned from the remainder, in this
-# fixed order. There's no catch-all type for anything left over once every
-# special type has its one instance - those buildings become "residential"
+# per import: ~75% of buildings become "residential"; the remainder is
+# split between the always-present economy chain (granary, milling,
+# baking - see _assign_building_types_and_capabilities) and these purely
+# decorative types, which fill any slots left over after the economy chain
+# is satisfied. There's no catch-all type for anything left over once every
+# type here has its one instance - those buildings become "residential"
 # too.
 RESIDENTIAL_BUILDING_RATIO = 0.75
-SPECIAL_BUILDING_TYPES = ["granary", "inn", "mill", "bakery", "market", "hall"]
+OPTIONAL_BUILDING_TYPES = ["inn", "market", "hall"]
 
 
-def _assign_building_types(count: int) -> list[str]:
+def _polygon_area(polygon_coords) -> float:
+    """
+    Area of a raw (untranslated) watabou building polygon - translation
+    doesn't affect area, so this works ahead of picking an origin/offset,
+    unlike _translate_polygon.
+    """
+    return Polygon(*(_close_ring(ring) for ring in polygon_coords)).area
+
+
+def _assign_building_types_and_capabilities(
+    building_coordinates: list,
+) -> tuple[list[str], dict[int, list[str]]]:
+    """
+    Decide each imported building's building_type, and which
+    BuildingCapability activities (if any) it should get - driven by
+    settlement_plan instead of a fixed one-of-each-special-type list (see
+    .claude/plans/village-capacity-sizing-plan.md step 4). Returns
+    (building_types, capabilities_by_index), the second a map from index
+    in building_types/building_coordinates to a list of
+    economy.models.BuildingCapability.Activity values to attach.
+
+    Granary/milling/baking are guaranteed a slot ahead of the purely
+    decorative OPTIONAL_BUILDING_TYPES, since they're the always_present
+    economy chain (see planning_services._recommended_buildings). If
+    there's only one spare non-residential slot, milling and baking are
+    packed onto a single shared "communal" building instead of one being
+    dropped entirely - this is what actually fixes the original Ashenford
+    bug (a small village silently missing a bakery because the old
+    fixed-order allocation ran out of slots before reaching it).
+
+    The population figure fed to settlement_plan is a rough pre-creation
+    estimate (from the footprint areas of whichever buildings this same
+    ratio split would leave residential), not the more accurate post-
+    creation estimate logged at the end of import_watabou_village - good
+    enough here since it only ever changes *how many* buildings each role
+    recommends (always exactly 1 today - see _recommended_buildings' "no
+    per-building labor cap yet" note), not whether it's needed at all.
+    """
+    count = len(building_coordinates)
     residential_count = round(count * RESIDENTIAL_BUILDING_RATIO)
-
     remaining = count - residential_count
-    types = []
-    for building_type in SPECIAL_BUILDING_TYPES:
+
+    residential_areas = [
+        _polygon_area(coords)
+        for coords in (
+            building_coordinates[-residential_count:] if residential_count else []
+        )
+    ]
+    estimated_population = (
+        population_estimation.estimate_population_from_footprint_areas(
+            residential_areas
+        )
+    )
+    plan = settlement_plan(population=estimated_population)
+
+    building_types: list[str] = []
+    capabilities_by_index: dict[int, list[str]] = {}
+
+    if remaining > 0 and plan.recommended_granaries > 0:
+        building_types.append("granary")
+        remaining -= 1
+
+    needs_milling = plan.milling.recommended_buildings > 0
+    needs_baking = plan.baking.recommended_buildings > 0
+    if remaining >= 2 and needs_milling and needs_baking:
+        capabilities_by_index[len(building_types)] = [
+            BuildingCapability.Activity.MILLING
+        ]
+        building_types.append("mill")
+        remaining -= 1
+        capabilities_by_index[len(building_types)] = [
+            BuildingCapability.Activity.BAKING
+        ]
+        building_types.append("bakery")
+        remaining -= 1
+    elif remaining >= 1 and (needs_milling or needs_baking):
+        activities = []
+        if needs_milling:
+            activities.append(BuildingCapability.Activity.MILLING)
+        if needs_baking:
+            activities.append(BuildingCapability.Activity.BAKING)
+        capabilities_by_index[len(building_types)] = activities
+        building_types.append("communal")
+        remaining -= 1
+
+    for building_type in OPTIONAL_BUILDING_TYPES:
         if remaining <= 0:
             break
-        types.append(building_type)
+        building_types.append(building_type)
         remaining -= 1
-    types.extend(["residential"] * (residential_count + remaining))
 
-    return types
+    building_types.extend(["residential"] * (residential_count + remaining))
+
+    return building_types, capabilities_by_index
 
 
 def _feature_by_id(data: dict, feature_id: str) -> dict | None:
@@ -200,7 +284,9 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
     )
 
     building_coordinates = buildings_feature.get("coordinates", [])
-    building_types = _assign_building_types(len(building_coordinates))
+    building_types, capabilities_by_index = _assign_building_types_and_capabilities(
+        building_coordinates
+    )
 
     for i, (polygon_coords, building_type) in enumerate(
         zip(building_coordinates, building_types)
@@ -214,6 +300,8 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
             footprint=footprint,
             population_centre=population_centre,
         )
+        for activity in capabilities_by_index.get(i, []):
+            BuildingCapability.objects.create(building=building, activity=activity)
         Node.objects.get_or_create(
             building=building,
             kind=Node.Kind.BUILDING,

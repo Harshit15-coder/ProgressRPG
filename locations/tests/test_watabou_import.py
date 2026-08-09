@@ -1,6 +1,7 @@
 from django.contrib.gis.geos import Point, Polygon
 from django.test import TestCase
 
+from economy.models import BuildingCapability
 from locations.models import LandArea, Node, PopulationCentre, Road, Subzone
 from locations.services.watabou_import import import_watabou_village
 
@@ -88,8 +89,12 @@ class WatabouImportBuildingTypeTest(TestCase):
         self.assertEqual(building.building_type, "residential")
 
     def test_roughly_three_quarters_residential_with_one_of_each_special(self):
-        # 8 buildings: 75% -> 6 residential, remaining 2 -> one each of the
-        # first two special types (granary, inn), in fixed order.
+        # 8 buildings: 75% -> 6 residential, remaining 2 -> granary plus one
+        # shared "communal" building packing both milling and baking (only
+        # one non-residential slot is left once granary takes the other),
+        # rather than a decorative "inn" - the always-present economy chain
+        # is guaranteed a slot ahead of decorative types (see
+        # _assign_building_types_and_capabilities).
         data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
         origin = Point(0, 0, srid=3857)
 
@@ -98,9 +103,13 @@ class WatabouImportBuildingTypeTest(TestCase):
         types = [b.building_type for b in centre.buildings.order_by("id")]
         self.assertEqual(types.count("residential"), 6)
         self.assertEqual(types.count("granary"), 1)
-        self.assertEqual(types.count("inn"), 1)
-        for untouched_type in ["mill", "bakery", "market", "hall", "communal"]:
+        self.assertEqual(types.count("communal"), 1)
+        for untouched_type in ["inn", "mill", "bakery", "market", "hall"]:
             self.assertEqual(types.count(untouched_type), 0)
+
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
 
     def test_leftover_after_every_special_type_falls_back_to_residential(self):
         # 30 buildings: 75% -> 22 residential (Python's round-half-to-even),
@@ -116,6 +125,37 @@ class WatabouImportBuildingTypeTest(TestCase):
         for special_type in ["granary", "inn", "mill", "bakery", "market", "hall"]:
             self.assertEqual(types.count(special_type), 1)
         self.assertEqual(types.count("communal"), 0)
+
+        mill = centre.buildings.get(building_type="mill")
+        bakery = centre.buildings.get(building_type="bakery")
+        self.assertEqual(
+            list(mill.capabilities.values_list("activity", flat=True)), ["milling"]
+        )
+        self.assertEqual(
+            list(bakery.capabilities.values_list("activity", flat=True)), ["baking"]
+        )
+
+    def test_small_village_packs_milling_and_baking_onto_one_communal_building(self):
+        # 6 buildings: 75% -> 4 residential, remaining 2 - not enough for a
+        # granary plus one dedicated building per role, so milling and
+        # baking share a single "communal" building instead of one losing
+        # out to a fixed allocation order (the original Ashenford bug: a
+        # small village silently missing a bakery).
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 6)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Small Village", origin=origin)
+
+        types = [b.building_type for b in centre.buildings.order_by("id")]
+        self.assertEqual(types.count("residential"), 4)
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("communal"), 1)
+        for untouched_type in ["inn", "mill", "bakery", "market", "hall"]:
+            self.assertEqual(types.count(untouched_type), 0)
+
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
 
 
 class WatabouImportPopulationPlanLoggingTest(TestCase):
