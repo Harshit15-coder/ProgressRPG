@@ -297,8 +297,6 @@ prompt-toolkit==3.0.52
     # via click-repl
 psutil==7.2.2
     # via locust
-psycopg2==2.9.12
-    # via -r requirements.in
 psycopg2-binary==2.9.12
     # via -r requirements.in
 pycparser==3.0
