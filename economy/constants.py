@@ -132,6 +132,15 @@ LINK_POINTS_PRODUCTIVITY_SCALE = 2000
 # unlinked baseline (2x at the default below).
 MAX_PRODUCTIVITY_BONUS = 1.0
 
+# A settlement at or below this resident count shares one building for both
+# milling and baking (see planning_services.SettlementPlan.
+# combine_milling_and_baking) rather than getting a dedicated building per
+# role, even when there'd be enough building slots for two - two half-empty
+# production buildings isn't a better outcome than one shared one for a
+# small village. 30 is an approximate "small village" cutoff pending a real
+# balance pass, not derived from another constant.
+SMALL_SETTLEMENT_POPULATION_THRESHOLD = 30
+
 
 def unit_suffix(good_type):
     """Display suffix ("kg"/"L") for a good's quantity, per GOOD_TYPE_UNIT."""

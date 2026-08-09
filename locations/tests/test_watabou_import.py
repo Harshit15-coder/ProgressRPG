@@ -20,6 +20,11 @@ MILL_WARD = {
 # Building coordinates are a list of rings (one ring each here), same shape
 # as watabou's own "buildings" feature - not a bare list of points.
 TRADE_BUILDING = [[[2, 2], [8, 2], [8, 8], [2, 8]]]
+# A much larger footprint than TRADE_BUILDING (100 sqm vs 36 sqm) - used
+# where a test needs population_estimation to produce a population above
+# SMALL_SETTLEMENT_POPULATION_THRESHOLD, since TRADE_BUILDING alone rounds
+# down to 0 estimated residents per building.
+LARGE_BUILDING = [[[0, 0], [10, 0], [10, 10], [0, 10]]]
 
 EARTH = {"coordinates": [[[-500, -500], [500, -500], [500, 500], [-500, 500]]]}
 
@@ -112,18 +117,48 @@ class WatabouImportBuildingTypeTest(TestCase):
         self.assertEqual(activities, {"milling", "baking"})
 
     def test_leftover_after_every_special_type_falls_back_to_residential(self):
-        # 30 buildings: 75% -> 22 residential (Python's round-half-to-even),
-        # remaining 8 -> one each of all six special types, and the 2 slots
-        # left over after that fold back into residential (no catch-all).
+        # 30 small (TRADE_BUILDING) buildings: 75% -> 22 residential
+        # (Python's round-half-to-even), remaining 8. TRADE_BUILDING's tiny
+        # footprint rounds down to 0 estimated residents per building, so
+        # the settlement is well under SMALL_SETTLEMENT_POPULATION_THRESHOLD
+        # and milling+baking still share one communal building even though
+        # there'd be enough slots for two dedicated ones - granary and
+        # communal take 2 of the 8 remaining slots, inn/market/hall take
+        # the next 3, and the final 3 fold back into residential (no
+        # catch-all).
         data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 30)
         origin = Point(0, 0, srid=3857)
 
         centre = import_watabou_village(data, name="Thirty Buildings", origin=origin)
 
         types = [b.building_type for b in centre.buildings.order_by("id")]
-        self.assertEqual(types.count("residential"), 24)
-        for special_type in ["granary", "inn", "mill", "bakery", "market", "hall"]:
+        self.assertEqual(types.count("residential"), 25)
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("communal"), 1)
+        for special_type in ["inn", "market", "hall"]:
             self.assertEqual(types.count(special_type), 1)
+        for untouched_type in ["mill", "bakery"]:
+            self.assertEqual(types.count(untouched_type), 0)
+
+        communal = centre.buildings.get(building_type="communal")
+        activities = set(communal.capabilities.values_list("activity", flat=True))
+        self.assertEqual(activities, {"milling", "baking"})
+
+    def test_large_population_gets_dedicated_mill_and_bakery(self):
+        # 24 large (LARGE_BUILDING) buildings: 75% -> 18 residential,
+        # remaining 6. LARGE_BUILDING's footprint is big enough that the
+        # estimated population clears SMALL_SETTLEMENT_POPULATION_THRESHOLD,
+        # so milling and baking get dedicated buildings rather than sharing
+        # a communal one, even though sharing would also fit.
+        data = _make_export(districts=None, buildings=[LARGE_BUILDING] * 24)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Large Village", origin=origin)
+
+        types = [b.building_type for b in centre.buildings.order_by("id")]
+        self.assertEqual(types.count("granary"), 1)
+        self.assertEqual(types.count("mill"), 1)
+        self.assertEqual(types.count("bakery"), 1)
         self.assertEqual(types.count("communal"), 0)
 
         mill = centre.buildings.get(building_type="mill")

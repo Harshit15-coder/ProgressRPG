@@ -85,12 +85,15 @@ def _assign_building_types_and_capabilities(
 
     Granary/milling/baking are guaranteed a slot ahead of the purely
     decorative OPTIONAL_BUILDING_TYPES, since they're the always_present
-    economy chain (see planning_services._recommended_buildings). If
-    there's only one spare non-residential slot, milling and baking are
-    packed onto a single shared "communal" building instead of one being
-    dropped entirely - this is what actually fixes the original Ashenford
-    bug (a small village silently missing a bakery because the old
-    fixed-order allocation ran out of slots before reaching it).
+    economy chain (see planning_services._recommended_buildings). Milling
+    and baking are packed onto a single shared "communal" building
+    whenever the settlement is small (plan.combine_milling_and_baking -
+    see SMALL_SETTLEMENT_POPULATION_THRESHOLD) even if there'd be enough
+    slots for two dedicated buildings, and as a fallback whenever there
+    genuinely isn't room for two regardless of population - this is what
+    actually fixes the original Ashenford bug (a small village silently
+    missing a bakery because the old fixed-order allocation ran out of
+    slots before reaching it).
 
     The population figure fed to settlement_plan is a rough pre-creation
     estimate (from the footprint areas of whichever buildings this same
@@ -126,17 +129,26 @@ def _assign_building_types_and_capabilities(
 
     needs_milling = plan.milling.recommended_buildings > 0
     needs_baking = plan.baking.recommended_buildings > 0
-    if remaining >= 2 and needs_milling and needs_baking:
-        capabilities_by_index[len(building_types)] = [
-            BuildingCapability.Activity.MILLING
-        ]
-        building_types.append("mill")
-        remaining -= 1
-        capabilities_by_index[len(building_types)] = [
-            BuildingCapability.Activity.BAKING
-        ]
-        building_types.append("bakery")
-        remaining -= 1
+    if needs_milling and needs_baking:
+        combine = plan.combine_milling_and_baking or remaining < 2
+        if combine and remaining >= 1:
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.MILLING,
+                BuildingCapability.Activity.BAKING,
+            ]
+            building_types.append("communal")
+            remaining -= 1
+        elif remaining >= 2:
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.MILLING
+            ]
+            building_types.append("mill")
+            remaining -= 1
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.BAKING
+            ]
+            building_types.append("bakery")
+            remaining -= 1
     elif remaining >= 1 and (needs_milling or needs_baking):
         activities = []
         if needs_milling:
