@@ -20,6 +20,8 @@ from character.models import Character
 from economy.constants import (
     BREAD_PER_CHARACTER_DAILY_CONSUMPTION,
     FLOUR_TO_BREAD_RATIO,
+    LINK_POINTS_PRODUCTIVITY_SCALE,
+    MAX_PRODUCTIVITY_BONUS,
     PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
@@ -34,6 +36,7 @@ from economy.services.capacity_services import (
     find_granary,
     find_mill,
     population_capacity_report,
+    worker_capacity_present,
     workers_present,
 )
 from locations.models import Building, LandArea, Node, PopulationCentre, Subzone
@@ -316,3 +319,79 @@ class SharedHelperTests(TestCase):
         self.assertIsNone(find_granary(None))
         self.assertIsNone(find_mill(None))
         self.assertIsNone(find_bakery(None))
+
+
+class WorkerCapacityPresentTests(TestCase):
+    """
+    worker_capacity_present - the link-scaled counterpart to workers_present
+    used everywhere a headcount feeds a capacity_per_day labor cap (see
+    economy.tasks and population_capacity_report). Expected values are
+    derived from LINK_POINTS_PRODUCTIVITY_SCALE/MAX_PRODUCTIVITY_BONUS
+    rather than hardcoded, matching this module's "never hardcode" rule.
+    """
+
+    def test_zero_iff_workers_present_is_zero(self):
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
+        bakery, node = _make_building(centre, "bakery", 10)
+
+        self.assertEqual(worker_capacity_present(bakery), 0)
+
+    def test_unlinked_characters_contribute_exactly_one_each(self):
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
+        bakery, node = _make_building(centre, "bakery", 10)
+        _add_workers(bakery, node, count=3)
+
+        self.assertEqual(worker_capacity_present(bakery), 3)
+
+    def test_linked_character_contributes_more_than_baseline(self):
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
+        bakery, node = _make_building(centre, "bakery", 10)
+        Character.objects.create(
+            given_name="Linked",
+            location=bakery.location,
+            current_node=node,
+            is_moving=False,
+        )
+        link_points = LINK_POINTS_PRODUCTIVITY_SCALE / 2
+
+        with patch.object(
+            Character,
+            "total_link_points",
+            new_callable=PropertyMock,
+            return_value=link_points,
+        ):
+            capacity = worker_capacity_present(bakery)
+
+        expected = 1 + (link_points / LINK_POINTS_PRODUCTIVITY_SCALE)
+        self.assertEqual(capacity, expected)
+        self.assertGreater(capacity, 1)
+
+    def test_productivity_bonus_is_capped_not_unbounded(self):
+        centre, patcher = _make_centre()
+        self.addCleanup(patcher.stop)
+        bakery, node = _make_building(centre, "bakery", 10)
+        Character.objects.create(
+            given_name="MaxedOut",
+            location=bakery.location,
+            current_node=node,
+            is_moving=False,
+        )
+        # Vastly more link_points than the scale constant - if the curve
+        # were linear rather than capped, this would blow past
+        # 1 + MAX_PRODUCTIVITY_BONUS, which is exactly the bug this test
+        # guards against (see plan Risk: "unbounded productivity if the
+        # curve is implemented as linear by mistake").
+        huge_link_points = LINK_POINTS_PRODUCTIVITY_SCALE * 1000
+
+        with patch.object(
+            Character,
+            "total_link_points",
+            new_callable=PropertyMock,
+            return_value=huge_link_points,
+        ):
+            capacity = worker_capacity_present(bakery)
+
+        self.assertEqual(capacity, 1 + MAX_PRODUCTIVITY_BONUS)

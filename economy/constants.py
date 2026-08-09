@@ -116,6 +116,22 @@ HUNGER_PER_MISSED_MEAL = 10.0
 # unbounded.
 HUNGER_MAX = 100.0
 
+# Link-scaled worker productivity: a physically-present worker contributes
+# 1 (baseline - matches today's flat headcount) plus a bonus derived from
+# their character's total_link_points, instead of a flat 1 per worker.
+# Capped, not linear, since link_points itself is cumulative and unbounded
+# (see PlayerCharacterLink.link_points) - an uncapped multiplier would let a
+# long-linked character's output grow forever. ~100 days of a link
+# (100 * 20 = 2000 link points from days_linked alone, before any
+# login/activity points) reaches the cap - a rough "several months of
+# regular play" outer bound pending a real balance pass.
+LINK_POINTS_PRODUCTIVITY_SCALE = 2000
+
+# Maximum productivity bonus a single worker's link_points can contribute -
+# a fully-maxed worker produces at most 1 + MAX_PRODUCTIVITY_BONUS times the
+# unlinked baseline (2x at the default below).
+MAX_PRODUCTIVITY_BONUS = 1.0
+
 
 def unit_suffix(good_type):
     """Display suffix ("kg"/"L") for a good's quantity, per GOOD_TYPE_UNIT."""
