@@ -2,6 +2,7 @@ import math
 import random
 from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import Point, Polygon, MultiPolygon
+from economy.models import BuildingCapability
 from economy.services.planning_services import settlement_plan
 from locations.models import PopulationCentre, Building, InteriorSpace, Node, Path
 from locations.services import population_estimation
@@ -11,6 +12,16 @@ from math import sqrt
 
 
 SPECIAL_BUILDINGS = ["granary", "inn", "mill", "bakery", "communal"]
+# Which of SPECIAL_BUILDINGS get a BuildingCapability row - granary/inn/
+# communal aren't labor-capped production activities (see
+# economy.models.BuildingCapability's docstring); mill/bakery are, and
+# without this the mill/bakery buildings this command creates would be
+# invisible to capacity_services.find_mill/find_bakery, which look up
+# capabilities__activity rather than building_type.
+SPECIAL_BUILDING_CAPABILITIES = {
+    "mill": BuildingCapability.Activity.MILLING,
+    "bakery": BuildingCapability.Activity.BAKING,
+}
 RESIDENTIAL_PER_VILLAGE = 5
 IRREGULARITY = 0
 BUILDING_BUFFER = 2
@@ -333,6 +344,11 @@ class Command(BaseCommand):
                     footprint=footprint,
                     population_centre=None,
                 )
+                activity = SPECIAL_BUILDING_CAPABILITIES.get(building_type)
+                if activity:
+                    BuildingCapability.objects.create(
+                        building=building, activity=activity
+                    )
 
                 placed_building_points.append(building_point)
                 created_buildings.append(building)
