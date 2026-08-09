@@ -90,6 +90,26 @@ class GameSettings(models.Model):
         max_digits=5, decimal_places=2, default="1.25"
     )
     task_completion_xp = models.IntegerField(default=100)
+    xp_mastery_scale = models.DecimalField(
+        max_digits=10,
+        decimal_places=2,
+        default="1000.00",
+        help_text=(
+            "Skill XP needed for the Activity Points mastery multiplier to "
+            "grow by +1.0x (see progression.points.xp_mastery_multiplier)."
+        ),
+    )
+    xp_mastery_multiplier_cap = models.DecimalField(
+        max_digits=5, decimal_places=2, default="3.00"
+    )
+    activity_compaction_cutoff_days = models.IntegerField(
+        default=90,
+        help_text=(
+            "Completed CharacterActivity rows older than this are rolled "
+            "into CharacterActivityArchive monthly summaries and deleted "
+            "(see progression.tasks.compact_character_activities)."
+        ),
+    )
     activity_search_includes_tasks = models.BooleanField(default=False)
     trial_period_days = models.IntegerField(default=14)
     registration_cap = models.IntegerField(default=1_000_000_000)
@@ -142,6 +162,12 @@ class GameSettings(models.Model):
             errors["task_activity_xp_multiplier"] = "Must be > 0."
         if self.task_completion_xp < 0:
             errors["task_completion_xp"] = "Must be non-negative."
+        if self.xp_mastery_scale <= 0:
+            errors["xp_mastery_scale"] = "Must be > 0."
+        if self.xp_mastery_multiplier_cap < 1:
+            errors["xp_mastery_multiplier_cap"] = "Must be >= 1."
+        if self.activity_compaction_cutoff_days <= 0:
+            errors["activity_compaction_cutoff_days"] = "Must be > 0."
         if self.trial_period_days < 0:
             errors["trial_period_days"] = "Must be non-negative."
         if self.registration_cap < 0:
@@ -169,6 +195,30 @@ class GameSettings(models.Model):
 class AnnouncementQuerySet(models.QuerySet):
     def published(self):
         return self.filter(is_published=True)
+
+
+class FeatureFlag(models.Model):
+    ACCESS_GROUPS = ["all", "premium", "testers"]
+
+    key = models.CharField(max_length=100, unique=True)
+    access_groups = models.JSONField(
+        default=list,
+        help_text="List of groups that can access this feature: 'all', 'premium', 'testers'.",
+    )
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("key",)
+
+    def __str__(self):
+        groups = ", ".join(self.access_groups) if self.access_groups else "no one"
+        return f"{self.key} ({groups})"
+
+    @classmethod
+    def as_dict(cls):
+        return {flag.key: flag.access_groups for flag in cls.objects.all()}
 
 
 class Announcement(models.Model):

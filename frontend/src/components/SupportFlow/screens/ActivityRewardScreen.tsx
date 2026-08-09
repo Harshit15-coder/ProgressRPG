@@ -3,9 +3,9 @@ import React, { useEffect, useRef, useState } from "react";
 import Button from "../../Button/Button";
 import ButtonFrame from "../../Button/ButtonFrame";
 import { formatRewardDuration } from "../../../utils/formatUtils";
-import { buildActivityRewardBreakdown } from "../../../utils/activityRewardBreakdown";
 import { useTasks, useUpdateTask } from "../../../hooks/useTasks";
 import { useGame } from "../../../hooks/useGame";
+import RewardBreakdown from "./RewardBreakdown";
 import styles from "../SupportFlowModal.module.scss";
 
 const SUPPORT_COUNTDOWN_MS = 3000;
@@ -99,27 +99,26 @@ export default function ActivityRewardScreen({
   const continueButtonLabel = shouldEnableCountdown
     ? `Continue with support in ${countdownSeconds}..`
     : "Continue with support";
-
-  const {
-    hasXp,
-    xpGained: parsedXp,
-    hasElapsedSeconds,
-    condensedElapsed,
-    rewardSummaryLine,
-    multiplierLines,
-    isLikelyPremiumUser,
-    normalizedLevelUps,
-    hasActivityName,
-  } = buildActivityRewardBreakdown({
-    activityName,
-    xpGained,
-    baseXp,
-    xpMultiplier,
-    taskXpMultiplier,
-    levelUps,
-    elapsedSeconds,
-  });
-
+  const parsedBaseXp = Number(baseXp);
+  const parsedMultiplier = Number(xpMultiplier);
+  const hasRewardBreakdown =
+    Number.isFinite(parsedBaseXp) &&
+    parsedBaseXp >= 0 &&
+    Number.isFinite(parsedMultiplier) &&
+    parsedMultiplier > 0 &&
+    Number.isFinite(Number(xpGained));
+  const parsedTaskXpMultiplier = Number(taskXpMultiplier);
+  const hasTaskBonus =
+    Number.isFinite(parsedTaskXpMultiplier) && parsedTaskXpMultiplier > 1;
+  // Infer premium component: combined / task (or combined if no task bonus).
+  // Duplicated (not shared) with RewardBreakdown's own copy of this
+  // calculation — it's only used here to gate the upgrade prompt, which is
+  // specific to this modal screen, not the extracted breakdown display.
+  const premiumMultiplier =
+    hasRewardBreakdown && hasTaskBonus && parsedTaskXpMultiplier > 0
+      ? parsedMultiplier / parsedTaskXpMultiplier
+      : parsedMultiplier;
+  const isLikelyPremiumUser = premiumMultiplier >= 2;
   const shouldShowUpgradePrompt = Boolean(showUpgradePrompt) && !isLikelyPremiumUser;
   const upgradeMessage = shouldShowUpgradePrompt
     ? isAutoStopped
@@ -129,34 +128,15 @@ export default function ActivityRewardScreen({
 
   return (
     <div>
-      {(hasElapsedSeconds || hasXp) && (
-        <div className={styles.rewardBreakdown}>
-          <p className={styles.rewardSummary}>{rewardSummaryLine}</p>
-          {condensedElapsed && (
-            <div className={styles.rewardBreakdownRow}>
-              <span className={styles.rewardBreakdownLabel}>Time</span>
-              <span className={styles.rewardBreakdownValue}>{condensedElapsed}</span>
-            </div>
-          )}
-          {multiplierLines.map((line) => (
-            <div className={styles.rewardBreakdownRow} key={line.label}>
-              <span className={styles.rewardBreakdownLabel}>{line.label}</span>
-              <span className={styles.rewardBreakdownValue}>{line.value}</span>
-            </div>
-          ))}
-          {hasXp && (
-            <div className={styles.rewardBreakdownRowPrimary}>
-              <span className={styles.rewardBreakdownLabel}>Total XP gained</span>
-              <span className={styles.rewardBreakdownValue}>+{parsedXp} XP</span>
-            </div>
-          )}
-        </div>
-      )}
-      {!(hasElapsedSeconds || hasXp) && <p>{rewardSummaryLine}</p>}
-      {normalizedLevelUps.map((level) => (
-        <p key={level}>Level up! You reached level {level}.</p>
-      ))}
-      {!hasActivityName && hasXp && <p>You gained {parsedXp} XP!</p>}
+      <RewardBreakdown
+        activityName={activityName}
+        xpGained={xpGained}
+        baseXp={baseXp}
+        xpMultiplier={xpMultiplier}
+        taskXpMultiplier={taskXpMultiplier}
+        levelUps={levelUps}
+        elapsedSeconds={elapsedSeconds}
+      />
 
       {linkedTask && (
         <div className={styles.taskCompletionPanel}>

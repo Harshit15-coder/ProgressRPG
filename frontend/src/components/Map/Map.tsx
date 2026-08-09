@@ -1,5 +1,13 @@
 import type React from "react";
-import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from "react";
+import {
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+  type Ref,
+} from "react";
 import { createRoot, type Root } from "react-dom/client";
 import {
   Map as MapLibreMap,
@@ -11,22 +19,25 @@ import {
   type MapMouseEvent,
 } from "maplibre-gl";
 import "maplibre-gl/dist/maplibre-gl.css";
-import { fromLngLat, quantizeBbox, toLngLat } from "./utils";
+import { fromLngLat, padBbox, quantizeBbox, toLngLat } from "./utils";
 import { CharacterTooltipContent, PopulationCentreTooltipContent } from "./MapTooltips";
 import { scatterCharacters } from "./characters/placement";
 import {
   buildingFootprintRings,
+  buildingTypeLabel,
+  cropSubzoneRingsByShelterBuilding,
   polygonTooltipContent,
-  styledLineFeatures,
-  styledPolygonFeatures,
 } from "./geojson";
 import {
   addCharacterImage,
   addVillageLayers,
   CLICKABLE_LAYERS,
-  VILLAGE_MARKER_LAYER,
+  VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
+import DetailCard from "../DetailCard/DetailCard";
+import CharacterDetail from "../CharacterDetail/CharacterDetail";
+import BuildingDetail from "../BuildingDetail/BuildingDetail";
 import styles from "./Map.module.scss";
 
 // maplibre-gl loads its own tile-processing worker via a runtime
@@ -105,11 +116,27 @@ interface PopulationCentreMapProps {
 // only fires once the camera has actually settled.
 const VIEWPORT_DEBOUNCE_MS = 400;
 
+// MapLibre's flyTo scales its own animation length by distance/zoom delta
+// when no duration is given - villages can be many km apart (see
+// import_village.py's placement grid), which made "find village" jumps take
+// several seconds even once the destination's data was already cached.
+// Pinning a fixed duration keeps every jump feeling equally snappy
+// regardless of how far apart the two villages are.
+const FLY_TO_DURATION_MS = 1200;
+
 interface TooltipOverlayState {
   key: string;
   content: React.ReactNode;
   lngLat: [number, number];
 }
+
+// The map's second level of progressive disclosure (tooltip -> click "View
+// details" -> DetailCard). Only character/building are wired up yet
+// (population centres are a later follow-up - see the map entity detail
+// card issue).
+type DetailSelection =
+  | { type: "character"; id: number }
+  | { type: "building"; id: number };
 
 export default function PopulationCentreMap({
   geojson,
@@ -136,6 +163,7 @@ export default function PopulationCentreMap({
         mapRef.current?.flyTo({
           center: toLngLat(point),
           zoom: 14,
+          duration: FLY_TO_DURATION_MS,
           essential: true
         });
       },
@@ -147,13 +175,90 @@ export default function PopulationCentreMap({
   const tooltipRootRef = useRef<Root | null>(null);
   const tooltipHostRef = useRef<HTMLDivElement | null>(null);
 
-  // Creates the map once. onViewportChange is read via a ref inside the
-  // handler below rather than as an effect dep, so the camera event
-  // listener isn't torn down and re-attached on every poll.
+  const [detail, setDetail] = useState<DetailSelection | null>(null);
+  // Opening the richer detail card obscures the (unreachable, once the
+  // card's overlay covers it) floating tooltip behind it - close it rather
+  // than leave it lingering under the modal.
+  const openDetail = useCallback((selection: DetailSelection) => {
+    setTooltip(null);
+    setDetail(selection);
+  }, []);
+
+  const buildingFootprints = useMemo(
+    () => buildingFootprintRings(features),
+    [features]
+  );
+
+  // Lets scatterCharacters spread a field_shelter's idle workers across the
+  // crops Subzone(s) it services instead of clustering them at the
+  // shelter's own small footprint - see scatterCharacters' own comment.
+  const shelterFieldRings = useMemo(
+    () => cropSubzoneRingsByShelterBuilding(features),
+    [features]
+  );
+
+  const characterFeatures = useMemo(
+    () => features.filter((f) => f.properties?.feature_type === "character"),
+    [features]
+  );
+
+  // Characters with an active journey (a non-empty `path` from the backend,
+  // see CharacterPointFeatureSerializer) are animated by the walker loop
+  // below instead of the idle scatter-inside-building placement, which only
+  // makes sense for characters standing still.
+  const walkingFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
+    [characterFeatures]
+  );
+  const idleFeatures = useMemo(
+    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
+    [characterFeatures]
+  );
+
+  const positionedCharacters = useMemo(
+    () => scatterCharacters(idleFeatures, buildingFootprints, shelterFieldRings),
+    [idleFeatures, buildingFootprints, shelterFieldRings]
+  );
+
+  const idleCharacterPositions = useMemo(() => {
+    return new Map(
+      positionedCharacters.map(({ feature, cx, cy }) => [
+        String(feature.properties?.id),
+        [cx, cy] as [number, number],
+      ])
+    );
+  }, [positionedCharacters]);
+
+  // Per-character walker state (current interpolated position, remaining
+  // path, speed), keyed by character id. Lives in a ref rather than state -
+  // it's updated up to 60x/sec by the animation loop below.
+  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
+
+  const refreshVillageSource = useCallback(() => {
+    sourceRef.current?.setData(
+      buildVillageSourceData({
+        features,
+        characterFeatures,
+        idleCharacterPositions,
+        walkers: walkersRef.current,
+        now: Date.now(),
+      })
+    );
+  }, [features, characterFeatures, idleCharacterPositions]);
+
+  // Creates the map once. onViewportChange and refreshVillageSource are each
+  // read via a ref inside the handlers below rather than as effect deps, so
+  // the map (and its camera event listener) isn't torn down and recreated on
+  // every poll/feature update.
   const onViewportChangeRef = useRef(onViewportChange);
   useEffect(() => {
     onViewportChangeRef.current = onViewportChange;
   }, [onViewportChange]);
+
+  const refreshVillageSourceRef = useRef(refreshVillageSource);
+  useEffect(() => {
+    refreshVillageSourceRef.current = refreshVillageSource;
+  }, [refreshVillageSource]);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -177,7 +282,7 @@ export default function PopulationCentreMap({
         const bounds = map.getBounds();
         const sw = fromLngLat([bounds.getWest(), bounds.getSouth()]);
         const ne = fromLngLat([bounds.getEast(), bounds.getNorth()]);
-        onChange(quantizeBbox([sw[0], sw[1], ne[0], ne[1]]));
+        onChange(quantizeBbox(padBbox([sw[0], sw[1], ne[0], ne[1]])));
       }, VIEWPORT_DEBOUNCE_MS);
     };
 
@@ -196,14 +301,23 @@ export default function PopulationCentreMap({
         const feature = e.features?.[0];
         if (!feature) return;
         e.originalEvent?.stopPropagation?.();
+        // home/work carry the building_type (e.g. "residential", "bakery"),
+        // not the building's bookkeeping name - resolved to the same plain
+        // label ("House", "Bakery") shown on that building's own tooltip,
+        // via buildingTypeLabel.
+        const homeType = feature.properties?.home_type as string | null | undefined;
+        const workType = feature.properties?.work_type as string | null | undefined;
+        const characterId = Number(feature.properties?.id);
         setTooltip({
           key: `character-${feature.id ?? JSON.stringify(feature.properties)}`,
           content: (
             <CharacterTooltipContent
               name={feature.properties?.name as string | undefined}
-              home={feature.properties?.home as string | null | undefined}
-              work={feature.properties?.work as string | null | undefined}
-              hungerLabel={feature.properties?.hunger_label as string | null | undefined}
+              home={homeType ? buildingTypeLabel(homeType) : undefined}
+              work={workType ? buildingTypeLabel(workType) : undefined}
+              currentActivity={feature.properties?.current_activity as string | null | undefined}
+              isMoving={feature.properties?.is_moving as boolean | null | undefined}
+              onViewDetails={() => openDetail({ type: "character", id: characterId })}
             />
           ),
           lngLat: [e.lngLat.lng, e.lngLat.lat],
@@ -216,12 +330,12 @@ export default function PopulationCentreMap({
         map.getCanvas().style.cursor = "";
       });
 
-      // Tapping/selecting a village marker expands it into its progress bar
-      // + state label (issue #673) - the marker itself only shows a
-      // state-coded dot at rest (see VILLAGE_MARKER_LAYER in layers.ts).
+      // Tapping/selecting a village's name label expands it into its
+      // progress bar + state (issue #673) - the label itself is coloured by
+      // state at rest (see VILLAGE_LABEL_LAYER in layers.ts).
       map.on(
         "click",
-        VILLAGE_MARKER_LAYER,
+        VILLAGE_LABEL_LAYER,
         (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
@@ -239,22 +353,51 @@ export default function PopulationCentreMap({
           });
         }
       );
-      map.on("mouseenter", VILLAGE_MARKER_LAYER, () => {
+      map.on("mouseenter", VILLAGE_LABEL_LAYER, () => {
         map.getCanvas().style.cursor = "pointer";
       });
-      map.on("mouseleave", VILLAGE_MARKER_LAYER, () => {
+      map.on("mouseleave", VILLAGE_LABEL_LAYER, () => {
         map.getCanvas().style.cursor = "";
       });
 
-      refreshVillageSource();
+      refreshVillageSourceRef.current();
 
-      for (const layerId of CLICKABLE_LAYERS) {
+      CLICKABLE_LAYERS.forEach((layerId, index) => {
+        // Layers earlier in CLICKABLE_LAYERS take priority when polygons
+        // overlap (e.g. a "field_shelter" building's footprint sits inside
+        // its crop subzone's boundary) - see the array's own comment.
+        const higherPriorityLayers = CLICKABLE_LAYERS.slice(0, index);
         map.on("click", layerId, (e: MapMouseEvent & { features?: MapGeoJSONFeature[] }) => {
           const feature = e.features?.[0];
           if (!feature) return;
+          // A village's name label - or a character standing inside a
+          // building's footprint - can sit over a building/subzone
+          // underneath it, and CLICKABLE_LAYERS entries can overlap each
+          // other too - each map.on(type, layerId, ...) delegate queries
+          // features independently, so every handler whose layer has a hit
+          // fires for the same click (stopPropagation on the DOM event
+          // doesn't stop sibling MapLibre delegates). Deferring to the
+          // higher-priority handler (registered/run first, so it already
+          // set the tooltip) keeps its tooltip from being clobbered.
+          if (
+            map.queryRenderedFeatures(e.point, { layers: ["characters", VILLAGE_LABEL_LAYER] })
+              .length > 0
+          ) {
+            return;
+          }
+          if (
+            higherPriorityLayers.length > 0 &&
+            map.queryRenderedFeatures(e.point, { layers: higherPriorityLayers }).length > 0
+          ) {
+            return;
+          }
           e.originalEvent?.stopPropagation?.();
+          const buildingId = Number(feature.properties?.id);
           const content = polygonTooltipContent(
-            feature.properties as GeoJSONFeatureProperties
+            feature.properties as GeoJSONFeatureProperties,
+            feature.properties?.feature_type === "building"
+              ? () => openDetail({ type: "building", id: buildingId })
+              : undefined
           );
           if (!content) return;
           setTooltip({
@@ -269,14 +412,14 @@ export default function PopulationCentreMap({
         map.on("mouseleave", layerId, () => {
           map.getCanvas().style.cursor = "";
         });
-      }
+      });
 
       map.on("click", (e: MapMouseEvent) => {
         // A click that hit one of the clickable layers is handled by the
         // per-layer listeners above and stops here; a click on empty map
         // area closes whatever tooltip is open.
         const hits = map.queryRenderedFeatures(e.point, {
-          layers: ["characters", VILLAGE_MARKER_LAYER, ...CLICKABLE_LAYERS],
+          layers: ["characters", VILLAGE_LABEL_LAYER, ...CLICKABLE_LAYERS],
         });
         if (hits.length === 0) closeTooltip();
       });
@@ -302,7 +445,10 @@ export default function PopulationCentreMap({
       setMapReady(false);
       initialFitDoneRef.current = false;
     };
-  }, []);
+    // openDetail is a useCallback with its own `[]` deps, so it's
+    // referentially stable - listing it here satisfies exhaustive-deps
+    // without changing this effect's actual "run once on mount" behaviour.
+  }, [openDetail]);
 
   // Keeps the tooltip overlay anchored to its map-space point while panning,
   // and reprojects the initial position once opened.
@@ -378,60 +524,6 @@ export default function PopulationCentreMap({
     map.setMaxBounds(new LngLatBounds(toLngLat([minX, minY]), toLngLat([maxX, maxY])));
   }, [worldBounds, mapReady]);
 
-  const buildingFootprints = useMemo(
-    () => buildingFootprintRings(features),
-    [features]
-  );
-
-  const characterFeatures = useMemo(
-    () => features.filter((f) => f.properties?.feature_type === "character"),
-    [features]
-  );
-
-  // Characters with an active journey (a non-empty `path` from the backend,
-  // see CharacterPointFeatureSerializer) are animated by the walker loop
-  // below instead of the idle scatter-inside-building placement, which only
-  // makes sense for characters standing still.
-  const walkingFeatures = useMemo(
-    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) > 0),
-    [characterFeatures]
-  );
-  const idleFeatures = useMemo(
-    () => characterFeatures.filter((f) => (f.properties?.path?.length ?? 0) === 0),
-    [characterFeatures]
-  );
-
-  const positionedCharacters = useMemo(
-    () => scatterCharacters(idleFeatures, buildingFootprints),
-    [idleFeatures, buildingFootprints]
-  );
-
-  const idleCharacterPositions = useMemo(() => {
-    return new Map(
-      positionedCharacters.map(({ feature, cx, cy }) => [
-        String(feature.properties?.id),
-        [cx, cy] as [number, number],
-      ])
-    );
-  }, [positionedCharacters]);
-
-  function refreshVillageSource() {
-    sourceRef.current?.setData(
-      buildVillageSourceData({
-        features,
-        characterFeatures,
-        idleCharacterPositions,
-        walkers: walkersRef.current,
-        now: Date.now(),
-      })
-    );
-  }
-
-  // Per-character walker state (current interpolated position, remaining
-  // path, speed), keyed by character id. Lives in a ref rather than state -
-  // it's updated up to 60x/sec by the animation loop below.
-  const walkersRef = useRef<Map<string, WalkerState>>(new Map());
-
   // Resets each walking character's checkpoint to the latest poll whenever
   // the underlying geojson changes: the authoritative position, its
   // remaining path, its speed, and the moment this checkpoint was taken.
@@ -495,17 +587,115 @@ export default function PopulationCentreMap({
   // Unmount cleanup for the tooltip root when the whole component goes away.
   useEffect(() => {
     return () => {
-      tooltipRootRef.current?.unmount();
+      const tooltipRoot = tooltipRootRef.current;
       tooltipRootRef.current = null;
+      // Defer nested-root unmount so it does not run during parent-root
+      // teardown, which can trigger React's unmount-during-render warning.
+      queueMicrotask(() => {
+        tooltipRoot?.unmount();
+      });
       sourceRef.current = null;
     };
   }, []);
+
+  // Derived from data the map already has loaded (this village's features/
+  // characterFeatures) rather than a dedicated fetch - BuildingDetail's
+  // residents/workers are every currently-loaded character feature whose
+  // home_id/work_id (see CharacterPointFeatureSerializer) matches the
+  // selected building.
+  const selectedBuildingFeature = useMemo(() => {
+    if (!detail || detail.type !== "building") return null;
+    return (
+      features.find(
+        (f) =>
+          f.properties?.feature_type === "building" &&
+          Number(f.properties?.id) === detail.id
+      ) ?? null
+    );
+  }, [detail, features]);
+
+  const selectedBuildingResidents = useMemo(() => {
+    if (!detail || detail.type !== "building") return [];
+    return characterFeatures
+      .filter((f) => f.properties?.home_id != null && Number(f.properties.home_id) === detail.id)
+      .map((f) => ({
+        id: Number(f.properties?.id),
+        name: (f.properties?.name as string | undefined) ?? "",
+        currentActivity: f.properties?.current_activity as string | null | undefined,
+        isMoving: f.properties?.is_moving as boolean | null | undefined,
+      }));
+  }, [detail, characterFeatures]);
+
+  const selectedBuildingWorkers = useMemo(() => {
+    if (!detail || detail.type !== "building") return [];
+    return characterFeatures
+      .filter((f) => f.properties?.work_id != null && Number(f.properties.work_id) === detail.id)
+      .map((f) => ({
+        id: Number(f.properties?.id),
+        name: (f.properties?.name as string | undefined) ?? "",
+        currentActivity: f.properties?.current_activity as string | null | undefined,
+        isMoving: f.properties?.is_moving as boolean | null | undefined,
+      }));
+  }, [detail, characterFeatures]);
+
+  const selectedCharacterName = useMemo(() => {
+    if (!detail || detail.type !== "character") return "Character";
+    const feature = characterFeatures.find(
+      (f) => Number(f.properties?.id) === detail.id
+    );
+    return (feature?.properties?.name as string | undefined) ?? "Character";
+  }, [detail, characterFeatures]);
 
   return (
     <div className={styles.mapWrapper}>
       <div ref={containerRef} className={styles.mapContainer} />
       <div ref={tooltipHostRef} className={styles.tooltipHost} />
       {children && <div className={styles.controlsOverlay}>{children}</div>}
+      {detail?.type === "character" && (
+        <DetailCard
+          open
+          placement="right"
+          title={selectedCharacterName}
+          onClose={() => setDetail(null)}
+        >
+          <CharacterDetail
+            characterId={detail.id}
+            onSelectBuilding={(buildingId) => openDetail({ type: "building", id: buildingId })}
+            onSelectRelationship={(characterId) => openDetail({ type: "character", id: characterId })}
+          />
+        </DetailCard>
+      )}
+      {detail?.type === "building" && selectedBuildingFeature && (
+        <DetailCard
+          open
+          placement="right"
+          title={buildingTypeLabel(
+            selectedBuildingFeature.properties?.building_type as string | undefined
+          )}
+          onClose={() => setDetail(null)}
+        >
+          <BuildingDetail
+            buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
+            residents={selectedBuildingResidents}
+            workers={selectedBuildingWorkers}
+            workerCount={selectedBuildingFeature.properties?.workers as number | null | undefined}
+            residentialCapacity={
+              selectedBuildingFeature.properties?.residential_capacity as
+                | number
+                | null
+                | undefined
+            }
+            goods={
+              selectedBuildingFeature.properties?.goods as
+                | { good_type?: string; display?: string }[]
+                | null
+                | undefined
+            }
+            onSelectResident={(characterId) => openDetail({ type: "character", id: characterId })}
+            onSelectWorker={(characterId) => openDetail({ type: "character", id: characterId })}
+          />
+        </DetailCard>
+      )}
     </div>
   );
 }

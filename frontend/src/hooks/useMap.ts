@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchFirstPopulationCentreId,
+  fetchMapCharacterDetail,
   fetchMapViewport,
   fetchMapWorldBounds,
   fetchPopulationCentreMap,
@@ -20,7 +21,8 @@ export function usePopulationCentreId() {
   return useQuery({
     queryKey: ["population-centres", "first-id"],
     queryFn: fetchFirstPopulationCentreId,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -34,7 +36,25 @@ export function useInitialMapCentre(pcId: number | null | undefined) {
     queryKey: ["map", "population-centre", "initial-centre", pcId],
     queryFn: () => fetchPopulationCentreMap(pcId as number),
     enabled: pcId != null,
-    staleTime: Infinity,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
+  });
+}
+
+// Reads the same cache entry MapPage's prefetch effect primes for the
+// upcoming "find village" target (see the prefetchQuery call there) - while
+// the camera is mid-flight to that village, onViewportChange hasn't fired
+// yet (only fires on "moveend" + a debounce, see Map.tsx), so this fills the
+// gap with the prefetched village's data instead of showing stale content
+// from wherever the camera used to be. Resolves instantly from cache when
+// the prefetch already completed; only hits the network if it hasn't.
+export function useTargetCentreMap(centreId: number | null) {
+  return useQuery({
+    queryKey: ["map", "population-centre", "initial-centre", centreId],
+    queryFn: () => fetchPopulationCentreMap(centreId as number),
+    enabled: centreId != null,
+    staleTime: 15 * 60 * 1000,
+    gcTime: 30 * 60 * 1000,
   });
 }
 
@@ -49,6 +69,8 @@ export function useMapViewport(bbox: string | null) {
     queryFn: () => fetchMapViewport(bbox as string),
     enabled: bbox != null,
     refetchInterval: MAP_POLL_INTERVAL_MS,
+    staleTime: 5 * 1000,
+    gcTime: 15 * 60 * 1000,
     placeholderData: (previousData: unknown) => previousData,
   });
 }
@@ -61,7 +83,22 @@ export function useMapWorldBounds() {
   return useQuery({
     queryKey: ["map", "world-bounds"],
     queryFn: fetchMapWorldBounds,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
+  });
+}
+
+// On-demand fetch for one character's map detail card (see DetailCard/
+// CharacterDetail) - only enabled while that character's card is actually
+// open, not polled like useMapViewport, since age/sex/relationships don't
+// need to track second-to-second the way position/activity do.
+export function useMapCharacterDetail(characterId: number | null) {
+  return useQuery({
+    queryKey: ["map", "character-detail", characterId],
+    queryFn: () => fetchMapCharacterDetail(characterId as number),
+    enabled: characterId != null,
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
 
@@ -73,6 +110,7 @@ export function usePopulationCentres() {
   return useQuery({
     queryKey: ["population-centres", "all"],
     queryFn: fetchPopulationCentres,
-    staleTime: Infinity,
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
   });
 }

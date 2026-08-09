@@ -7,20 +7,78 @@ gameplay support for travelling between villages yet, so the point is just
 to stop villages looking isolated on the map.
 """
 
+from math import hypot, sin, pi
+from random import Random
+
 from django.contrib.gis.db.models.functions import Distance
 from django.contrib.gis.geos import LineString, Point
 
 from locations.models import PopulationCentre, Road
 
-CONNECTOR_ROAD_WIDTH = 4.0
+
+def _curved_points(
+    start: Point, end: Point, *, rng: Random, segments: int = 6
+) -> list[Point]:
+    dx = end.x - start.x
+    dy = end.y - start.y
+    length = hypot(dx, dy)
+
+    # Unit vector perpendicular to the road.
+    px = -dy / length
+    py = dx / length
+
+    curve_amount = min(length * rng.uniform(0.15, 0.25), 100)
+    offset = rng.uniform(curve_amount * 0.5, curve_amount)
+
+    if rng.random() < 0.5:
+        offset *= -1
+
+    points = []
+
+    for i in range(segments + 1):
+        progress = i / segments
+
+        # Smooth curve: 0 at either end, maximum in the middle.
+        curve = sin(progress * pi) * offset
+
+        points.append(
+            Point(
+                start.x + dx * progress + px * curve,
+                start.y + dy * progress + py * curve,
+                srid=start.srid,
+            )
+        )
+
+    return points
+
+
+def curved_connector(start: Point, end: Point) -> LineString:
+    dx = end.x - start.x
+    dy = end.y - start.y
+    length = hypot(dx, dy)
+
+    if length == 0:
+        return LineString(start, end, srid=start.srid)
+
+    # Deterministic random so the same villages always get the same road.
+    seed = f"{round(start.x)}:{round(start.y)}:{round(end.x)}:{round(end.y)}"
+    rng = Random(seed)
+
+    points = _curved_points(start, end, rng=rng)
+    return LineString(points, srid=start.srid)
+
+
+CONNECTOR_ROAD_WIDTH = 6.0
 
 
 def _road_endpoints(population_centre: PopulationCentre) -> list[Point]:
     endpoints = []
     for road in population_centre.roads.all():
         coords = road.geom.coords
-        endpoints.append(Point(*coords[0], srid=road.geom.srid))
-        endpoints.append(Point(*coords[-1], srid=road.geom.srid))
+        start = coords[0]
+        end = coords[-1]
+        endpoints.append(Point(start[0], start[1], srid=road.geom.srid))
+        endpoints.append(Point(end[0], end[1], srid=road.geom.srid))
     return endpoints
 
 
@@ -54,6 +112,7 @@ def connect_nearest_village_roads(population_centre: PopulationCentre) -> Road |
     )
 
     return Road.objects.create(
-        geom=LineString(closest_pair[0], closest_pair[1], srid=closest_pair[0].srid),
+        population_centre=population_centre,
+        geom=curved_connector(closest_pair[0], closest_pair[1]),
         width=CONNECTOR_ROAD_WIDTH,
     )

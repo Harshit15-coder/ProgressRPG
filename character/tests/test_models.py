@@ -1,6 +1,7 @@
 # character/tests.py
 
 from datetime import date, datetime, timedelta
+from django.core.exceptions import ValidationError
 from django.db import IntegrityError, transaction
 from django.test import TestCase
 from django.utils.timezone import now
@@ -12,22 +13,21 @@ from character.models import (
     CharacterRelationship,
     CharacterRelationshipMembership,
     PlayerCharacterLink,
+    RelationshipRole,
+    RelationshipType,
+    RELATIONSHIP_SPECS,
 )
-
-from gameplay.models import QuestCompletion, Quest, QuestResults, QuestTimer
 
 
 class CharacterRelationshipTests(TestCase):
     def setUp(self):
         self.char1 = Character.objects.create(
-            first_name="Alice",
-            last_name="Smith",
+            given_name="Alice",
             birth_date=date(2000, 1, 1),
             sex="Female",
         )
         self.char2 = Character.objects.create(
-            first_name="Bob",
-            last_name="Jones",
+            given_name="Bob",
             birth_date=date(1998, 6, 15),
             sex="Male",
         )
@@ -111,15 +111,14 @@ class CharacterRelationshipTests(TestCase):
 
         str_repr = str(relationship)
         self.assertIn("mentor", str_repr)
-        self.assertIn("Alice Smith", str_repr)
-        self.assertIn("Bob Jones", str_repr)
+        self.assertIn("Alice", str_repr)
+        self.assertIn("Bob", str_repr)
 
 
 class CharacterRelationshipMembershipTests(TestCase):
     def setUp(self):
         self.char = Character.objects.create(
-            first_name="Test",
-            last_name="Character",
+            given_name="Test",
             birth_date=date(2000, 1, 1),
             sex="Female",
         )
@@ -130,30 +129,87 @@ class CharacterRelationshipMembershipTests(TestCase):
     def test_create_membership(self):
         """Test creating relationship membership"""
         membership = CharacterRelationshipMembership.objects.create(
-            character=self.char, relationship=self.relationship, role="leader"
+            character=self.char,
+            relationship=self.relationship,
+            role=RelationshipRole.PARTICIPANT,
         )
 
         self.assertEqual(membership.character, self.char)
         self.assertEqual(membership.relationship, self.relationship)
-        self.assertEqual(membership.role, "leader")
+        self.assertEqual(membership.role, RelationshipRole.PARTICIPANT)
 
     def test_unique_together_constraint(self):
         """Test that character can't have duplicate memberships in same relationship"""
         CharacterRelationshipMembership.objects.create(
-            character=self.char, relationship=self.relationship
+            character=self.char,
+            relationship=self.relationship,
+            role=RelationshipRole.PARTICIPANT,
         )
 
-        with self.assertRaises(IntegrityError):
+        # clean() (run via save()) reports this as a friendlier ValidationError
+        # before it would ever reach the DB's unique_together constraint.
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=self.char,
+                relationship=self.relationship,
+                role=RelationshipRole.PARTICIPANT,
+            )
+
+    def test_role_must_be_valid_for_relationship_type(self):
+        """A role not in the type's spec is rejected."""
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=self.char,
+                relationship=self.relationship,
+                role=RelationshipRole.PARENT,
+            )
+
+    def test_role_required_for_typed_relationship(self):
+        """Relationship types with a spec require a role, unlike before."""
+        with self.assertRaises(ValidationError):
             CharacterRelationshipMembership.objects.create(
                 character=self.char, relationship=self.relationship
             )
+
+    def test_role_max_count_enforced(self):
+        """A role can't exceed its spec's max participant count."""
+        other = Character.objects.create(given_name="Other", sex="Male")
+        romantic = CharacterRelationship.objects.create(relationship_type="romantic")
+        CharacterRelationshipMembership.objects.create(
+            character=self.char,
+            relationship=romantic,
+            role=RelationshipRole.PARTICIPANT,
+        )
+        CharacterRelationshipMembership.objects.create(
+            character=other, relationship=romantic, role=RelationshipRole.PARTICIPANT
+        )
+
+        third = Character.objects.create(given_name="Third", sex="Female")
+        with self.assertRaises(ValidationError):
+            CharacterRelationshipMembership.objects.create(
+                character=third,
+                relationship=romantic,
+                role=RelationshipRole.PARTICIPANT,
+            )
+
+    def test_variant_must_be_allowed_for_relationship_type(self):
+        """variant is validated against the type's allowed_variants."""
+        with self.assertRaises(ValidationError):
+            CharacterRelationship.objects.create(
+                relationship_type=RelationshipType.FRIEND, variant="biological"
+            )
+
+        # PARENT_CHILD allows it.
+        relationship = CharacterRelationship.objects.create(
+            relationship_type=RelationshipType.PARENT_CHILD, variant="biological"
+        )
+        self.assertEqual(relationship.variant, "biological")
 
 
 class LifeCycleMixinTests(TestCase):
     def setUp(self):
         self.character = Character.objects.create(
-            first_name="Test",
-            last_name="Character",
+            given_name="Test",
             birth_date=date.today() - timedelta(days=365 * 25),  # 25 years old
             sex="Female",
             fertility=75,
@@ -184,16 +240,14 @@ class LifeCycleMixinTests(TestCase):
     def test_can_reproduce_with(self):
         """Test reproduction compatibility"""
         male_partner = Character.objects.create(
-            first_name="Male",
-            last_name="Partner",
+            given_name="Male",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
         )
 
         female_partner = Character.objects.create(
-            first_name="Female",
-            last_name="Partner",
+            given_name="Female",
             birth_date=date.today() - timedelta(days=365 * 28),
             sex="Female",
             fertility=60,
@@ -213,7 +267,7 @@ class LifeCycleMixinTests(TestCase):
     def test_start_pregnancy(self):
         """Test starting pregnancy"""
         partner = Character.objects.create(
-            first_name="Partner",
+            given_name="Partner",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
@@ -233,7 +287,7 @@ class LifeCycleMixinTests(TestCase):
         )
 
         partner = Character.objects.create(
-            first_name="Partner",
+            given_name="Partner",
             birth_date=date.today() - timedelta(days=365 * 30),
             sex="Male",
             fertility=50,
@@ -249,13 +303,13 @@ class LifeCycleMixinTests(TestCase):
         self.assertEqual(Character.objects.count(), initial_count + 1)
 
         # Check child was created correctly
-        child = Character.objects.filter(name__startswith="Child of").first()
+        child = Character.objects.filter(given_name__startswith="Child of").first()
         self.assertIsNotNone(child)
         # Not working properly! Fix later
         # self.assertEqual(child.sex, "Female")
         self.assertEqual(child.birth_date, now().date())
-        self.assertIn(self.character, child.parents.all())
-        self.assertIn(partner, child.parents.all())
+        self.assertIn(self.character, child.parents)
+        self.assertIn(partner, child.parents)
 
     def test_handle_miscarriage(self):
         """Test miscarriage handling"""
@@ -286,7 +340,7 @@ class PersonTests(TestCase):
     def setUp(self):
         # Create a concrete character to test Person functionality
         self.character = Character.objects.create(
-            first_name="Test",
+            given_name="Test",
             birth_date=date.today() - timedelta(days=365 * 20),
             sex="Male",
             xp=50,
@@ -354,15 +408,13 @@ class CharacterNPCTests(TestCase):
 
         # Create NPCs that are available for linking
         self.npc1 = Character.objects.create(
-            first_name="NPC1",
-            last_name="Character",
+            given_name="NPC1",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=True,
         )
         self.npc2 = Character.objects.create(
-            first_name="NPC2",
-            last_name="Character",
+            given_name="NPC2",
             birth_date=date(2000, 1, 1),
             sex="Female",
             can_link=True,
@@ -385,8 +437,7 @@ class CharacterNPCTests(TestCase):
 
         # Now create our test character and link it
         self.player_character = Character.objects.create(
-            first_name="Player",
-            last_name="Character",
+            given_name="Player",
             birth_date=date(2000, 1, 1),
             sex="Male",
             can_link=False,
@@ -468,7 +519,7 @@ class PlayerCharacterLinkPointsTodayTests(TestCase):
             email="today-points@example.com", password="pass12345"
         )
         self.player = self.user.player
-        character = Character.objects.create(first_name="Hero", last_name="Link")
+        character = Character.objects.create(given_name="Hero")
         self.link = PlayerCharacterLink.objects.create(
             player=self.player, character=character
         )

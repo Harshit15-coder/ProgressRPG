@@ -1,6 +1,4 @@
 import json
-import random
-from math import sqrt
 
 from django.contrib.gis.geos import Point
 from django.core.management import call_command
@@ -14,10 +12,6 @@ from locations.services.watabou_import import import_watabou_village
 from locations.village_names import VILLAGE_NAMES
 
 
-def _distance(p1: Point, p2: Point) -> float:
-    return sqrt((p1.x - p2.x) ** 2 + (p1.y - p2.y) ** 2)
-
-
 class Command(BaseCommand):
     help = "Import a watabou city/village-generator JSON export as a PopulationCentre."
 
@@ -25,21 +19,21 @@ class Command(BaseCommand):
         parser.add_argument("file", help="Path to the exported watabou .json file")
         parser.add_argument(
             "--name",
-            help="Name to give the new PopulationCentre (defaults to a random "
+            help="Name to give the new PopulationCentre (defaults to the first "
             "unused name from village_names.VILLAGE_NAMES, e.g. 'Driftmoor "
             "village')",
         )
         parser.add_argument(
-            "--min-distance",
+            "--x",
             type=int,
-            default=1000,
-            help="Minimum distance (metres) to keep from every existing PopulationCentre",
+            help="Origin X coordinate (metres, SRID 3857) to centre the village on. "
+            "Required unless --overwrite is reusing an existing centre's location.",
         )
         parser.add_argument(
-            "--grid-size",
+            "--y",
             type=int,
-            default=10000,
-            help="Half-width (metres) of the square region to search for a free spot",
+            help="Origin Y coordinate (metres, SRID 3857) to centre the village on. "
+            "Required unless --overwrite is reusing an existing centre's location.",
         )
         parser.add_argument(
             "--overwrite",
@@ -74,14 +68,7 @@ class Command(BaseCommand):
         if overwrite:
             reimport_origin = self._delete_existing(name, options["interactive"])
 
-        existing_locations = list(
-            PopulationCentre.objects.exclude(name=name).values_list(
-                "location", flat=True
-            )
-        )
-        origin = reimport_origin or self._pick_origin(
-            existing_locations, options["min_distance"], options["grid_size"]
-        )
+        origin = reimport_origin or self._resolve_origin(options["x"], options["y"])
 
         try:
             population_centre = import_watabou_village(data, name=name, origin=origin)
@@ -114,6 +101,13 @@ class Command(BaseCommand):
                 f"{population_centre.roads.count()} roads)"
             )
         )
+
+        # Watabou exports carry their own "crops" Subzone geometry (see
+        # watabou_import._import_fields), but not a field_shelter Building or
+        # FieldCrop - generate_fields attaches those. Must run before
+        # generate_paths, which needs the shelter's entrance node to exist.
+        call_command("generate_fields")
+        self.stdout.write(self.style.SUCCESS("Generated fields for the new centre"))
 
         call_command("generate_paths", centre=population_centre.id)
         self.stdout.write(self.style.SUCCESS("Generated paths for the new centre"))
@@ -150,32 +144,19 @@ class Command(BaseCommand):
 
     def _pick_village_name(self) -> str:
         used_names = set(PopulationCentre.objects.values_list("name", flat=True))
-        available = [
-            f"{village_name} village"
-            for village_name in VILLAGE_NAMES
-            if f"{village_name} village" not in used_names
-        ]
-        if not available:
-            raise CommandError(
-                "Every name in village_names.VILLAGE_NAMES is already taken - "
-                "pass --name explicitly."
-            )
-        return random.choice(available)
-
-    def _pick_origin(
-        self, existing_locations: list[Point], min_distance: int, grid_size: int
-    ) -> Point:
-        for _ in range(200):
-            candidate = Point(
-                random.randint(-grid_size, grid_size),
-                random.randint(-grid_size, grid_size),
-                srid=3857,
-            )
-            if all(
-                _distance(candidate, loc) >= min_distance for loc in existing_locations
-            ):
+        for village_name in VILLAGE_NAMES:
+            candidate = f"{village_name} village"
+            if candidate not in used_names:
                 return candidate
         raise CommandError(
-            "Could not find a free spot for the new village after 200 attempts - "
-            "try a larger --grid-size or a smaller --min-distance."
+            "Every name in village_names.VILLAGE_NAMES is already taken - "
+            "pass --name explicitly."
         )
+
+    def _resolve_origin(self, x: int | None, y: int | None) -> Point:
+        if x is None or y is None:
+            raise CommandError(
+                "Pass both --x and --y for the village's origin (or --overwrite "
+                "an existing centre to reuse its location)."
+            )
+        return Point(x, y, srid=3857)

@@ -3,6 +3,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { ReactElement, ReactNode } from 'react';
 
 import { useBootstrapGameData } from '../hooks/useBootstrapGameData';
+import { useEventCallback } from '../hooks/useEventCallback';
 import { apiFetch } from "../utils/api";
 import useActivityTimer from '../hooks/useActivityTimer';
 import useUnloadWarning from '../hooks/useUnloadWarning';
@@ -129,11 +130,12 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
 
   const { isAuthenticated, loading: authLoading } = useAuth();
 
+  const onAuthReadyFetchPlayerAndCharacter = useEventCallback(fetchPlayerAndCharacter);
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      fetchPlayerAndCharacter();
+      onAuthReadyFetchPlayerAndCharacter();
     }
-  }, [fetchPlayerAndCharacter, isAuthenticated, authLoading]);
+  }, [onAuthReadyFetchPlayerAndCharacter, isAuthenticated, authLoading]);
 
   useEffect(() => {
     if (activityTimerInfo) {
@@ -148,21 +150,30 @@ export const GameProvider = ({ children }: ProviderProps): ReactElement => {
     player?.is_premium,
   ]);
 
+  const onAuthReadyFetchActivities = useEventCallback(fetchActivities);
   useEffect(() => {
     if (!authLoading && isAuthenticated) {
-      fetchActivities();
+      onAuthReadyFetchActivities();
     }
-  }, [fetchActivities, isAuthenticated, authLoading]);
+  }, [onAuthReadyFetchActivities, isAuthenticated, authLoading]);
 
-  useEffect(() => {
+  // Adjust local state when the bootstrap-loaded values arrive, per
+  // https://react.dev/learn/you-might-not-need-an-effect#adjusting-some-state-when-a-prop-changes
+  const [prevXpModsOnload, setPrevXpModsOnload] = useState(xpModsOnload);
+  if (xpModsOnload !== prevXpModsOnload) {
+    setPrevXpModsOnload(xpModsOnload);
     if (xpModsOnload) {
       setXpMods(xpModsOnload);
     }
-  }, [xpModsOnload]);
+  }
 
-  useEffect(() => {
+  const [prevAnnouncementUnreadCountOnload, setPrevAnnouncementUnreadCountOnload] = useState(
+    announcementUnreadCountOnload
+  );
+  if (announcementUnreadCountOnload !== prevAnnouncementUnreadCountOnload) {
+    setPrevAnnouncementUnreadCountOnload(announcementUnreadCountOnload);
     setAnnouncementUnreadCount(announcementUnreadCountOnload);
-  }, [announcementUnreadCountOnload]);
+  }
 
 
   // ----------------------------------------

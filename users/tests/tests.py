@@ -47,7 +47,7 @@ class UserCreationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.character = Character.objects.create(
-            first_name="Jane", sex="Female", can_link=True
+            given_name="Jane", sex="Female", can_link=True
         )
         cls.user = user_factory(
             with_player=True, email="testuser@example.com", password="testpassword123"
@@ -122,7 +122,7 @@ class PlayerNameValidationTest(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.character = Character.objects.create(
-            first_name="Jane", sex="Female", can_link=True
+            given_name="Jane", sex="Female", can_link=True
         )
 
     def setUp(self):
@@ -247,7 +247,7 @@ class PlayerAchievementGoalsTest(TestCase):
         self.assertEqual([goal["next_threshold"] for goal in goals], [None, None, None])
 
     def test_player_serializer_includes_achievements(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         user = user_factory(with_player=True)
 
         data = PlayerSerializer(user.player).data
@@ -301,8 +301,8 @@ class OnboardingTest(TestCase):
 @tag("fast")
 class PlayerMethodsTest(TestCase):
     def setUp(self):
-        self.character = Character.objects.create(first_name="Jane", can_link=True)
-        self.character2 = Character.objects.create(first_name="John", can_link=True)
+        self.character = Character.objects.create(given_name="Jane", can_link=True)
+        self.character2 = Character.objects.create(given_name="John", can_link=True)
         self.user = user_factory(with_player=True)
 
     def test_player_add_activity(self):
@@ -380,7 +380,7 @@ class PlayerMethodsTest(TestCase):
 
 class UserLoginModelTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(with_player=True)
 
     def _create_login(self, days_ago):
@@ -467,7 +467,7 @@ class UserLoginModelTest(TestCase):
 
 class JwtLoginTrackingTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(
             with_player=True, email="test@example.com", password="testpassword123"
         )
@@ -486,7 +486,7 @@ class JwtLoginTrackingTest(TestCase):
 
 class DailyLoginRewardTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(with_player=True)
 
     def _login_via_jwt(self):
@@ -546,7 +546,7 @@ class DailyLoginRewardTest(TestCase):
 
 class UserTimezoneApiTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(with_player=True)
         self.factory = APIRequestFactory()
 
@@ -568,7 +568,7 @@ class UserTimezoneApiTest(TestCase):
 
 class UserTimezoneMiddlewareTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(with_player=True)
         self.user.timezone = "Europe/Paris"
         self.user.save(update_fields=["timezone"])
@@ -744,7 +744,7 @@ class PerformAccountWipeTest(TestCase):
 
 class CustomAccountAdapterTest(TestCase):
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.user = user_factory(with_player=True)
 
     @patch("users.adapters.send_rendered_email_task.delay")
@@ -775,14 +775,12 @@ class AssignCharacterTest(TestCase):
 
         # Create available NPCs
         self.npc1 = Character.objects.create(
-            first_name="Available",
-            last_name="NPC1",
+            given_name="Available",
             sex="Male",
             can_link=True,
         )
         self.npc2 = Character.objects.create(
-            first_name="Available",
-            last_name="NPC2",
+            given_name="Available",
             sex="Female",
             can_link=True,
         )
@@ -817,16 +815,14 @@ class AssignCharacterTest(TestCase):
 
         # Create a character that's not linkable
         unlinkable = Character.objects.create(
-            first_name="Unlinkable",
-            last_name="Character",
+            given_name="Unlinkable",
             sex="Male",
             can_link=False,
         )
 
         # Create a dead character
         dead = Character.objects.create(
-            first_name="Dead",
-            last_name="Character",
+            given_name="Dead",
             sex="Female",
             can_link=True,
             death_date=date.today(),
@@ -876,7 +872,7 @@ class CustomUserAdminChangelistQueryTest(TestCase):
     """
 
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.plan = SubscriptionPlan.objects.create(
             name="Premium", price="9.99", interval="monthly"
         )
@@ -934,7 +930,7 @@ class CustomUserAdminChangeViewQueryTest(TestCase):
     """
 
     def setUp(self):
-        Character.objects.create(first_name="Jane", can_link=True)
+        Character.objects.create(given_name="Jane", can_link=True)
         self.admin_user = get_user_model().objects.create_superuser(
             email="superadmin@example.com", password="testpassword123"
         )

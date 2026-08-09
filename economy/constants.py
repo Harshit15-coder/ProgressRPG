@@ -184,3 +184,15 @@ def format_quantity(good_type, value, signed=False):
     if formatter:
         return formatter(value)
     return _format_default(good_type, value)
+
+
+def format_rate(good_type, value, signed=False):
+    """
+    Format a continuous per-day flow (demand, production capacity, or the
+    surplus/shortfall between them) - always the plain weight/volume figure
+    (see _format_default), even for goods with a GOOD_TYPE_FORMATTER meant
+    for *stored* quantities (bread as a loaf count, flour rounded up to
+    whole sacks). "3 sacks/day" or a rounded loaf count doesn't mean
+    anything for a rate the way it does for how much space a stock needs.
+    """
+    return _format_default(good_type, value, signed=signed)

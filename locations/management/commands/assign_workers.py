@@ -2,18 +2,16 @@ import random
 
 from django.core.management.base import BaseCommand
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from locations.models import Building
 
+# Every building type is a work site except residential - kept derived from
+# Building.BUILDING_TYPES (the single source of truth) so a new building
+# type added there doesn't also need remembering here.
 WORK_BUILDING_TYPES = [
-    "granary",
-    "inn",
-    "mill",
-    "bakery",
-    "hall",
-    "market",
-    "communal",
-    "field_shelter",
+    building_type
+    for building_type, _label in Building.BUILDING_TYPES
+    if building_type != "residential"
 ]
 MIN_WORKING_AGE = 16
 MAX_WORKING_AGE = 65
@@ -24,8 +22,7 @@ MAX_WORKERS_PER_BUILDING = 3
 class Command(BaseCommand):
     help = (
         "Assign a handful of working-age characters to work in the village's "
-        "non-residential buildings (granary, inn, mill, bakery, hall, market, "
-        "communal, field_shelter). "
+        "non-residential buildings. "
         "Not every character gets a job - children and elders are excluded, "
         "and each building only takes on 2-3 workers, scoped to its own "
         "population centre."
@@ -54,7 +51,8 @@ class Command(BaseCommand):
                 char
                 for char in Character.objects.filter(
                     population_centre=building.population_centre,
-                    building__isnull=False,
+                    locations__role=CharacterLocation.Role.HOME,
+                    locations__is_primary=True,
                 )
                 if char.id not in assigned_ids
                 and MIN_WORKING_AGE <= (char.get_age() // 365) <= MAX_WORKING_AGE
@@ -69,7 +67,7 @@ class Command(BaseCommand):
                 char.assign_work(building)
                 assigned_ids.add(char.id)
                 self.stdout.write(
-                    f"{char.full_name} now works at {building.name} (ID {building.id})"
+                    f"{char.name} now works at {building.name} (ID {building.id})"
                 )
 
         self.stdout.write(self.style.SUCCESS("Workers have been assigned"))

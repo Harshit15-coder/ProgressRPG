@@ -92,7 +92,7 @@ from users.utils import send_email_to_users
 from progress_rpg.settings.utils import get_build_number
 
 from metrics.utils import track_user_session
-from server_management.models import FeatureFlag
+from core.models import FeatureFlag
 
 import logging
 
@@ -203,7 +203,9 @@ class WaitlistJoinAPIView(APIView):
         ).exists()
         if not already_waiting:
             try:
-                entry = Waitlist.objects.create(email=email, status=Waitlist.Status.WAITING)
+                entry = Waitlist.objects.create(
+                    email=email, status=Waitlist.Status.WAITING
+                )
             except IntegrityError:
                 pass  # race with a concurrent signup — treat as already-waiting
             else:
@@ -249,6 +251,19 @@ class IsOwnerCharacter(permissions.BasePermission):
             ).exists()
 
         return False
+
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    For authored/curated catalogs (roles, skill taxonomy, activity
+    definitions, suggested activities) - any authenticated player can read,
+    only staff can create/update/delete.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+        return bool(request.user and request.user.is_staff)
 
 
 class CustomTokenObtainPairView(TokenObtainPairView):

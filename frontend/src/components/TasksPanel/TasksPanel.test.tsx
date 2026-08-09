@@ -1,3 +1,4 @@
+import type { ComponentProps } from "react";
 import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -5,10 +6,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { TooltipProvider } from "../Tooltip/Tooltip";
 import TasksPanel from "./TasksPanel";
 
-function renderTasksPanel() {
+function renderTasksPanel(props: ComponentProps<typeof TasksPanel> = {}) {
   return render(
     <TooltipProvider>
-      <TasksPanel />
+      <TasksPanel {...props} />
     </TooltipProvider>
   );
 }
@@ -17,9 +18,12 @@ const mockUseTasks = vi.fn();
 const mockUseCreateTask = vi.fn();
 const mockUseUpdateTask = vi.fn();
 const mockUseDeleteTask = vi.fn();
+const mockUseNotes = vi.fn();
+const mockUseCreateNote = vi.fn();
 const createMutate = vi.fn();
 const updateMutate = vi.fn();
 const deleteMutate = vi.fn();
+const createNoteMutate = vi.fn();
 
 const navigate = vi.fn();
 const startActivity = vi.fn().mockResolvedValue(undefined);
@@ -33,6 +37,11 @@ vi.mock("../../hooks/useTasks", () => ({
   useCreateTask: () => mockUseCreateTask(),
   useUpdateTask: () => mockUseUpdateTask(),
   useDeleteTask: () => mockUseDeleteTask(),
+}));
+
+vi.mock("../../hooks/useNotes", () => ({
+  useNotes: () => mockUseNotes(),
+  useCreateNote: () => mockUseCreateNote(),
 }));
 
 vi.mock("react-router", () => ({
@@ -71,6 +80,9 @@ const incompleteTask = {
   created_at: "2026-05-01T08:00:00.000Z",
   last_updated: "2026-05-01T08:00:00.000Z",
   last_worked_on: null,
+  due_at: null,
+  parent: null,
+  subtask_count: 0,
   total_time: 1800,
   total_records: 3,
 };
@@ -83,6 +95,9 @@ const completeTask = {
   created_at: "2026-04-01T08:00:00.000Z",
   last_updated: "2026-05-03T12:00:00.000Z",
   last_worked_on: "2026-05-03T12:00:00.000Z",
+  due_at: null,
+  parent: null,
+  subtask_count: 0,
   total_time: 600,
   total_records: 1,
 };
@@ -92,6 +107,7 @@ describe("TasksPanel", () => {
     createMutate.mockReset();
     updateMutate.mockReset();
     deleteMutate.mockReset();
+    createNoteMutate.mockReset();
     navigate.mockReset();
     startActivity.mockClear();
     fetchPlayerAndCharacter.mockReset();
@@ -111,6 +127,8 @@ describe("TasksPanel", () => {
     mockUseCreateTask.mockReturnValue({ mutate: createMutate });
     mockUseUpdateTask.mockReturnValue({ mutate: updateMutate });
     mockUseDeleteTask.mockReturnValue({ mutate: deleteMutate });
+    mockUseNotes.mockReturnValue({ data: [] });
+    mockUseCreateNote.mockReturnValue({ mutate: createNoteMutate });
   });
 
   it("hides completed tasks by default", () => {
@@ -184,6 +202,77 @@ describe("TasksPanel", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
+  it("opens the edit dialog for openTaskId on mount", async () => {
+    const onOpenTaskHandled = vi.fn();
+    renderTasksPanel({ openTaskId: 1, onOpenTaskHandled });
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("dialog")).getByDisplayValue("Morning routine")).toBeInTheDocument();
+    });
+    expect(onOpenTaskHandled).toHaveBeenCalled();
+  });
+
+  it("reveals a completed openTaskId even though completed tasks are hidden by default", async () => {
+    const onOpenTaskHandled = vi.fn();
+    renderTasksPanel({ openTaskId: 2, onOpenTaskHandled });
+
+    await waitFor(() => {
+      expect(within(screen.getByRole("dialog")).getByDisplayValue("Taxes")).toBeInTheDocument();
+    });
+    expect(onOpenTaskHandled).toHaveBeenCalled();
+  });
+
+  it("does not show note controls in the edit dialog when onOpenNote is not provided", async () => {
+    const user = userEvent.setup();
+    renderTasksPanel();
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+
+    expect(
+      within(screen.getByRole("dialog")).queryByRole("button", { name: "Create note for this task" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("offers to create a note for a task with no linked note", async () => {
+    const user = userEvent.setup();
+    const onOpenNote = vi.fn();
+    createNoteMutate.mockImplementation((_data, { onSuccess }) => onSuccess({ id: 9 }));
+    renderTasksPanel({ onOpenNote });
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "Create note for this task" }),
+    );
+
+    expect(createNoteMutate).toHaveBeenCalledWith(
+      { title: "Morning routine", body: "", task: 1 },
+      expect.objectContaining({ onSuccess: expect.any(Function) }),
+    );
+    expect(onOpenNote).toHaveBeenCalledWith(9);
+  });
+
+  it("shows a link to an existing linked note instead of the create button", async () => {
+    const user = userEvent.setup();
+    const onOpenNote = vi.fn();
+    mockUseNotes.mockReturnValue({
+      data: [{ id: 3, title: "Routine notes", body: "", player: 1, task: 1 }],
+    });
+    renderTasksPanel({ onOpenNote });
+
+    await user.click(
+      screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+    );
+    await user.click(
+      within(screen.getByRole("dialog")).getByRole("button", { name: "View linked note" }),
+    );
+
+    expect(onOpenNote).toHaveBeenCalledWith(3);
+  });
+
   it("edits a task name through the PlayerItemList dialog", async () => {
     const user = userEvent.setup();
     renderTasksPanel();
@@ -201,6 +290,125 @@ describe("TasksPanel", () => {
       expect(updateMutate).toHaveBeenCalledWith({
         id: 1,
         data: { name: "Evening routine" },
+      });
+    });
+  });
+
+  describe("subtasks", () => {
+    const parentTask = {
+      id: 3,
+      name: "Parent project task",
+      is_complete: false,
+      completed_at: null,
+      created_at: "2026-05-01T08:00:00.000Z",
+      last_updated: "2026-05-01T08:00:00.000Z",
+      last_worked_on: null,
+      due_at: null,
+      parent: null,
+      subtask_count: 1,
+      total_time: 0,
+      total_records: 0,
+    };
+
+    const childTask = {
+      id: 4,
+      name: "Child subtask",
+      is_complete: false,
+      completed_at: null,
+      created_at: "2026-05-01T08:05:00.000Z",
+      last_updated: "2026-05-01T08:05:00.000Z",
+      last_worked_on: null,
+      due_at: null,
+      parent: 3,
+      subtask_count: 0,
+      total_time: 0,
+      total_records: 0,
+    };
+
+    it("renders a subtask nested under its parent", () => {
+      mockUseTasks.mockReturnValue({
+        isLoading: false,
+        data: [parentTask, childTask],
+      });
+      renderTasksPanel();
+
+      const parentButton = screen.getAllByRole("button", { name: "Edit task Parent project task" })[0];
+      const childButton = screen.getAllByRole("button", { name: "Edit task Child subtask" })[0];
+      expect(parentButton).toBeInTheDocument();
+      expect(childButton).toBeInTheDocument();
+      // The subtask is nested inside the parent's <li>, not a sibling top-level row.
+      const parentListItem = parentButton.closest("li");
+      expect(parentListItem).toContainElement(childButton);
+    });
+
+    it("hides a completed parent and its subtasks together", () => {
+      const completedParent = { ...parentTask, id: 5, is_complete: true, completed_at: "2026-05-02T00:00:00.000Z" };
+      const childOfCompletedParent = { ...childTask, id: 6, parent: 5 };
+      mockUseTasks.mockReturnValue({
+        isLoading: false,
+        data: [completedParent, childOfCompletedParent],
+      });
+      renderTasksPanel();
+
+      expect(screen.queryByText("Parent project task")).not.toBeInTheDocument();
+      expect(screen.queryByText("Child subtask")).not.toBeInTheDocument();
+    });
+
+    it("pre-fills the add-task form with a parent chip via the add-subtask row action", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      mockUseTasks.mockReturnValue({
+        isLoading: false,
+        data: [parentTask],
+      });
+      renderTasksPanel();
+
+      await user.click(screen.getByRole("button", { name: "Add subtask to Parent project task" }));
+
+      expect(screen.getByText(/Subtask of Parent project task/)).toBeInTheDocument();
+
+      const input = screen.getByLabelText("new task");
+      await user.type(input, "Buy groceries");
+      await user.click(screen.getByRole("button", { name: "Add subtask" }));
+
+      await waitFor(() => {
+        expect(createMutate).toHaveBeenCalledWith({ name: "Buy groceries", parent: 3 });
+      });
+    });
+
+    it("disables the parent picker for a task that already has subtasks", async () => {
+      const user = userEvent.setup();
+      mockUseTasks.mockReturnValue({
+        isLoading: false,
+        data: [parentTask, childTask],
+      });
+      renderTasksPanel();
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Edit task Parent project task" })[0],
+      );
+
+      expect(screen.getByLabelText("Parent task")).toBeDisabled();
+    });
+  });
+
+  describe("due date", () => {
+    it("commits a due date edit immediately on blur", async () => {
+      const user = userEvent.setup();
+      renderTasksPanel();
+
+      await user.click(
+        screen.getAllByRole("button", { name: "Edit task Morning routine" })[0],
+      );
+
+      const dueDateInput = screen.getByLabelText("Due date");
+      await user.type(dueDateInput, "2026-06-01T09:00");
+      await user.tab();
+
+      await waitFor(() => {
+        expect(updateMutate).toHaveBeenCalledWith({
+          id: 1,
+          data: { due_at: expect.any(String) },
+        });
       });
     });
   });
