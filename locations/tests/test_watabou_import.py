@@ -118,6 +118,25 @@ class WatabouImportBuildingTypeTest(TestCase):
         self.assertEqual(types.count("communal"), 0)
 
 
+class WatabouImportPopulationPlanLoggingTest(TestCase):
+    """
+    Step 3 of .claude/plans/village-capacity-sizing-plan.md: import logs the
+    population-estimation-driven settlement_plan recommendation, but doesn't
+    yet act on it - no building/capability assignment changes here. This
+    just checks the compute-and-log call doesn't crash and reports a
+    sensible number, not any generation-behaviour change.
+    """
+
+    def test_import_logs_recommended_settlement_plan(self):
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
+        origin = Point(0, 0, srid=3857)
+
+        with self.assertLogs("general", level="INFO") as logs:
+            import_watabou_village(data, name="Logged Village", origin=origin)
+
+        self.assertTrue(any("recommended plan" in message for message in logs.output))
+
+
 class WatabouImportGraphTest(TestCase):
     def test_creates_centre_node_and_building_nodes(self):
         data = _make_export(
