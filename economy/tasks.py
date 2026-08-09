@@ -150,10 +150,12 @@ def advance_mill_economy_tick(today=None):
     """
     today = today or timezone.localdate()
 
-    for mill in Building.objects.filter(building_type="mill").select_related(
-        "population_centre"
-    ):
-        state, _ = GoodsConversionState.objects.get_or_create(building=mill)
+    for mill in Building.objects.filter(
+        capabilities__activity="milling"
+    ).select_related("population_centre"):
+        state, _ = GoodsConversionState.objects.get_or_create(
+            building=mill, activity="milling"
+        )
         if state.last_processed_on == today:
             continue
 
@@ -201,10 +203,12 @@ def advance_bakery_economy_tick(today=None):
     """
     today = today or timezone.localdate()
 
-    for bakery in Building.objects.filter(building_type="bakery").select_related(
-        "population_centre"
-    ):
-        state, _ = GoodsConversionState.objects.get_or_create(building=bakery)
+    for bakery in Building.objects.filter(
+        capabilities__activity="baking"
+    ).select_related("population_centre"):
+        state, _ = GoodsConversionState.objects.get_or_create(
+            building=bakery, activity="baking"
+        )
         if state.last_processed_on == today:
             continue
 
