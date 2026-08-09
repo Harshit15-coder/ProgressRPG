@@ -1,10 +1,11 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { act, render, screen } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
 import { fromLngLat, toLngLat } from './utils';
 import { colourForCharacter } from './characters/placement';
+import { TOOLTIP_ONLY_SELECTION_OPACITY } from './layers';
 
 const mockFetchMapCharacterDetail = vi.fn();
 vi.mock('../../api/map', async (importOriginal) => {
@@ -71,6 +72,11 @@ class FakeMap {
   setFilterCalls: { layerId: string; filter: unknown }[] = [];
   setFilter(layerId: string, filter: unknown) {
     this.setFilterCalls.push({ layerId, filter });
+  }
+
+  setPaintPropertyCalls: { layerId: string; name: string; value: unknown }[] = [];
+  setPaintProperty(layerId: string, name: string, value: unknown) {
+    this.setPaintPropertyCalls.push({ layerId, name, value });
   }
 
   on(event: string, a: string | ((e?: unknown) => void), b?: (e?: unknown) => void) {
@@ -1180,6 +1186,51 @@ describe('PopulationCentreMap entity detail card', () => {
       ['==', ['get', 'feature_type'], 'building'],
       ['==', ['get', 'id'], -1],
     ]);
+  });
+
+  it('outlines a building at reduced opacity while just its tooltip is open, then at full opacity once its detail card opens', async () => {
+    const user = userEvent.setup();
+    const geojsonWithHouse = {
+      ...baseGeojson,
+      features: [
+        {
+          geometry: { type: 'Polygon', coordinates: [[[5, 5], [5, 10], [10, 10], [10, 5], [5, 5]]] },
+          properties: { feature_type: 'building', id: 42, name: 'House', building_type: 'residential' },
+        },
+      ],
+    };
+    renderMap({ geojson: geojsonWithHouse });
+    const feature = villageSourceFeatures().find((f) => f.properties.feature_type === 'building');
+
+    act(() => {
+      currentMap().trigger('click', { features: [feature], lngLat: { lng: 0, lat: 0 } }, 'buildings-fill');
+    });
+    await screen.findByRole('tooltip');
+
+    const buildingCalls = currentMap().setFilterCalls.filter(
+      (c) => c.layerId === 'selected-building-outline'
+    );
+    expect(buildingCalls.at(-1)?.filter).toEqual([
+      'all',
+      ['==', ['get', 'feature_type'], 'building'],
+      ['==', ['get', 'id'], 42],
+    ]);
+    await waitFor(() => {
+      const opacityCalls = currentMap().setPaintPropertyCalls.filter(
+        (c) => c.layerId === 'selected-building-outline' && c.name === 'line-opacity'
+      );
+      expect(opacityCalls.at(-1)?.value).toBe(TOOLTIP_ONLY_SELECTION_OPACITY);
+    });
+
+    await user.click(screen.getByRole('button', { name: 'View details' }));
+    await screen.findByRole('dialog', { name: 'House' });
+
+    await waitFor(() => {
+      const opacityCalls = currentMap().setPaintPropertyCalls.filter(
+        (c) => c.layerId === 'selected-building-outline' && c.name === 'line-opacity'
+      );
+      expect(opacityCalls.at(-1)?.value).toBe(1);
+    });
   });
 
   it('highlights the selected character on the map while its detail card is open', async () => {
