@@ -600,8 +600,9 @@ export default function PopulationCentreMap({
 
   // Derived from data the map already has loaded (this village's features/
   // characterFeatures) rather than a dedicated fetch - BuildingDetail's
-  // residents are every currently-loaded character feature whose home_id
-  // (see CharacterPointFeatureSerializer) matches the selected building.
+  // residents/workers are every currently-loaded character feature whose
+  // home_id/work_id (see CharacterPointFeatureSerializer) matches the
+  // selected building.
   const selectedBuildingFeature = useMemo(() => {
     if (!detail || detail.type !== "building") return null;
     return (
@@ -617,6 +618,18 @@ export default function PopulationCentreMap({
     if (!detail || detail.type !== "building") return [];
     return characterFeatures
       .filter((f) => f.properties?.home_id != null && Number(f.properties.home_id) === detail.id)
+      .map((f) => ({
+        id: Number(f.properties?.id),
+        name: (f.properties?.name as string | undefined) ?? "",
+        currentActivity: f.properties?.current_activity as string | null | undefined,
+        isMoving: f.properties?.is_moving as boolean | null | undefined,
+      }));
+  }, [detail, characterFeatures]);
+
+  const selectedBuildingWorkers = useMemo(() => {
+    if (!detail || detail.type !== "building") return [];
+    return characterFeatures
+      .filter((f) => f.properties?.work_id != null && Number(f.properties.work_id) === detail.id)
       .map((f) => ({
         id: Number(f.properties?.id),
         name: (f.properties?.name as string | undefined) ?? "",
@@ -645,7 +658,11 @@ export default function PopulationCentreMap({
           title={selectedCharacterName}
           onClose={() => setDetail(null)}
         >
-          <CharacterDetail characterId={detail.id} />
+          <CharacterDetail
+            characterId={detail.id}
+            onSelectBuilding={(buildingId) => openDetail({ type: "building", id: buildingId })}
+            onSelectRelationship={(characterId) => openDetail({ type: "character", id: characterId })}
+          />
         </DetailCard>
       )}
       {detail?.type === "building" && selectedBuildingFeature && (
@@ -660,6 +677,7 @@ export default function PopulationCentreMap({
           <BuildingDetail
             buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
             residents={selectedBuildingResidents}
+            workers={selectedBuildingWorkers}
             workerCount={selectedBuildingFeature.properties?.workers as number | null | undefined}
             residentialCapacity={
               selectedBuildingFeature.properties?.residential_capacity as
@@ -674,6 +692,7 @@ export default function PopulationCentreMap({
                 | undefined
             }
             onSelectResident={(characterId) => openDetail({ type: "character", id: characterId })}
+            onSelectWorker={(characterId) => openDetail({ type: "character", id: characterId })}
           />
         </DetailCard>
       )}

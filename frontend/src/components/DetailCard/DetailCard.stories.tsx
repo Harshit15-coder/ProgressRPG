@@ -57,3 +57,33 @@ export const WithLongerContent: Story = {
     ),
   },
 };
+
+/**
+ * `placement="right"` - the docked side-panel variant Map uses, so a click
+ * on a character/building stays open and browsable alongside the map
+ * instead of covering it. Non-modal (no dimming overlay, map underneath
+ * stays interactive), narrower, capped at 75vh with its own scroll.
+ */
+export const RightPlacement: Story = {
+  args: {
+    placement: 'right',
+    title: 'Rose Cottage',
+    children: (
+      <>
+        <p>House</p>
+        <p>Residents: 4</p>
+        <ul>
+          <li>Alice (idle)</li>
+          <li>Thomas (delivering goods to neighbours)</li>
+          <li>Emily (idle)</li>
+          <li>James (idle)</li>
+        </ul>
+      </>
+    ),
+  },
+  play: async ({ canvasElement }) => {
+    const body = within(canvasElement.ownerDocument.body);
+    const dialog = await body.findByRole('dialog', { name: 'Rose Cottage' });
+    await expect(dialog).toBeVisible();
+  },
+};

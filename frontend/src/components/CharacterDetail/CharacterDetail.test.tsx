@@ -19,6 +19,7 @@ function detail(overrides: Partial<MapCharacterDetail> = {}): MapCharacterDetail
     home_type: 'residential',
     home_id: 5,
     work_type: 'bakery',
+    work_id: 8,
     current_activity: 'delivering goods to neighbours',
     is_moving: false,
     relationships: [],

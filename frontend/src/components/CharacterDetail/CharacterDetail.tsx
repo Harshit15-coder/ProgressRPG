@@ -5,9 +5,17 @@ import styles from "./CharacterDetail.module.scss";
 
 interface CharacterDetailProps {
   characterId: number;
+  /** Omit to render home/work as plain, non-interactive text. */
+  onSelectBuilding?: (buildingId: number) => void;
+  /** Omit to render relationships as a plain, non-interactive list. */
+  onSelectRelationship?: (characterId: number) => void;
 }
 
-export default function CharacterDetail({ characterId }: CharacterDetailProps) {
+export default function CharacterDetail({
+  characterId,
+  onSelectBuilding,
+  onSelectRelationship,
+}: CharacterDetailProps) {
   const { data, isLoading, isError } = useMapCharacterDetail(characterId);
 
   if (isLoading) {
@@ -51,13 +59,37 @@ export default function CharacterDetail({ characterId }: CharacterDetailProps) {
         {home && (
           <div className={styles.fact}>
             <dt>Home</dt>
-            <dd>{home}</dd>
+            <dd>
+              {onSelectBuilding && data.home_id != null ? (
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => onSelectBuilding(data.home_id as number)}
+                >
+                  {home}
+                </button>
+              ) : (
+                home
+              )}
+            </dd>
           </div>
         )}
         {work && (
           <div className={styles.fact}>
             <dt>Work</dt>
-            <dd>{work}</dd>
+            <dd>
+              {onSelectBuilding && data.work_id != null ? (
+                <button
+                  type="button"
+                  className={styles.linkButton}
+                  onClick={() => onSelectBuilding(data.work_id as number)}
+                >
+                  {work}
+                </button>
+              ) : (
+                work
+              )}
+            </dd>
           </div>
         )}
       </dl>
@@ -68,6 +100,8 @@ export default function CharacterDetail({ characterId }: CharacterDetailProps) {
           <List<RelationshipListItem>
             items={relationshipItems}
             className={styles.relationshipsList}
+            canSelect={Boolean(onSelectRelationship)}
+            onSelect={(relationship) => onSelectRelationship?.(relationship.character_id)}
             renderItem={(relationship) => (
               <span>
                 {relationship.name} — {relationship.label}

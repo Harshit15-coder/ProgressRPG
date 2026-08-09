@@ -6,6 +6,8 @@ interface BuildingDetailGood {
   display?: string;
 }
 
+// Also reused for workers - both are just "a character tied to this
+// building", differing only in which List section they render under.
 export interface BuildingDetailResident {
   id: number;
   name: string;
@@ -16,11 +18,14 @@ export interface BuildingDetailResident {
 interface BuildingDetailProps {
   buildingType?: string;
   residents: BuildingDetailResident[];
+  workers?: BuildingDetailResident[];
   workerCount?: number | null;
   residentialCapacity?: number | null;
   goods?: BuildingDetailGood[] | null;
   /** Omit to render residents as a plain, non-interactive list. */
   onSelectResident?: (characterId: number) => void;
+  /** Omit to render workers as a plain, non-interactive list. */
+  onSelectWorker?: (characterId: number) => void;
 }
 
 function capitalize(word: string): string {
@@ -37,10 +42,12 @@ function residentLine(resident: BuildingDetailResident): string {
 export default function BuildingDetail({
   buildingType,
   residents,
+  workers = [],
   workerCount,
   residentialCapacity,
   goods,
   onSelectResident,
+  onSelectWorker,
 }: BuildingDetailProps) {
   const isResidential = buildingType === "residential";
   const stockedGoods = (goods ?? []).filter((good) => good.display);
@@ -90,6 +97,19 @@ export default function BuildingDetail({
             canSelect={Boolean(onSelectResident)}
             onSelect={(resident) => onSelectResident?.(resident.id)}
             renderItem={(resident) => <span>{residentLine(resident)}</span>}
+          />
+        </section>
+      )}
+
+      {!isResidential && workers.length > 0 && (
+        <section className={styles.section}>
+          <h3 className={styles.sectionHeading}>Workers</h3>
+          <List<BuildingDetailResident>
+            items={workers}
+            className={styles.residentsList}
+            canSelect={Boolean(onSelectWorker)}
+            onSelect={(worker) => onSelectWorker?.(worker.id)}
+            renderItem={(worker) => <span>{residentLine(worker)}</span>}
           />
         </section>
       )}

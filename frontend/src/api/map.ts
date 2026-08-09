@@ -73,6 +73,7 @@ export interface MapCharacterDetail {
   home_type: string | null;
   home_id: number | null;
   work_type: string | null;
+  work_id: number | null;
   current_activity: string | null;
   is_moving: boolean;
   relationships: MapCharacterRelationship[];
