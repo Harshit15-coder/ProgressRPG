@@ -446,6 +446,15 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
     def has_available(cls):
         return character_services.character_has_available(cls)
 
+    @property
+    def total_link_points(self):
+        """
+        Sum of link_points across every player link this character has ever
+        had (past and current) - the character-side symmetric counterpart to
+        Player.total_link_points.
+        """
+        return PlayerCharacterLink.total_link_points(self.links.all())
+
 
 ########################################################################
 ####    PLAYER CHARACTER LINK MODEL
