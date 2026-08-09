@@ -148,6 +148,16 @@ def unit_suffix(good_type):
     return "L" if unit == UnitKind.VOLUME else "kg"
 
 
+# Grain and flour quantities/rates switch from kg to tonnes past this many
+# kg, rather than staying in kg indefinitely - a granary/mill dealing in
+# tonnes of wheat or flour is a common, expected scale (unlike bread, which
+# stays loaf-counted regardless of size - see _format_bread), so kg alone
+# gets unreadable there. Not applied to signed deltas (see _format_default),
+# which stay in the plain kg figure.
+TONNE_DISPLAY_THRESHOLD_KG = 1000
+TONNE_DISPLAY_GOOD_TYPES = {"wheat", "flour"}
+
+
 # Bread naturally exists as discrete loaves, so it's displayed as a loaf
 # count rather than a weight - 1 loaf = 1kg is an exact, not approximate,
 # conversion for display purposes.
@@ -165,10 +175,19 @@ def _format_default(good_type, value, signed=False):
     Format a quantity as a plain weight/volume figure. Weight-kind goods are
     stored in grams but displayed in kilograms for readability; volume-kind
     goods (litres) keep one decimal place, since fractional litres are
-    meaningful.
+    meaningful. Unsigned wheat/flour quantities past TONNE_DISPLAY_THRESHOLD_KG
+    switch to tonnes instead (see TONNE_DISPLAY_GOOD_TYPES).
     """
     unit = GOOD_TYPE_UNIT.get(good_type, UnitKind.WEIGHT)
     display_value = value if unit == UnitKind.VOLUME else value / 1000
+
+    if (
+        not signed
+        and good_type in TONNE_DISPLAY_GOOD_TYPES
+        and display_value >= TONNE_DISPLAY_THRESHOLD_KG
+    ):
+        return f"{display_value / 1000:,.1f}t"
+
     sign = "+" if signed else ""
     return f"{display_value:{sign},.1f}{unit_suffix(good_type)}"
 
