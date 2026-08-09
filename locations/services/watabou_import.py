@@ -29,7 +29,7 @@ from django.contrib.gis.geos import LineString, Point, Polygon
 from django.db import transaction
 
 from economy.services.planning_services import settlement_plan
-from locations.management.commands.spawn_villages import (
+from locations.management.commands.generate_villages import (
     compute_building_entrance_point,
 )
 from locations.models import Building, LandArea, Node, PopulationCentre, Road, Subzone
