@@ -418,6 +418,7 @@ class NoteSerializer(serializers.ModelSerializer):
             "body",
             "player",
             "task",
+            "activity",
             "created_at",
             "last_updated",
         ]
@@ -446,3 +447,21 @@ class NoteSerializer(serializers.ModelSerializer):
                 "This task is already linked to another note."
             )
         return task
+
+    def validate_activity(self, activity: Activity | None) -> Activity | None:
+        if activity is None:
+            return None
+        request = self.context.get("request")
+        player = getattr(getattr(request, "user", None), "player", None)
+        if player is None or activity.player_id != player.id:
+            raise serializers.ValidationError(
+                "Activity must belong to the requesting player."
+            )
+        existing = Note.objects.filter(activity=activity)
+        if self.instance is not None:
+            existing = existing.exclude(pk=self.instance.pk)
+        if existing.exists():
+            raise serializers.ValidationError(
+                "This activity is already linked to another note."
+            )
+        return activity

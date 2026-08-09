@@ -151,6 +151,8 @@ export interface PlayerActivity {
   skill: number | null;
   project: number | null;
   task: number | null;
+  /** FK to the reusable Activity "type" (catalog entry), not this session's own id. */
+  activity: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -225,6 +227,7 @@ export interface Note {
   body: string;
   player: number;
   task: number | null;
+  activity: number | null;
   created_at: string;
   last_updated: string;
 }

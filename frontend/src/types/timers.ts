@@ -46,8 +46,14 @@ export interface CurrentActivity {
   text?: string;
   /** Optional task ID the activity is logged against */
   taskId?: number | null;
-  /** Server-assigned id once confirmed */
+  /** Server-assigned id once confirmed (this timed session's PlayerActivity id) */
   id?: number;
+  /**
+   * FK to the reusable Activity "type" (catalog entry) this session resolved
+   * to — stable across separate start/stop cycles of the same-named,
+   * task-less activity, unlike `id` above.
+   */
+  activity?: number | null;
 }
 
 /**

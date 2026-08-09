@@ -309,8 +309,8 @@ class NoteAdmin(admin.ModelAdmin):
     list display and the detail view here, showing only metadata.
     """
 
-    list_display = ("id", "player", "task", "created_at", "last_updated")
+    list_display = ("id", "player", "task", "activity", "created_at", "last_updated")
     exclude = ("title", "body")
     list_filter = ("player", "task")
-    readonly_fields = ("player", "task", "created_at", "last_updated")
+    readonly_fields = ("player", "task", "activity", "created_at", "last_updated")
     date_hierarchy = "created_at"

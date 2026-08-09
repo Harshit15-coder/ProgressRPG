@@ -561,6 +561,8 @@ export function useActivityInput() {
     isUnlabelled,
     isEditingLabel,
     inputValue,
+    taskId: currentActivity?.taskId ?? null,
+    activityCatalogId: currentActivity?.activity ?? null,
     minutes,
     seconds,
     formattedLimit,

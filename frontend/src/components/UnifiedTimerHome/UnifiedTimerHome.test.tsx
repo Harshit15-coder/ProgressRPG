@@ -71,6 +71,12 @@ vi.mock('../SupportFlow/SupportFlowModal', () => ({
   default: () => null,
 }));
 
+vi.mock('./TimerNoteField', () => ({
+  default: ({ taskId, activityId }: { taskId: number | null; activityId: number | null }) => (
+    <div data-testid="timer-note-field" data-task-id={taskId ?? ''} data-activity-id={activityId ?? ''} />
+  ),
+}));
+
 vi.mock('../../utils/sounds', () => ({
   playLimitReachedSound: vi.fn(),
   primeAudio: vi.fn(),
@@ -435,6 +441,53 @@ describe('UnifiedTimerHome', () => {
 
       expect(screen.getByRole('button', { name: /Deep work/ })).toBeInTheDocument();
       expect(labelActivity).toHaveBeenCalledWith('Deep work', null);
+    });
+  });
+
+  describe('timer note field', () => {
+    it('is hidden while the notesFeature flag is off, even with an active labelled timer', () => {
+      mockUseFeatureFlag.mockReset().mockReturnValue(false);
+      mockGame({ status: 'active', currentActivity: { name: 'Deep work', taskId: 5 } });
+      render(<UnifiedTimerHome />);
+
+      expect(screen.queryByTestId('timer-note-field')).not.toBeInTheDocument();
+    });
+
+    it('is shown in Doing mode once notesFeature is on and the timer has a task', () => {
+      mockUseFeatureFlag.mockReset().mockImplementation((flag: string) => flag === 'notesFeature');
+      mockGame({ status: 'active', currentActivity: { name: 'Deep work', taskId: 5 } });
+      render(<UnifiedTimerHome />);
+
+      const field = screen.getByTestId('timer-note-field');
+      expect(field).toHaveAttribute('data-task-id', '5');
+    });
+
+    it('is shown once notesFeature is on and the timer has a catalog activity but no task', () => {
+      mockUseFeatureFlag.mockReset().mockImplementation((flag: string) => flag === 'notesFeature');
+      mockGame({ status: 'active', currentActivity: { name: 'Washing dishes', activity: 7 } });
+      render(<UnifiedTimerHome />);
+
+      const field = screen.getByTestId('timer-note-field');
+      expect(field).toHaveAttribute('data-activity-id', '7');
+    });
+
+    it('stays hidden for a still-nameless running timer, even with the flag on', () => {
+      mockUseFeatureFlag.mockReset().mockImplementation((flag: string) => flag === 'notesFeature');
+      mockGame({ status: 'active', currentActivity: { name: '' } });
+      render(<UnifiedTimerHome />);
+
+      expect(screen.queryByTestId('timer-note-field')).not.toBeInTheDocument();
+    });
+
+    it('is hidden in Planning mode even with the flag on and a task attached', async () => {
+      const user = userEvent.setup();
+      mockUseFeatureFlag.mockReset().mockImplementation((flag: string) => flag === 'notesFeature');
+      mockGame({ status: 'active', currentActivity: { name: 'Deep work', taskId: 5 } });
+      render(<UnifiedTimerHome />);
+
+      await user.click(screen.getByRole('radio', { name: 'Planning' }));
+
+      expect(screen.queryByTestId('timer-note-field')).not.toBeInTheDocument();
     });
   });
 });

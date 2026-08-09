@@ -9,8 +9,10 @@ import SupportFlowModal from "../SupportFlow/SupportFlowModal";
 import TimerResultsPanel from "./TimerResultsPanel";
 import ModeSwitcher from "../ModeSwitcher/ModeSwitcher";
 import TasksPanel from "../TasksPanel/TasksPanel";
+import TimerNoteField from "./TimerNoteField";
 import { useActivityInput } from "../ActivityInput/useActivityInput";
 import { useDefaultActivityEntries } from "../../hooks/useDefaultActivityEntries";
+import { useFeatureFlag } from "../../hooks/useFeatureFlag";
 import styles from "./UnifiedTimerHome.module.scss";
 
 type TimerMode = "doing" | "planning";
@@ -36,6 +38,8 @@ export default function UnifiedTimerHome() {
     isUnlabelled,
     isEditingLabel,
     inputValue,
+    taskId,
+    activityCatalogId,
     minutes,
     seconds,
     formattedLimit,
@@ -58,6 +62,7 @@ export default function UnifiedTimerHome() {
   } = useActivityInput();
 
   const defaultResults = useDefaultActivityEntries();
+  const notesFeatureEnabled = useFeatureFlag("notesFeature");
   const [submitConfirmOpen, setSubmitConfirmOpen] = useState(false);
   const [mode, setMode] = useState<TimerMode>("doing");
   const containerRef = useRef<HTMLDivElement>(null);
@@ -239,6 +244,10 @@ export default function UnifiedTimerHome() {
 
         {isActive && (
           <>
+            {notesFeatureEnabled && mode === "doing" && (taskId !== null || activityCatalogId !== null) && (
+              <TimerNoteField taskId={taskId} activityId={activityCatalogId} />
+            )}
+
             <ModeSwitcher
               modes={TIMER_MODES}
               activeKey={mode}

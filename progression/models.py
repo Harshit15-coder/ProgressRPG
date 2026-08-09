@@ -1012,10 +1012,30 @@ class Note(PlayerOwnedMixin):
         null=True,
         blank=True,
     )
+    # Links a note to a reusable activity "type" (see Activity) rather than
+    # a single timed session, so the note persists across separate
+    # start/stop cycles of the same ad-hoc/unlabelled activity.
+    activity = models.OneToOneField(
+        "progression.Activity",
+        on_delete=models.SET_NULL,
+        related_name="note",
+        null=True,
+        blank=True,
+    )
     title = models.CharField(max_length=255, blank=True)
     body = models.TextField(max_length=10000, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     last_updated = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        constraints = [
+            models.CheckConstraint(
+                condition=(
+                    models.Q(task__isnull=True) | models.Q(activity__isnull=True)
+                ),
+                name="note_task_or_activity_not_both",
+            )
+        ]
 
     def __str__(self):
         return self.title or f"Note ({self.player.name})"
