@@ -70,3 +70,8 @@
 .canSelect .listItem:hover {
   cursor: pointer;
 }
+
+.compact .listItem {
+  padding: sp.$padding-sm;
+  gap: sp.$spacing-xs;
+}
