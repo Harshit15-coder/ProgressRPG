@@ -50,7 +50,9 @@ def find_mill(population_centre):
     if population_centre is None:
         return None
     return (
-        population_centre.buildings.filter(building_type="mill").order_by("id").first()
+        population_centre.buildings.filter(capabilities__activity="milling")
+        .order_by("id")
+        .first()
     )
 
 
@@ -58,7 +60,7 @@ def find_bakery(population_centre):
     if population_centre is None:
         return None
     return (
-        population_centre.buildings.filter(building_type="bakery")
+        population_centre.buildings.filter(capabilities__activity="baking")
         .order_by("id")
         .first()
     )
@@ -176,7 +178,7 @@ def population_capacity_report(population_centre):
         demand_per_day=wheat_demand,
     )
 
-    mills = list(population_centre.buildings.filter(building_type="mill"))
+    mills = list(population_centre.buildings.filter(capabilities__activity="milling"))
     milling_workers = sum(workers_present(mill) for mill in mills)
     milling = CapacityLine(
         building_count=len(mills),
@@ -190,7 +192,7 @@ def population_capacity_report(population_centre):
         demand_per_day=flour_demand,
     )
 
-    bakeries = list(population_centre.buildings.filter(building_type="bakery"))
+    bakeries = list(population_centre.buildings.filter(capabilities__activity="baking"))
     baking_workers = sum(workers_present(bakery) for bakery in bakeries)
     baking = CapacityLine(
         building_count=len(bakeries),
