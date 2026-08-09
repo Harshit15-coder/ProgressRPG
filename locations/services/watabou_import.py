@@ -13,7 +13,8 @@ same "just metres, no real georeferencing" convention the rest of
 locations/ already uses (see MAX_BBOX_AREA_SQ_M in locations/utils.py).
 
 This only creates static geometry - PopulationCentre, Building, Road, the
-Node graph's CENTRE/BUILDING/BUILDING_ENTRANCE points, and (if the export
+Node graph's CENTRE/BUILDING points plus BUILDING_ENTRANCE for non-granary
+buildings, and (if the export
 has a "fields" feature) a LandArea/Subzone pair per field polygon. It
 deliberately does not generate Path edges: Path is the movement/pathfinding
 graph and Road is just the drawn street, so wiring the graph is left to the
@@ -72,7 +73,7 @@ def _polygon_area(polygon_coords) -> float:
 
 def _assign_building_types_and_capabilities(
     building_coordinates: list,
-) -> tuple[list[str], dict[int, list[str]]]:
+) -> tuple[list[str], dict[int, list[BuildingCapability.Activity]]]:
     """
     Decide each imported building's building_type, and which
     BuildingCapability activities (if any) it should get - driven by
@@ -84,12 +85,15 @@ def _assign_building_types_and_capabilities(
 
     Granary/milling/baking are guaranteed a slot ahead of the purely
     decorative OPTIONAL_BUILDING_TYPES, since they're the always_present
-    economy chain (see planning_services._recommended_buildings). If
-    there's only one spare non-residential slot, milling and baking are
-    packed onto a single shared "communal" building instead of one being
-    dropped entirely - this is what actually fixes the original Ashenford
-    bug (a small village silently missing a bakery because the old
-    fixed-order allocation ran out of slots before reaching it).
+    economy chain (see planning_services._recommended_buildings). Milling
+    and baking are packed onto a single shared "communal" building
+    whenever the settlement is small (plan.combine_milling_and_baking -
+    see SMALL_SETTLEMENT_POPULATION_THRESHOLD) even if there'd be enough
+    slots for two dedicated buildings, and as a fallback whenever there
+    genuinely isn't room for two regardless of population - this is what
+    actually fixes the original Ashenford bug (a small village silently
+    missing a bakery because the old fixed-order allocation ran out of
+    slots before reaching it).
 
     The population figure fed to settlement_plan is a rough pre-creation
     estimate (from the footprint areas of whichever buildings this same
@@ -117,7 +121,7 @@ def _assign_building_types_and_capabilities(
     plan = settlement_plan(population=estimated_population)
 
     building_types: list[str] = []
-    capabilities_by_index: dict[int, list[str]] = {}
+    capabilities_by_index: dict[int, list[BuildingCapability.Activity]] = {}
 
     if remaining > 0 and plan.recommended_granaries > 0:
         building_types.append("granary")
@@ -125,17 +129,26 @@ def _assign_building_types_and_capabilities(
 
     needs_milling = plan.milling.recommended_buildings > 0
     needs_baking = plan.baking.recommended_buildings > 0
-    if remaining >= 2 and needs_milling and needs_baking:
-        capabilities_by_index[len(building_types)] = [
-            BuildingCapability.Activity.MILLING
-        ]
-        building_types.append("mill")
-        remaining -= 1
-        capabilities_by_index[len(building_types)] = [
-            BuildingCapability.Activity.BAKING
-        ]
-        building_types.append("bakery")
-        remaining -= 1
+    if needs_milling and needs_baking:
+        combine = plan.combine_milling_and_baking or remaining < 2
+        if combine and remaining >= 1:
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.MILLING,
+                BuildingCapability.Activity.BAKING,
+            ]
+            building_types.append("communal")
+            remaining -= 1
+        elif remaining >= 2:
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.MILLING
+            ]
+            building_types.append("mill")
+            remaining -= 1
+            capabilities_by_index[len(building_types)] = [
+                BuildingCapability.Activity.BAKING
+            ]
+            building_types.append("bakery")
+            remaining -= 1
     elif remaining >= 1 and (needs_milling or needs_baking):
         activities = []
         if needs_milling:
@@ -310,17 +323,18 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
                 "location": building.location,
             },
         )
-        entrance_point = compute_building_entrance_point(
-            building.footprint, building.location
-        )
-        Node.objects.get_or_create(
-            building=building,
-            kind=Node.Kind.BUILDING_ENTRANCE,
-            defaults={
-                "name": f"Entrance for {building.name}",
-                "location": entrance_point,
-            },
-        )
+        if building.building_type != "granary":
+            entrance_point = compute_building_entrance_point(
+                building.footprint, building.location
+            )
+            Node.objects.get_or_create(
+                building=building,
+                kind=Node.Kind.BUILDING_ENTRANCE,
+                defaults={
+                    "name": f"Entrance for {building.name}",
+                    "location": entrance_point,
+                },
+            )
 
     for geometry in roads_feature.get("geometries", []):
         if geometry.get("type") != "LineString":

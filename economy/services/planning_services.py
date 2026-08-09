@@ -24,6 +24,7 @@ from economy.constants import (
     PER_WORKER_DAILY_BAKING_CAPACITY,
     PER_WORKER_DAILY_CAPACITY,
     PER_WORKER_DAILY_MILLING_CAPACITY,
+    SMALL_SETTLEMENT_POPULATION_THRESHOLD,
     WHEAT_TO_FLOUR_RATIO,
 )
 from economy.services.capacity_services import (
@@ -64,6 +65,13 @@ class SettlementPlan:
     # population centre should have grain storage... even if small" rule
     # below.
     recommended_granaries: int
+    # Population-driven signal (not a building-slot-scarcity one) for
+    # whether a settlement should share one building for milling and
+    # baking rather than getting a dedicated building per role - see
+    # SMALL_SETTLEMENT_POPULATION_THRESHOLD. Consumers (e.g.
+    # watabou_import) still fall back to sharing when there genuinely
+    # isn't room for two dedicated buildings, regardless of this flag.
+    combine_milling_and_baking: bool
 
 
 def _workers_needed(demand_per_day, per_worker_capacity, yield_ratio=1.0):
@@ -152,6 +160,8 @@ def _settlement_plan_for_residents(resident_count):
         milling=milling,
         baking=baking,
         recommended_granaries=1,
+        combine_milling_and_baking=resident_count
+        <= SMALL_SETTLEMENT_POPULATION_THRESHOLD,
     )
 
 
