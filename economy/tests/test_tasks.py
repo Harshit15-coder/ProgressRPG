@@ -638,6 +638,82 @@ class AdvanceBakeryEconomyTickTests(TestCase):
         )
 
 
+class MultiCapabilityBuildingTests(TestCase):
+    """
+    A building holding more than one capability (e.g. a communal building
+    that both mills and bakes) must be ticked for every one of them on the
+    same day. Regression coverage for the GoodsConversionState collision
+    described in .claude/plans/building-capabilities-plan.md: before
+    GoodsConversionState was keyed by (building, activity), the first tick
+    to run would mark the building "processed today" and the second would
+    silently skip it.
+    """
+
+    def test_milling_and_baking_both_run_on_the_same_day_for_one_building(self):
+        centre = PopulationCentre.objects.create(
+            name="Communalville",
+            location=Point(0, 0, srid=3857),
+            boundary=_square(0, 0, 50),
+        )
+        granary = _make_granary(centre)
+        GoodsStock.objects.create(
+            building=granary,
+            good_type=GoodsStock.GoodType.WHEAT,
+            quantity=500_000.0,
+        )
+
+        communal = Building.objects.create(
+            name="Communal Hall",
+            building_type="communal",
+            location=Point(80, 0, srid=3857),
+            footprint=_square(80, 0, 5),
+            population_centre=centre,
+        )
+        BuildingCapability.objects.create(building=communal, activity="milling")
+        BuildingCapability.objects.create(building=communal, activity="baking")
+        InteriorSpace.objects.create(
+            building=communal, name="Flour store", usage="flour_storage", area=1000.0
+        )
+        InteriorSpace.objects.create(
+            building=communal, name="Bread store", usage="storage", area=1000.0
+        )
+        node = Node.objects.create(
+            name="Node for Communal Hall",
+            location=communal.location,
+            kind=Node.Kind.BUILDING,
+            building=communal,
+        )
+        Character.objects.create(
+            given_name="Worker1",
+            location=communal.location,
+            current_node=node,
+            is_moving=False,
+        )
+
+        with _unlimited_demand():
+            advance_mill_economy_tick()
+            advance_bakery_economy_tick()
+
+        # Bread can only exist if baking found flour to consume - and the
+        # only source of flour is the same building's milling tick having
+        # already run today, so a positive bread quantity is proof both
+        # ticks actually ran rather than the second silently no-opping.
+        # (Flour itself may end up fully consumed here, since milling and
+        # baking share one building with no minimum retention between
+        # them - that's expected, not asserted on directly.)
+        bread = GoodsStock.objects.get(building=communal, good_type="bread")
+        self.assertGreater(bread.quantity, 0)
+
+        milling_state = GoodsConversionState.objects.get(
+            building=communal, activity="milling"
+        )
+        baking_state = GoodsConversionState.objects.get(
+            building=communal, activity="baking"
+        )
+        self.assertEqual(milling_state.last_processed_on, timezone.localdate())
+        self.assertEqual(baking_state.last_processed_on, timezone.localdate())
+
+
 class AdvanceBreadConsumptionTickTests(TestCase):
     def _make_centre_with_home(self, name="Eatville"):
         centre_point = Point(0, 0, srid=3857)
