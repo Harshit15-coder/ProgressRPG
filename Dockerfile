@@ -7,15 +7,20 @@ ARG PYTHON_VERSION=3.12
 # --------------------------
 FROM python:${PYTHON_VERSION}-slim AS builder
 
-# Install build dependencies first (cached separately from app code)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install build dependencies first (cached separately from app code).
+# Cache-mount apt's package/list dirs so a Dockerfile edit that invalidates
+# this layer redownloads nothing already fetched by a prior build. The base
+# image's docker-clean config would otherwise wipe the cache right after
+# install, so it's removed first (see https://docs.docker.com/build/cache/optimize/#use-cache-mounts).
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update && apt-get install -y --no-install-recommends \
         libpq-dev \
         gdal-bin \
         libgdal-dev \
         build-essential \
-        gcc \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+        gcc
 
 ENV GDAL_LIBRARY_PATH=/usr/lib/libgdal.so
 
@@ -47,14 +52,16 @@ ENV PATH="/usr/local/bin:$PATH"
 # dynamically rather than hardcoding it. It also only ships a versioned
 # filename (e.g. libgdal.so.32), so symlink the unversioned name
 # GDAL_LIBRARY_PATH expects.
-RUN apt-get update \
+# Cache-mounted the same way as the builder stage's apt install above.
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    rm -f /etc/apt/apt.conf.d/docker-clean \
+    && apt-get update \
     && GDAL_PKG="$(apt-cache search --names-only '^libgdal[0-9]+$' | cut -d' ' -f1)" \
     && apt-get install -y --no-install-recommends \
         libpq5 \
         "$GDAL_PKG" \
-    && ln -s "$(find /usr/lib -name 'libgdal.so.*' | sort -V | tail -1)" /usr/lib/libgdal.so \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && ln -s "$(find /usr/lib -name 'libgdal.so.*' | sort -V | tail -1)" /usr/lib/libgdal.so
 
 WORKDIR /app
 
