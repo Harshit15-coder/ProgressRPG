@@ -2,7 +2,7 @@ import random
 
 from django.core.management.base import BaseCommand
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from locations.models import Building
 
 # Every building type is a work site except residential - kept derived from
@@ -51,7 +51,8 @@ class Command(BaseCommand):
                 char
                 for char in Character.objects.filter(
                     population_centre=building.population_centre,
-                    building__isnull=False,
+                    locations__role=CharacterLocation.Role.HOME,
+                    locations__is_primary=True,
                 )
                 if char.id not in assigned_ids
                 and MIN_WORKING_AGE <= (char.get_age() // 365) <= MAX_WORKING_AGE
