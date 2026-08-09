@@ -91,7 +91,7 @@ class CharacterAdmin(admin.ModelAdmin):
             None,
             {
                 "fields": (
-                    ("first_name", "last_name"),
+                    "given_name",
                     "can_link",
                     "sex",
                 )
@@ -102,7 +102,6 @@ class CharacterAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "current_node",
-                    "building",
                     "population_centre",
                 )
             },
@@ -140,8 +139,7 @@ class CharacterAdmin(admin.ModelAdmin):
     )
 
     list_display = [
-        "first_name",
-        "last_name",
+        "name",
         "get_player",
         "can_link",
         "birth_date",
@@ -154,8 +152,7 @@ class CharacterAdmin(admin.ModelAdmin):
         "population_centre",
     ]
     search_fields = [
-        "first_name",
-        "last_name",
+        "given_name",
         "links__player__name",
     ]
     readonly_fields = [
@@ -165,7 +162,7 @@ class CharacterAdmin(admin.ModelAdmin):
         "get_family_summary",
     ]
 
-    ordering = ["last_name", "first_name"]
+    ordering = ["given_name"]
     inlines = [
         LinkInline,
         CharacterRelationshipMembershipInline,
@@ -242,7 +239,7 @@ class PlayerCharacterLinkAdmin(admin.ModelAdmin):
 class CharacterLocationAdmin(admin.ModelAdmin):
     list_display = ["character", "role", "location", "is_primary"]
     list_filter = ["role", "is_primary"]
-    search_fields = ["character__first_name", "character__last_name", "location__name"]
+    search_fields = ["character__given_name", "location__name"]
 
 
 @admin.register(CharacterCurrency)
@@ -250,8 +247,7 @@ class CharacterCurrencyAdmin(admin.ModelAdmin):
     list_display = ["character", "currency", "balance", "earned", "spent"]
     list_filter = ["currency"]
     search_fields = [
-        "character__first_name",
-        "character__last_name",
+        "character__given_name",
         "currency__code",
         "currency__name",
     ]

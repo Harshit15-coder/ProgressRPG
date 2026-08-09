@@ -67,7 +67,8 @@ export function buildingTypeLabel(buildingType: string | null | undefined): stri
 }
 
 export function polygonTooltipContent(
-  properties: GeoJSONFeatureProperties | null | undefined
+  properties: GeoJSONFeatureProperties | null | undefined,
+  onViewDetails?: () => void
 ): React.ReactNode | undefined {
   if (properties?.feature_type === "building") {
     const buildingType = properties?.building_type as string | undefined;
@@ -79,6 +80,7 @@ export function polygonTooltipContent(
         workers={properties?.workers as number | null | undefined}
         residents={properties?.residents as number | null | undefined}
         goods={properties?.goods as { good_type?: string; display?: string }[] | null | undefined}
+        onViewDetails={onViewDetails}
       />
     );
   }

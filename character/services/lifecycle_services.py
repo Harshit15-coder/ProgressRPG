@@ -84,9 +84,9 @@ def lifecycle_start_pregnancy(instance, partner) -> None:
 def lifecycle_handle_childbirth(instance) -> None:
     from character.models import Character
 
-    child_name = f"Child of {instance.first_name}"
+    child_name = f"Child of {instance.name}"
     child = Character.objects.create(
-        name=child_name,
+        given_name=child_name,
         birth_date=timezone.now().date(),
         sex="Male" if randint(0, 1) == 0 else "Female",
     )

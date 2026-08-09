@@ -160,8 +160,8 @@ class PlayerActivityAdmin(admin.ModelAdmin):
 
 @admin.register(ActivityDefinition)
 class ActivityDefinitionAdmin(admin.ModelAdmin):
-    list_display = ("id", "name", "kind", "skill", "created_at")
-    search_fields = ("name", "description")
+    list_display = ("id", "name", "present_tense", "kind", "skill", "created_at")
+    search_fields = ("name", "present_tense", "description")
     list_filter = ("kind", "skill")
 
 
@@ -309,8 +309,8 @@ class NoteAdmin(admin.ModelAdmin):
     list display and the detail view here, showing only metadata.
     """
 
-    list_display = ("id", "player", "task", "created_at", "last_updated")
+    list_display = ("id", "player", "task", "activity", "created_at", "last_updated")
     exclude = ("title", "body")
     list_filter = ("player", "task")
-    readonly_fields = ("player", "task", "created_at", "last_updated")
+    readonly_fields = ("player", "task", "activity", "created_at", "last_updated")
     date_hierarchy = "created_at"

@@ -14,7 +14,6 @@ export type FeatureFlagValue = AccessGroup[];
 
 /** Known feature flag keys (from src/featureFlags.js) */
 export type FeatureFlagKey =
-  | "activityList"
   | "tasksFeature"
   | "categoriesFeature"
   | "skillsFeature"
@@ -87,13 +86,6 @@ export type ServerWebSocketAction =
 // ---------------------------------------------------------------------------
 
 export type XpModifierScope = "PLAYER" | "CHARACTER";
-
-// ---------------------------------------------------------------------------
-// Quest category / frequency
-// ---------------------------------------------------------------------------
-
-export type QuestCategory = "NONE" | "TRADE" | "RECUR" | "EVENT";
-export type QuestFrequency = "NONE" | "DAY" | "WEEK" | "MONTH";
 
 // ---------------------------------------------------------------------------
 // Subscription plan

@@ -7,19 +7,18 @@ from django.utils import timezone
 
 import logging
 
-from .models import Character, PlayerCharacterLink, Behaviour, CharacterNeeds
+from .models import (
+    Character,
+    CharacterRelationship,
+    CharacterRelationshipMembership,
+    PlayerCharacterLink,
+    Behaviour,
+    CharacterNeeds,
+)
 
-from gameplay.models import QuestTimer
 from progression.models import CharacterActivity
 
 logger = logging.getLogger("general")
-
-
-@receiver(post_save, sender=Character)
-def create_timer(sender, instance, created, **kwargs):
-    """Create a quest timer for a new character"""
-    if created:
-        quest_timer = QuestTimer.objects.create(character=instance)
 
 
 @receiver(post_save, sender=Character)
@@ -93,3 +92,21 @@ def link_postsave_recompute(sender, instance, **kwargs):
 @receiver(post_delete, sender=PlayerCharacterLink)
 def link_postdelete_recompute(sender, instance, **kwargs):
     transaction.on_commit(lambda: recompute_character_flags(instance.character_id))
+
+
+@receiver(post_delete, sender=CharacterRelationshipMembership)
+def delete_relationship_with_no_members(sender, instance, **kwargs):
+    """
+    CharacterRelationshipMembership.character cascades on Character delete
+    (e.g. generate_characters wiping unlinked Characters before
+    regenerating a village's cast), but CharacterRelationship - the other
+    side of the through table - has no FK of its own for Django to cascade
+    from. Without this, a relationship whose members were all deleted
+    survives forever as an orphaned, memberless row.
+    """
+    relationship_id = instance.relationship_id
+    still_has_members = CharacterRelationshipMembership.objects.filter(
+        relationship_id=relationship_id
+    ).exists()
+    if not still_has_members:
+        CharacterRelationship.objects.filter(id=relationship_id).delete()

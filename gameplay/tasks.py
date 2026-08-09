@@ -6,7 +6,7 @@ from django.db.models import Q
 from django.utils import timezone
 
 from character.models import PlayerCharacterLink
-from .models import Quest, XpModifier
+from .models import XpModifier
 
 DISCONNECT_TASK_CACHE_KEY = "disconnect_task:{player_id}"
 
@@ -75,22 +75,6 @@ def auto_complete_timers_for_stale_players():
         completed_count += 1
 
     return completed_count
-
-
-@shared_task
-def update_quest_availability():
-    now = timezone.now()
-    quests = Quest.objects.all()
-    for quest in quests:
-        if quest.start_date and quest.start_date <= now:
-            quest.is_active = True
-
-        if quest.end_date and quest.end_date < now:
-            quest.is_active = False
-
-        if quest.start_date or quest.end_date:
-            quest.save()
-    return "Successfully updated quest availability"
 
 
 @shared_task(bind=True)

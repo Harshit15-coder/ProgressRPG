@@ -33,8 +33,6 @@ export type {
   ClientWebSocketAction,
   ServerWebSocketAction,
   XpModifierScope,
-  QuestCategory,
-  QuestFrequency,
   SubscriptionPlan,
 } from "./enums";
 
@@ -53,9 +51,6 @@ export type {
   Project,
   Task,
   Note,
-  Quest,
-  QuestResults,
-  CharacterQuest,
   XpModifier,
   PopulationCentre,
   Building,
@@ -66,7 +61,6 @@ export type {
 export type {
   ActivityTimerApiData,
   ActivityCompleteResponse,
-  QuestTimerApiData,
   CurrentActivity,
   StartActivityInput,
   AutoStopCompletion,

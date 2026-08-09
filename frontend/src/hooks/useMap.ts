@@ -2,6 +2,7 @@
 import { useQuery } from "@tanstack/react-query";
 import {
   fetchFirstPopulationCentreId,
+  fetchMapCharacterDetail,
   fetchMapViewport,
   fetchMapWorldBounds,
   fetchPopulationCentreMap,
@@ -84,6 +85,20 @@ export function useMapWorldBounds() {
     queryFn: fetchMapWorldBounds,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
+  });
+}
+
+// On-demand fetch for one character's map detail card (see DetailCard/
+// CharacterDetail) - only enabled while that character's card is actually
+// open, not polled like useMapViewport, since age/sex/relationships don't
+// need to track second-to-second the way position/activity do.
+export function useMapCharacterDetail(characterId: number | null) {
+  return useQuery({
+    queryKey: ["map", "character-detail", characterId],
+    queryFn: () => fetchMapCharacterDetail(characterId as number),
+    enabled: characterId != null,
+    staleTime: 15 * 1000,
+    gcTime: 5 * 60 * 1000,
   });
 }
 
