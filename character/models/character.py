@@ -323,13 +323,6 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
 
     given_name = models.CharField(max_length=50, default="")
     backstory = models.TextField(default="")
-    building = models.ForeignKey(
-        "locations.Building",
-        related_name="residents",
-        blank=True,
-        null=True,
-        on_delete=models.SET_NULL,
-    )
     population_centre = models.ForeignKey(
         "locations.PopulationCentre",
         null=True,
@@ -394,6 +387,16 @@ class Character(LevelProgressionMixin, LifeCycleMixin, Movable):
         """
         link = self.active_link
         return link.player if link else None
+
+    @property
+    def home(self):
+        """The Building from this character's primary HOME CharacterLocation, if any."""
+        from character.models.location import CharacterLocation
+
+        home_location = self.locations.filter(
+            role=CharacterLocation.Role.HOME, is_primary=True
+        ).first()
+        return home_location.location if home_location else None
 
     @property
     def parents(self):

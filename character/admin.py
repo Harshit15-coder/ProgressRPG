@@ -102,7 +102,6 @@ class CharacterAdmin(admin.ModelAdmin):
             {
                 "fields": (
                     "current_node",
-                    "building",
                     "population_centre",
                 )
             },

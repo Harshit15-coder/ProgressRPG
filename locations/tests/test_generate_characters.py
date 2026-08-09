@@ -9,10 +9,18 @@ from django.contrib.gis.geos import Point, Polygon
 from django.core.management import call_command
 from django.test import TestCase
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from locations.management.commands.generate_characters import Command
 from locations.models import Building, PopulationCentre
 from locations.services import population_estimation
+
+
+def _characters_housed_in(building):
+    return Character.objects.filter(
+        locations__location=building,
+        locations__role=CharacterLocation.Role.HOME,
+        locations__is_primary=True,
+    )
 
 
 def _square_footprint(size, x=0, y=0):
@@ -73,7 +81,7 @@ class GenerateForCentreTests(TestCase):
         characters = Character.objects.filter(population_centre=centre)
         self.assertGreater(characters.count(), 0)
         for character in characters:
-            self.assertEqual(character.building, building)
+            self.assertEqual(character.home, building)
 
     def test_no_building_exceeds_its_own_capacity(self):
         # Regression test: home assignment used to be a uniform
@@ -89,7 +97,7 @@ class GenerateForCentreTests(TestCase):
         call_command("generate_characters", centre=centre.id)
 
         for building in (small, large):
-            count = Character.objects.filter(building=building).count()
+            count = _characters_housed_in(building).count()
             self.assertLessEqual(
                 count, population_estimation.residential_capacity(building)
             )
@@ -119,7 +127,7 @@ class AssignHouseholdsToBuildingsTests(TestCase):
 
         for char in household:
             char.refresh_from_db()
-            self.assertEqual(char.building, building)
+            self.assertEqual(char.home, building)
 
     def test_household_larger_than_any_single_building_spills_across_buildings(self):
         centre = self._make_centre()
@@ -135,11 +143,11 @@ class AssignHouseholdsToBuildingsTests(TestCase):
 
         for char in household:
             char.refresh_from_db()
-        self.assertLessEqual(Character.objects.filter(building=small_a).count(), cap_a)
-        self.assertLessEqual(Character.objects.filter(building=small_b).count(), cap_b)
+        self.assertLessEqual(_characters_housed_in(small_a).count(), cap_a)
+        self.assertLessEqual(_characters_housed_in(small_b).count(), cap_b)
         # Combined capacity exactly matches the household, so everyone still
         # ends up housed somewhere - just not all in the same building.
-        self.assertTrue(all(char.building is not None for char in household))
+        self.assertTrue(all(char.home is not None for char in household))
 
     def test_household_exceeding_total_capacity_leaves_remainder_unhoused(self):
         centre = self._make_centre()
@@ -153,5 +161,5 @@ class AssignHouseholdsToBuildingsTests(TestCase):
 
         for char in household:
             char.refresh_from_db()
-        self.assertLessEqual(Character.objects.filter(building=building).count(), cap)
-        self.assertEqual(sum(1 for c in household if c.building is not None), cap)
+        self.assertLessEqual(_characters_housed_in(building).count(), cap)
+        self.assertEqual(sum(1 for c in household if c.home is not None), cap)

@@ -2,7 +2,7 @@ from django.core.management.base import BaseCommand
 from django.contrib.gis.geos import Point
 import random
 
-from character.models import Character
+from character.models import Character, CharacterLocation
 from character.services import relationship_services
 from locations.models import Building, Node
 
@@ -54,9 +54,13 @@ class Command(BaseCommand):
         # Count existing residents so re-running this command tops up housing
         # rather than stacking new residents on top of a prior run's.
         occupancy = {building.id: building.residents.count() for building in buildings}
-        already_housed_ids = {
-            char.id for char in characters if char.building_id in occupancy
-        }
+        already_housed_ids = set(
+            CharacterLocation.objects.filter(
+                role=CharacterLocation.Role.HOME,
+                is_primary=True,
+                location_id__in=occupancy,
+            ).values_list("character_id", flat=True)
+        )
         characters = [char for char in characters if char.id not in already_housed_ids]
         random.shuffle(characters)
 
@@ -136,8 +140,6 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS("Characters have been placed"))
 
     def _evict_excess_residents(self, buildings, max_per_building):
-        from character.models import CharacterLocation
-
         for building in buildings:
             residents = list(building.residents.all())
             excess = len(residents) - max_per_building
@@ -145,9 +147,8 @@ class Command(BaseCommand):
                 continue
 
             for char in random.sample(residents, excess):
-                char.building = None
                 char.population_centre = None
-                char.save(update_fields=["building", "population_centre"])
+                char.save(update_fields=["population_centre"])
                 CharacterLocation.objects.filter(
                     character=char,
                     role=CharacterLocation.Role.HOME,
