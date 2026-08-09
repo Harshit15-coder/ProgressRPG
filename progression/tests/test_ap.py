@@ -1,7 +1,6 @@
 from datetime import timedelta
 from decimal import Decimal
 
-from django.contrib.auth import get_user_model
 from django.test import SimpleTestCase, TestCase
 from django.utils import timezone
 
@@ -9,7 +8,7 @@ from character.models import Character
 from gameplay.models import XpModifier
 from progression import ap
 
-User = get_user_model()
+from users.tests import user_factory
 
 
 class ThresholdForLevelTests(SimpleTestCase):
@@ -130,9 +129,7 @@ class GetMultiplierTests(TestCase):
         self.assertEqual(ap.get_multiplier(self.character), Decimal("2"))
 
     def test_works_for_player_scope_too(self):
-        user = User.objects.create_user(
-            email="ap-test@example.com", password="pass12345"
-        )
+        user = user_factory(with_player=True)
         player = user.player
         XpModifier.objects.create(
             scope=XpModifier.Scope.PLAYER,

@@ -6,6 +6,8 @@ from character.models import Character, CharacterLocation
 from economy.models import FieldCrop, GoodsStock
 from progression.models import ActivityDefinition, CharacterActivity
 
+from users.tests import user_factory
+
 from ..models import Building, LandArea, PopulationCentre, Subzone
 from ..serializers import (
     BuildingFeatureSerializer,
@@ -371,14 +373,11 @@ class PopulationCentreLabelFeatureSerializerTest(TestCase):
 
     def test_reflects_village_points_derived_state(self):
         from character.models import Character, PlayerCharacterLink
-        from users.models import CustomUser
 
         resident = Character.objects.create(
             given_name="Res", population_centre=self.centre
         )
-        user = CustomUser.objects.create_user(
-            email="villager@example.com", password="x"
-        )
+        user = user_factory(with_player=True)
         # Deactivate the auto-assigned link/character so only `resident`
         # (with a controllable link_points via days_linked) counts here.
         for link in PlayerCharacterLink.objects.filter(

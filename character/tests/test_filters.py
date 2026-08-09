@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from character.models import Character, PlayerCharacterLink
 from character.filters import CharacterFilter
-from users.models import CustomUser
+from users.tests import user_factory
 
 
 class CharacterFilterTests(TestCase):
@@ -32,9 +32,7 @@ class CharacterFilterTests(TestCase):
 
         # Create player characters
         # User creation auto-assigns characters, so we need to handle that
-        self.user1 = CustomUser.objects.create_user(
-            email="user1@example.com", password="testpass123"
-        )
+        self.user1 = user_factory(with_player=True)
         # Deactivate auto-assigned character
         auto_links = PlayerCharacterLink.objects.filter(
             player=self.user1.player, is_active=True
@@ -55,9 +53,7 @@ class CharacterFilterTests(TestCase):
             player=self.user1.player, character=self.player_char1, is_active=True
         )
 
-        self.user2 = CustomUser.objects.create_user(
-            email="user2@example.com", password="testpass123"
-        )
+        self.user2 = user_factory(with_player=True)
         # Deactivate auto-assigned character
         auto_links = PlayerCharacterLink.objects.filter(
             player=self.user2.player, is_active=True

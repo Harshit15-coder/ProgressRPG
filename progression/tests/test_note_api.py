@@ -1,26 +1,21 @@
 """API tests for the standalone Notes feature (issue #632)."""
 
-from django.contrib.auth import get_user_model
 from django.urls import reverse
 from rest_framework import status
 from rest_framework.test import APITestCase
 
 from progression.models import Activity, Note, Task
 
-User = get_user_model()
+from users.tests import user_factory
 
 
 class NoteViewSetTests(APITestCase):
     """CRUD, ownership scoping and sanitization on the notes endpoint."""
 
     def setUp(self):
-        self.user = User.objects.create_user(
-            email="note-owner@example.com", password="pass"
-        )
+        self.user = user_factory(with_player=True)
         self.player = self.user.player
-        self.other_user = User.objects.create_user(
-            email="note-intruder@example.com", password="pass"
-        )
+        self.other_user = user_factory(with_player=True)
         self.client.force_authenticate(user=self.user)
 
     def test_create_assigns_requesting_player(self):
