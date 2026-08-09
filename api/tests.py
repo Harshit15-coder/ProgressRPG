@@ -11,9 +11,8 @@ from unittest import skip
 from unittest.mock import patch, MagicMock
 
 from character.models import Character, PlayerCharacterLink
-from core.models import Announcement, PlayerAnnouncementState
+from core.models import Announcement, FeatureFlag, PlayerAnnouncementState
 from progression.models import Activity, PlayerActivity
-from server_management.models import FeatureFlag
 from users.models import CustomUserManager, Player
 
 User = get_user_model()

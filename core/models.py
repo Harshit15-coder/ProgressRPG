@@ -197,6 +197,30 @@ class AnnouncementQuerySet(models.QuerySet):
         return self.filter(is_published=True)
 
 
+class FeatureFlag(models.Model):
+    ACCESS_GROUPS = ["all", "premium", "testers"]
+
+    key = models.CharField(max_length=100, unique=True)
+    access_groups = models.JSONField(
+        default=list,
+        help_text="List of groups that can access this feature: 'all', 'premium', 'testers'.",
+    )
+    description = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ("key",)
+
+    def __str__(self):
+        groups = ", ".join(self.access_groups) if self.access_groups else "no one"
+        return f"{self.key} ({groups})"
+
+    @classmethod
+    def as_dict(cls):
+        return {flag.key: flag.access_groups for flag in cls.objects.all()}
+
+
 class Announcement(models.Model):
     title = models.CharField(max_length=200)
     summary = models.CharField(max_length=300, blank=True)
