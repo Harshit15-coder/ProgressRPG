@@ -14,7 +14,6 @@ export type FeatureFlagValue = AccessGroup[];
 
 /** Known feature flag keys (from src/featureFlags.js) */
 export type FeatureFlagKey =
-  | "activityList"
   | "tasksFeature"
   | "categoriesFeature"
   | "skillsFeature"
