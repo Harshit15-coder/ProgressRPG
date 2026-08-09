@@ -82,7 +82,9 @@ export default function BuildingDetail({
             <List<BuildingDetailResident>
               items={residents}
               className={styles.residentsList}
+              compact
               canSelect={Boolean(onSelectResident)}
+              canHover={Boolean(onSelectResident)}
               onSelect={(resident) => onSelectResident?.(resident.id)}
               renderItem={(resident) => <span>{residentLine(resident)}</span>}
             />
@@ -99,7 +101,9 @@ export default function BuildingDetail({
               <List<BuildingDetailResident>
                 items={workers}
                 className={styles.residentsList}
+                compact
                 canSelect={Boolean(onSelectWorker)}
+                canHover={Boolean(onSelectWorker)}
                 onSelect={(worker) => onSelectWorker?.(worker.id)}
                 renderItem={(worker) => <span>{residentLine(worker)}</span>}
               />
