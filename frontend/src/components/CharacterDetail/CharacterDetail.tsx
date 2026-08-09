@@ -102,6 +102,7 @@ export default function CharacterDetail({
             items={relationshipItems}
             className={styles.relationshipsList}
             canSelect={Boolean(onSelectRelationship)}
+            canHover={Boolean(onSelectRelationship)}
             onSelect={(relationship) => onSelectRelationship?.(relationship.character_id)}
             renderItem={(relationship) => (
               <span>

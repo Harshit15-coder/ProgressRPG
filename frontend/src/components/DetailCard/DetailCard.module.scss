@@ -36,28 +36,6 @@
   }
 }
 
-// A portrait side panel docked to the right edge, instead of a
-// floating centered card - see the `placement` prop comment in
-// DetailCard.tsx for why (Map covers itself otherwise). Only takes effect at
-// `sm` and up; below that it's still the full-width bottom sheet, where a
-// side panel has no room to mean anything.
-.right {
-  @include m.respond-to(sm) {
-    left: auto;
-    right: 0;
-    top: 50%;
-    bottom: auto;
-    transform: translateY(-50%);
-    width: 90%;
-    max-width: min(90vw, 200px);
-    max-height: 75vh;
-    // No dimming overlay behind this variant (it's non-modal - see the
-    // `modal` prop comment in DetailSurface.tsx), so a border is the only
-    // thing separating it from the map underneath.
-    border: 1px solid c.$color-border-primary;
-  }
-}
-
 .header {
   display: flex;
   align-items: center;

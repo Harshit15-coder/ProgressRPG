@@ -44,7 +44,7 @@ import {
   VILLAGE_LABEL_LAYER,
 } from "./layers";
 import { buildVillageSourceData, type WalkerState } from "./sourceData";
-import DetailCard from "../DetailCard/DetailCard";
+import MapDetailCard from "../MapDetailCard/MapDetailCard";
 import CharacterDetail from "../CharacterDetail/CharacterDetail";
 import BuildingDetail from "../BuildingDetail/BuildingDetail";
 import styles from "./Map.module.scss";
@@ -164,6 +164,11 @@ export default function PopulationCentreMap({
   );
 
   const containerRef = useRef<HTMLDivElement>(null);
+  // Passed to MapDetailCard as DetailSurface's portal `container` so the
+  // docked detail panel positions relative to the map itself, not the
+  // viewport (see MapDetailCard.module.scss). State (not a plain ref) so
+  // the value is available for render once the wrapper mounts.
+  const [mapWrapperEl, setMapWrapperEl] = useState<HTMLDivElement | null>(null);
   const mapRef = useRef<MapLibreMap | null>(null);
   const sourceRef = useRef<GeoJSONSource | null>(null);
   const [mapReady, setMapReady] = useState(false);
@@ -825,29 +830,28 @@ export default function PopulationCentreMap({
   }, [detail, characterFeatures, idleCharacterPositions, selectedBuildingFeature]);
 
   return (
-    <div className={styles.mapWrapper}>
+    <div ref={setMapWrapperEl} className={styles.mapWrapper}>
       <div ref={containerRef} className={styles.mapContainer} />
       <div ref={tooltipHostRef} className={styles.tooltipHost} />
       {children && <div className={styles.controlsOverlay}>{children}</div>}
       {detail?.type === "character" && (
-        <DetailCard
+        <MapDetailCard
           open
-          placement="right"
           title={selectedCharacterName}
           onClose={() => setDetail(null)}
           onFlyTo={handleFlyToDetail}
+          container={mapWrapperEl}
         >
           <CharacterDetail
             characterId={detail.id}
             onSelectBuilding={(buildingId) => openDetail({ type: "building", id: buildingId })}
             onSelectRelationship={(characterId) => openDetail({ type: "character", id: characterId })}
           />
-        </DetailCard>
+        </MapDetailCard>
       )}
       {detail?.type === "building" && selectedBuildingFeature && (
-        <DetailCard
+        <MapDetailCard
           open
-          placement="right"
           title={
             (selectedBuildingFeature.properties?.name as string | undefined) ??
             buildingTypeLabel(
@@ -856,6 +860,7 @@ export default function PopulationCentreMap({
           }
           onClose={() => setDetail(null)}
           onFlyTo={handleFlyToDetail}
+          container={mapWrapperEl}
         >
           <BuildingDetail
             buildingType={selectedBuildingFeature.properties?.building_type as string | undefined}
@@ -877,7 +882,7 @@ export default function PopulationCentreMap({
             onSelectResident={(characterId) => openDetail({ type: "character", id: characterId })}
             onSelectWorker={(characterId) => openDetail({ type: "character", id: characterId })}
           />
-        </DetailCard>
+        </MapDetailCard>
       )}
     </div>
   );
