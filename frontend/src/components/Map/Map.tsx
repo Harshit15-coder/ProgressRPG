@@ -639,13 +639,19 @@ export default function PopulationCentreMap({
       <div ref={tooltipHostRef} className={styles.tooltipHost} />
       {children && <div className={styles.controlsOverlay}>{children}</div>}
       {detail?.type === "character" && (
-        <DetailCard open title={selectedCharacterName} onClose={() => setDetail(null)}>
+        <DetailCard
+          open
+          placement="right"
+          title={selectedCharacterName}
+          onClose={() => setDetail(null)}
+        >
           <CharacterDetail characterId={detail.id} />
         </DetailCard>
       )}
       {detail?.type === "building" && selectedBuildingFeature && (
         <DetailCard
           open
+          placement="right"
           title={buildingTypeLabel(
             selectedBuildingFeature.properties?.building_type as string | undefined
           )}

@@ -15,9 +15,20 @@ interface DetailCardProps {
   title: string;
   onClose: () => void;
   children: React.ReactNode;
+  // "center" (default) matches Modal's floating-card layout; "right" docks
+  // the card to the viewport's right edge instead (e.g. Map, where a
+  // centered card would sit on top of the very content it describes).
+  // Both still fall back to the same full-width bottom sheet on mobile.
+  placement?: "center" | "right";
 }
 
-export default function DetailCard({ open, title, onClose, children }: DetailCardProps) {
+export default function DetailCard({
+  open,
+  title,
+  onClose,
+  children,
+  placement = "center",
+}: DetailCardProps) {
   return (
     <DetailSurface
       open={open}
@@ -25,8 +36,9 @@ export default function DetailCard({ open, title, onClose, children }: DetailCar
         if (!next) onClose();
       }}
       title={title}
+      modal={placement !== "right"}
     >
-      <div className={styles.card}>
+      <div className={`${styles.card} ${placement === "right" ? styles.right : ""}`}>
         <div className={styles.header}>
           {/* Plain text, not a heading element - DetailSurface already
               renders an sr-only <h2> with the same text as the dialog's

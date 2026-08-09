@@ -17,6 +17,12 @@ interface DetailSurfaceProps {
    * Dialog to have one for screen reader users. */
   title: string;
   children: React.ReactNode;
+  /** Modal (default): dimming overlay, focus trap, closes on outside click -
+   * the right choice for a card floating over content it obscures. Non-modal
+   * drops all three, so the surface stays open and the page underneath (e.g.
+   * Map) stays fully interactive - for a docked side panel, which is meant
+   * to keep browsing alongside rather than block it. */
+  modal?: boolean;
 }
 
 export default function DetailSurface({
@@ -24,12 +30,18 @@ export default function DetailSurface({
   onOpenChange,
   title,
   children,
+  modal = true,
 }: DetailSurfaceProps) {
   return (
-    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange}>
+    <DialogPrimitive.Root open={open} onOpenChange={onOpenChange} modal={modal}>
       <DialogPrimitive.Portal>
-        <DialogPrimitive.Overlay className={styles.overlay} />
-        <DialogPrimitive.Content className={styles.content}>
+        {modal && <DialogPrimitive.Overlay className={styles.overlay} />}
+        <DialogPrimitive.Content
+          className={styles.content}
+          onInteractOutside={(e) => {
+            if (!modal) e.preventDefault();
+          }}
+        >
           <DialogPrimitive.Title className="sr-only">{title}</DialogPrimitive.Title>
           {children}
         </DialogPrimitive.Content>
