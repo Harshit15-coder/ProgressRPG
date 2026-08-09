@@ -202,6 +202,26 @@ class WatabouImportGraphTest(TestCase):
             ).exists()
         )
 
+    def test_granary_has_no_entrance_node_but_other_buildings_do(self):
+        data = _make_export(districts=None, buildings=[TRADE_BUILDING] * 8)
+        origin = Point(0, 0, srid=3857)
+
+        centre = import_watabou_village(data, name="Granary Entrances", origin=origin)
+
+        granary = centre.buildings.get(building_type="granary")
+        self.assertFalse(
+            Node.objects.filter(
+                building=granary, kind=Node.Kind.BUILDING_ENTRANCE
+            ).exists()
+        )
+
+        self.assertEqual(
+            centre.buildings.exclude(building_type="granary")
+            .exclude(nodes__kind=Node.Kind.BUILDING_ENTRANCE)
+            .count(),
+            0,
+        )
+
     def test_imports_roads_with_width_fallback(self):
         roads = [
             {"type": "LineString", "coordinates": [[0, 0], [10, 0]], "width": 4},

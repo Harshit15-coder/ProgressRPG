@@ -13,7 +13,8 @@ same "just metres, no real georeferencing" convention the rest of
 locations/ already uses (see MAX_BBOX_AREA_SQ_M in locations/utils.py).
 
 This only creates static geometry - PopulationCentre, Building, Road, the
-Node graph's CENTRE/BUILDING/BUILDING_ENTRANCE points, and (if the export
+Node graph's CENTRE/BUILDING points plus BUILDING_ENTRANCE for non-granary
+buildings, and (if the export
 has a "fields" feature) a LandArea/Subzone pair per field polygon. It
 deliberately does not generate Path edges: Path is the movement/pathfinding
 graph and Road is just the drawn street, so wiring the graph is left to the
@@ -72,7 +73,7 @@ def _polygon_area(polygon_coords) -> float:
 
 def _assign_building_types_and_capabilities(
     building_coordinates: list,
-) -> tuple[list[str], dict[int, list[str]]]:
+) -> tuple[list[str], dict[int, list[BuildingCapability.Activity]]]:
     """
     Decide each imported building's building_type, and which
     BuildingCapability activities (if any) it should get - driven by
@@ -117,7 +118,7 @@ def _assign_building_types_and_capabilities(
     plan = settlement_plan(population=estimated_population)
 
     building_types: list[str] = []
-    capabilities_by_index: dict[int, list[str]] = {}
+    capabilities_by_index: dict[int, list[BuildingCapability.Activity]] = {}
 
     if remaining > 0 and plan.recommended_granaries > 0:
         building_types.append("granary")
@@ -310,17 +311,18 @@ def import_watabou_village(data: dict, *, name: str, origin: Point) -> Populatio
                 "location": building.location,
             },
         )
-        entrance_point = compute_building_entrance_point(
-            building.footprint, building.location
-        )
-        Node.objects.get_or_create(
-            building=building,
-            kind=Node.Kind.BUILDING_ENTRANCE,
-            defaults={
-                "name": f"Entrance for {building.name}",
-                "location": entrance_point,
-            },
-        )
+        if building.building_type != "granary":
+            entrance_point = compute_building_entrance_point(
+                building.footprint, building.location
+            )
+            Node.objects.get_or_create(
+                building=building,
+                kind=Node.Kind.BUILDING_ENTRANCE,
+                defaults={
+                    "name": f"Entrance for {building.name}",
+                    "location": entrance_point,
+                },
+            )
 
     for geometry in roads_feature.get("geometries", []):
         if geometry.get("type") != "LineString":

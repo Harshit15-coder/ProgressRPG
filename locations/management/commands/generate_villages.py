@@ -387,17 +387,18 @@ class Command(BaseCommand):
                         "kind": Node.Kind.BUILDING,
                     },
                 )
-                entrance_point = compute_building_entrance_point(
-                    building.footprint, building.location
-                )
-                Node.objects.get_or_create(
-                    building=building,
-                    kind=Node.Kind.BUILDING_ENTRANCE,
-                    defaults={
-                        "name": f"Entrance for {building.name}",
-                        "location": entrance_point,
-                    },
-                )
+                if building.building_type != "granary":
+                    entrance_point = compute_building_entrance_point(
+                        building.footprint, building.location
+                    )
+                    Node.objects.get_or_create(
+                        building=building,
+                        kind=Node.Kind.BUILDING_ENTRANCE,
+                        defaults={
+                            "name": f"Entrance for {building.name}",
+                            "location": entrance_point,
+                        },
+                    )
 
             # Compute-and-log only for now (see population_estimation's
             # module docstring and
